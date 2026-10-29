@@ -12,7 +12,7 @@ O arquivo que você vai usar é o **agriprecisa-X.Y.Z.zip**, entregue pelo Claud
 
 1. Abra *Complementos > Gerenciar e instalar complementos*.
 2. Se o antigo **IDW em grade vetorial** estiver instalado, desinstale-o na aba *Instalados*, para não ficarem dois botões iguais.
-3. Na aba **Instalar a partir do ZIP**, escolha `agriprecisa-1.0.0.zip` e clique em **Instalar complemento**.
+3. Na aba **Instalar a partir do ZIP**, escolha o ZIP da versão mais recente (por exemplo, `agriprecisa-1.0.2.zip`) e clique em **Instalar complemento**.
 4. Confira:
    - o menu *Vetor > AgriPrecisa* com os itens **IDW em grade vetorial...** e **Documentação do AgriPrecisa**;
    - a barra de ferramentas **AgriPrecisa** com o ícone da grade com pontos;
