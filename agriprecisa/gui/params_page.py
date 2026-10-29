@@ -10,21 +10,28 @@ The chosen mode is remembered between runs.
 """
 
 from qgis.PyQt.QtCore import Qt, QTimer
+import numpy as np
+
 from qgis.PyQt.QtWidgets import (
     QWizardPage, QVBoxLayout, QHBoxLayout, QFormLayout, QGridLayout, QLabel, QSlider,
     QDoubleSpinBox, QRadioButton, QButtonGroup, QStackedWidget, QWidget, QGroupBox,
-    QComboBox, QMessageBox,
+    QComboBox, QMessageBox, QCheckBox, QPushButton, QApplication,
 )
-from qgis.core import QgsProject, QgsSettings
+from qgis.core import QgsProject, QgsSettings, QgsGeometry, QgsPointXY
 
 from ..core.idw_math import (
-    snap_extent, sample_density, mean_spacing, power_band, radius_band,
+    snap_extent, sample_density, power_band, radius_band, coverage_distances,
+    select_validation_samples, cross_validate_idw, best_combination,
     STUDENT_POWER_MIN, STUDENT_POWER_MAX, STUDENT_RADIUS_MIN, STUDENT_RADIUS_MAX,
     DEFAULT_RADIUS_MULTIPLE,
 )
 from ..core.pipeline import buffered, extract_points
 from ..i18n import tr, fmt
 from .widgets import WeightCurve, PreviewMap
+from .cv_dialog import CrossValidationDialog, CV_POWERS, CV_MULTIPLES, significant_decimals
+
+SHOW_POINTS_LIMIT = 500   # above this, samples start hidden in the preview
+MIN_VALIDATION = 10
 
 SETTINGS_KEY = "AgriPrecisa/idw_student_mode"
 POWER_TEXT = {"low": "p3_power_low", "mid": "p3_power_mid", "high": "p3_power_high"}
@@ -43,7 +50,9 @@ class ParametersPage(QWizardPage):
         self.setTitle(tr("p3_title"))
         self.setSubTitle(tr("p3_subtitle"))
         self.spacing = None
+        self.typical = None
         self.density = None
+        self.last_cv = None
         self.points_cache = {}
         self.timer = QTimer(self)
         self.timer.setSingleShot(True)
@@ -72,17 +81,31 @@ class ParametersPage(QWizardPage):
         self.spin_px.setDecimals(2)
         self.spin_px.setValue(5.0)
         self.spin_px.setSuffix(" m")
+        self.spin_px.setMaximumWidth(110)
         self.spin_px.valueChanged.connect(self.estimate)
         self.label_estimate = QLabel()
         self.label_estimate.setWordWrap(True)
-        px_form = QFormLayout()
-        px_form.addRow(tr("p3_pixel"), self.spin_px)
+        px_form = QHBoxLayout()
+        px_form.addWidget(QLabel(tr("p3_pixel")))
+        px_form.addWidget(self.spin_px)
+        px_form.addSpacing(12)
+        px_form.addWidget(self.label_estimate, 1)
+
+        self.button_cv = QPushButton(tr("cv_button"))
+        self.button_cv.setToolTip(tr("cv_tip"))
+        self.button_cv.clicked.connect(self.run_cross_validation)
+        self.label_cv = QLabel()
+        self.label_cv.setWordWrap(True)
+        self.label_cv.linkActivated.connect(self.show_more)
+        cv_row = QHBoxLayout()
+        cv_row.addWidget(self.button_cv)
+        cv_row.addWidget(self.label_cv, 1)
 
         layout = QVBoxLayout(self)
         layout.addLayout(mode_row)
         layout.addWidget(self.stack, 1)
+        layout.addLayout(cv_row)
         layout.addLayout(px_form)
-        layout.addWidget(self.label_estimate)
 
         student = QgsSettings().value(SETTINGS_KEY, True, type=bool)
         (self.radio_student if student else self.radio_advanced).setChecked(True)
@@ -107,15 +130,16 @@ class ParametersPage(QWizardPage):
         self.label_p_value = QLabel()
         self.label_p_text = QLabel()
         self.label_p_text.setWordWrap(True)
-        self.label_p_text.setMinimumHeight(48)
+        self.label_p_text.setMinimumHeight(40)
         self.label_p_text.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         self.label_p_text.linkActivated.connect(self.show_more)
         row = QHBoxLayout()
+        row.addWidget(self.label_p_value)
+        row.addSpacing(8)
         row.addWidget(QLabel(fmt(STUDENT_POWER_MIN, 1)))
         row.addWidget(self.slider_p, 1)
         row.addWidget(QLabel(fmt(STUDENT_POWER_MAX, 1)))
         lp = QVBoxLayout(box_p)
-        lp.addWidget(self.label_p_value)
         lp.addLayout(row)
         lp.addWidget(self.label_p_text)
 
@@ -132,7 +156,7 @@ class ParametersPage(QWizardPage):
         self.label_r_value = QLabel()
         self.label_r_text = QLabel()
         self.label_r_text.setWordWrap(True)
-        self.label_r_text.setMinimumHeight(48)
+        self.label_r_text.setMinimumHeight(40)
         self.label_r_text.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         self.label_r_text.linkActivated.connect(self.show_more)
         row = QHBoxLayout()
@@ -160,6 +184,9 @@ class ParametersPage(QWizardPage):
         attr_row = QHBoxLayout()
         attr_row.addWidget(QLabel(tr("p3_preview_attr")))
         attr_row.addWidget(self.combo_attr, 1)
+        self.check_points = QCheckBox(tr("p3_show_samples"))
+        self.check_points.toggled.connect(self.preview.set_show_points)
+        attr_row.addWidget(self.check_points)
         lm.addLayout(attr_row)
         lm.addWidget(self.preview, 1)
 
@@ -200,38 +227,62 @@ class ParametersPage(QWizardPage):
     # ------------------------------------------------------------- lifecycle
     def initializePage(self):
         w = self.wizard()
-        self.compute_spacing()
-        self.label_spacing.setText(
-            tr("p3_spacing", spacing=fmt(self.spacing), density=fmt(self.density, 1))
-            if self.spacing else tr("p3_spacing_none"))
-        self.slider_r.setEnabled(self.spacing is not None)
-
         self.preview.set_boundary(w.boundary_geom)
         self.points_cache = {}
         self.combo_attr.blockSignals(True)
         self.combo_attr.clear()
         for layer, field in w.items:
             self.combo_attr.addItem(f"{field} ({layer.name()})", (layer.id(), field))
+            self.points_for((layer.id(), field))
         self.combo_attr.blockSignals(False)
+
+        self.compute_spacing()
+        self.label_spacing.setText(
+            tr("p3_spacing", spacing=fmt(self.spacing), density=fmt(self.density, 1))
+            if self.spacing else tr("p3_spacing_none"))
+        self.slider_r.setEnabled(self.spacing is not None)
+        self.button_cv.setEnabled(self.spacing is not None)
+        self.label_cv.setText(tr("cv_hint") + "  " + _link("cv_more"))
+
+        n_max = max((self.points_cache[k][2].__len__() for k in self.points_cache), default=0)
+        self.check_points.setChecked(n_max <= SHOW_POINTS_LIMIT)
+        self.preview.set_show_points(self.check_points.isChecked())
         self.load_preview_points()
         self.on_student_changed()
         self.estimate()
 
+    def points_for(self, key):
+        """(xs, ys, zs) of one attribute inside the search area, cached as numpy arrays."""
+        if key not in self.points_cache:
+            w = self.wizard()
+            layer = QgsProject.instance().mapLayer(key[0])
+            rect = buffered(w.boundary_extent, w.tolerance)
+            xs, ys, zs = extract_points(layer, key[1], rect, w.boundary.crs(),
+                                        QgsProject.instance().transformContext())
+            self.points_cache[key] = (np.asarray(xs, float), np.asarray(ys, float),
+                                      np.asarray(zs, float))
+        return self.points_cache[key]
+
     def compute_spacing(self):
-        """Mean spacing of the sparsest selected attribute (inside the field)."""
+        """
+        Coverage distance of the sparsest selected attribute: 95 % of the field pixels are
+        within this distance of a sample. Works for grids and for sensor passes.
+        Also keeps the typical (median) distance, used as the cross-validation exclusion zone.
+        """
         w = self.wizard()
+        px, py = self.preview.cell_centres()
+        self.spacing, self.typical = None, None
+        for key, (xs, ys, _) in self.points_cache.items():
+            typical, cover = coverage_distances(px, py, xs, ys)
+            if cover is not None and (self.spacing is None or cover > self.spacing):
+                self.spacing, self.typical = cover, typical
         densities = []
         for layer, field in w.items:
-            stats = getattr(w, "layer_stats", {}).get(layer.id())
-            if not stats:
-                continue
-            fs = stats["fields"].get(field, {})
-            n = fs.get("inside") or fs.get("used") or 0
-            d = sample_density(n, w.area_ha)
+            fs = getattr(w, "layer_stats", {}).get(layer.id(), {}).get("fields", {}).get(field, {})
+            d = sample_density(fs.get("inside") or fs.get("used") or 0, w.area_ha)
             if d:
                 densities.append(d)
         self.density = min(densities) if densities else None
-        self.spacing = mean_spacing(self.density)
 
     # --------------------------------------------------------------- values
     def is_student(self):
@@ -294,13 +345,7 @@ class ParametersPage(QWizardPage):
         if not data:
             self.preview.set_points([], [], [])
             return
-        if data not in self.points_cache:
-            w = self.wizard()
-            layer = QgsProject.instance().mapLayer(data[0])
-            rect = buffered(w.boundary_extent, w.tolerance)
-            self.points_cache[data] = extract_points(
-                layer, data[1], rect, w.boundary.crs(), QgsProject.instance().transformContext())
-        self.preview.set_points(*self.points_cache[data])
+        self.preview.set_points(*self.points_for(tuple(data)))
 
     def refresh_preview(self):
         self.preview.compute(self.power(), self.radius())
@@ -326,6 +371,72 @@ class ParametersPage(QWizardPage):
         self.label_estimate.setText(text)
         if hasattr(self, "curve"):
             self.update_visuals()
+
+    # ------------------------------------------------------ cross-validation
+    def edge_distances(self, xs, ys):
+        """Distance of each sample to the field border; -1 for samples outside the field."""
+        geom = self.wizard().boundary_geom
+        engine = QgsGeometry.createGeometryEngine(geom.constGet())
+        engine.prepareGeometry()
+        border = QgsGeometry(geom.constGet().boundary())
+        out = np.full(len(xs), -1.0)
+        for k, (x, y) in enumerate(zip(xs, ys)):
+            pt = QgsGeometry.fromPointXY(QgsPointXY(float(x), float(y)))
+            if engine.intersects(pt.constGet()):
+                out[k] = border.distance(pt)
+        return out
+
+    def run_cross_validation(self):
+        data = self.combo_attr.currentData()
+        if not data or not self.spacing:
+            return
+        xs, ys, zs = self.points_for(tuple(data))
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            edge = self.edge_distances(xs, ys)
+            val = select_validation_samples(xs, ys, zs, edge, n_target=60,
+                                            edge_buffer=self.spacing)
+            if len(val) < MIN_VALIDATION:
+                QApplication.restoreOverrideCursor()
+                QMessageBox.warning(self, tr("cv_title"), tr("cv_few", n=len(val), min=MIN_VALIDATION))
+                return
+            radii = np.array(CV_MULTIPLES) * self.spacing
+            exclusion = self.typical or 0.0
+            rmse, cov = cross_validate_idw(xs, ys, zs, val, CV_POWERS, radii, exclusion)
+            best = best_combination(rmse, cov)
+            fine_p = None
+            if best is not None:
+                fine = np.round(np.arange(1.0, 3.0001, 0.1), 1)
+                rf, cf = cross_validate_idw(xs, ys, zs, val, fine, radii[[best[1]]], exclusion)
+                k = best_combination(rf, cf)
+                fine_p = float(fine[k[0]]) if k else float(CV_POWERS[best[0]])
+        finally:
+            if QApplication.overrideCursor() is not None:
+                QApplication.restoreOverrideCursor()
+        if best is None:
+            QMessageBox.warning(self, tr("cv_title"), tr("cv_failed"))
+            return
+        dlg = CrossValidationDialog(
+            self, attribute=self.combo_attr.currentText(), rmse=rmse, coverage=cov,
+            spacing=self.spacing, best=best, best_power=fine_p, n_val=len(val),
+            exclusion=exclusion, mean=float(np.mean(zs[val])))
+        dlg.linkActivated.connect(self.show_more)
+        self.last_cv = dlg.result_summary
+        if dlg.exec():
+            self.apply_cv(fine_p, CV_MULTIPLES[best[1]])
+        self.label_cv.setText(tr("cv_done", p=fmt(fine_p, 1), mult=fmt(CV_MULTIPLES[best[1]], 1),
+                                 radius=fmt(CV_MULTIPLES[best[1]] * self.spacing),
+                                 rmse=fmt(float(rmse[best]), significant_decimals(rmse)))
+                          + "  " + _link("cv_more"))
+
+    def apply_cv(self, power, multiple):
+        if self.is_student():
+            self.slider_p.setValue(int(round(min(max(power, STUDENT_POWER_MIN), STUDENT_POWER_MAX) * 10)))
+            self.slider_r.setValue(int(round(min(max(multiple, STUDENT_RADIUS_MIN), STUDENT_RADIUS_MAX) * 10)))
+        else:
+            self.spin_p.setValue(power)
+            self.spin_r.setValue(round(multiple * self.spacing, 1))
+        self.on_student_changed()
 
     def validatePage(self):
         w = self.wizard()

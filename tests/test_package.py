@@ -54,3 +54,19 @@ def test_regression_no_module_level_main_call():
     # as soon as QGIS imported the plugin.
     for path, text in _sources():
         assert not re.search(r"^main\(\)\s*$", text, re.M), path
+
+
+def test_cv_table_decimals_show_three_significant_digits():
+    # Regression: RMSE values like 0.039 and 0.045 were shown as 0,04 / 0,05 and the
+    # table could not be compared. cv_dialog needs QGIS, so the helper is checked by source.
+    import ast
+    src = open(os.path.join(PLUGIN, "gui", "cv_dialog.py"), encoding="utf-8").read()
+    fn = [n for n in ast.parse(src).body if isinstance(n, ast.FunctionDef) and n.name == "significant_decimals"][0]
+    import math
+    import numpy as np
+    ns = {"math": math}
+    exec(compile(ast.Module([fn], []), "cv", "exec"), ns)
+    f = ns["significant_decimals"]
+    assert f(np.array([0.0391, 0.045])) == 4
+    assert f(np.array([12.3, 40.1])) == 2
+    assert f(np.array([float("nan")])) == 2

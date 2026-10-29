@@ -194,9 +194,15 @@ print("Step 3 page:", p3.title())
 if not p3.radio_student.isChecked():
     errors.append("step 3 should open in student mode by default")
 print("Spacing:", round(p3.spacing, 1), "m; radius:", p3.radius(), "m; P:", p3.power())
-# densities: argila 7/2.5 = 2.8, pH 6/2.5 = 2.4 -> sparsest = 2.4 -> spacing = sqrt(10000/2.4)
-if abs(p3.spacing - (10000 / 2.4) ** 0.5) > 0.01:
-    errors.append("mean spacing should use the sparsest attribute (pH, 2.4 samples/ha)")
+# coverage distance of a ~55 x 50 m grid: between the typical distance and the half diagonal
+if not (p3.typical < p3.spacing < 45):
+    errors.append(f"unexpected coverage distance {p3.spacing:.1f} m (typical {p3.typical:.1f} m)")
+if not p3.check_points.isChecked():
+    errors.append("few samples: preview should start showing the samples")
+p3.check_points.setChecked(False)
+if p3.preview.show_points:
+    errors.append("'Mostrar amostras' did not hide the samples")
+p3.check_points.setChecked(True)
 if abs(p3.radius() - round(2 * p3.spacing, 1)) > 0.05:
     errors.append("default radius should be 2x the spacing")
 p3.slider_p.setValue(30)
@@ -262,6 +268,72 @@ if p3.slider_p.value() != 30:
 p3.validatePage()
 print("Wizard values:", wz.power, wz.radius, wz.pixel)
 wz.hide()
+
+# 3d) Sensor passes (like EC): coverage distance and cross-validation
+import math as _m
+import numpy as _np
+rng = _np.random.default_rng(7)
+ce = QgsVectorLayer("Point?crs=EPSG:31982&field=CE:double", "ce_sensor", "memory")
+cfeats = []
+for yy in _np.arange(5, 150, 15.0):                  # passes every 15 m
+    for xx in _np.arange(-5, 206, 2.0):              # points every 2 m along the pass
+        f2 = QgsFeature(ce.fields())
+        f2.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(X0 + xx, Y0 + yy)))
+        val = 2 + 0.01 * xx + 0.5 * _m.sin(yy / 30.0) + rng.normal(0, 0.05)
+        f2.setAttributes([float(val)])
+        cfeats.append(f2)
+ce.dataProvider().addFeatures(cfeats)
+QgsProject.instance().addMapLayer(ce)
+from agriprecisa.gui import params_page as _pp
+dialogs = []
+_pp.CrossValidationDialog.exec = lambda self: (dialogs.append(self), 1)[1]
+wz2 = idw_wizard.IdwWizard()
+wz2.show()
+q1 = wz2.currentPage()
+q1.combo.setCurrentIndex(q1.combo.findData(boundary.id()))
+q1.edit_folder.setText(tmp)
+wz2.next()
+q2 = wz2.currentPage()
+item_ce = q2.tree.findItems("ce_sensor [EPSG:31982]", Qt.MatchFlag.MatchExactly, 0)[0]
+item_ce.child(0).setCheckState(0, Qt.CheckState.Checked)
+wz2.next()
+q3 = wz2.currentPage()
+n_ce = q3.preview.points[2].size
+density_spacing = (10000 / (q2.wizard().layer_stats[ce.id()]["inside"] / wz2.area_ha)) ** 0.5
+print(f"Sensor: {n_ce} points; density-based spacing {density_spacing:.1f} m; "
+      f"coverage {q3.spacing:.1f} m; typical {q3.typical:.1f} m")
+# passes 15 m apart -> the farthest pixels are ~7.5 m from a pass; density alone says ~5.5 m
+if not (q3.spacing > density_spacing and 6.5 < q3.spacing < 7.6):
+    errors.append("coverage distance should see the 15 m gap between passes (~7 m), not the density spacing")
+if q3.check_points.isChecked():
+    errors.append("many samples: preview should start with samples hidden")
+q3.radio_student.setChecked(True)
+q3.run_cross_validation()
+if not dialogs:
+    errors.append("cross-validation dialog not shown")
+else:
+    dlg = dialogs[-1]
+    print("CV summary:", dlg.result_summary, "| table", dlg.table.rowCount(), "x", dlg.table.columnCount())
+    print("CV label:", q3.label_cv.text()[:80])
+    best_p = dlg.result_summary["power"]
+    if abs(q3.slider_p.value() / 10.0 - best_p) > 1e-6:
+        errors.append("'Aplicar' did not move the P slider to the suggested value")
+    if abs(q3.slider_r.value() / 10.0 - dlg.result_summary["multiple"]) > 1e-6:
+        errors.append("'Aplicar' did not move the radius slider")
+    if "Sugestão" not in q3.label_cv.text() or "0,0391" not in q3.label_cv.text():
+        errors.append("suggestion text missing")
+    shot_cv = os.environ.get("AGRIPRECISA_SHOT_CV")
+    if shot_cv:
+        dlg.show(); app.processEvents()
+        if dlg.table.height() < dlg.table.minimumHeight():
+            errors.append("cross-validation table is cut")
+        dlg.grab().save(shot_cv); dlg.hide()
+q3.refresh_preview(); app.processEvents()
+shot4 = os.environ.get("AGRIPRECISA_SHOT4")
+if shot4:
+    wz2.grab().save(shot4)
+wz2.hide()
+QgsProject.instance().removeMapLayer(ce.id())
 QgsProject.instance().removeMapLayer(geo.id())
 
 # 4) Plugin load/unload through classFactory
