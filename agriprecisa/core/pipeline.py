@@ -107,6 +107,60 @@ def extract_points(source, field, rect, rect_crs, transform_context):
     return xs, ys, zs
 
 
+def boundary_geometry(features):
+    """Union of the boundary geometries (None if there is none)."""
+    geoms = [QgsGeometry(f.geometry()) for f in features
+             if f.geometry() is not None and not f.geometry().isEmpty()]
+    if not geoms:
+        return None
+    geom = QgsGeometry.unaryUnion(geoms) if len(geoms) > 1 else geoms[0]
+    return geom.makeValid() if not geom.isGeosValid() else geom
+
+
+def sample_stats(source, fields, boundary_geom, boundary_crs, search_rect, transform_context):
+    """
+    Count samples of a point layer for the wizard.
+
+    Returns {"inside": n, "used": n, "fields": {name: {"inside": n, "used": n}}}:
+      inside -> points inside the boundary polygon (field values: non-empty numbers)
+      used   -> points inside the search rectangle (boundary + tolerance), i.e. the
+                samples the interpolation will use
+    """
+    src_crs = crs_of(source)
+    ct = None
+    if src_crs != boundary_crs:
+        ct = QgsCoordinateTransform(src_crs, boundary_crs, transform_context)
+    req = QgsFeatureRequest().setFilterRect(
+        rect_to_crs(search_rect, boundary_crs, src_crs, transform_context))
+    req.setSubsetOfAttributes(list(fields), source.fields())
+
+    engine = QgsGeometry.createGeometryEngine(boundary_geom.constGet())
+    engine.prepareGeometry()
+
+    stats = {"inside": 0, "used": 0, "fields": {f: {"inside": 0, "used": 0} for f in fields}}
+    for feat in source.getFeatures(req):
+        geom = feat.geometry()
+        if geom is None or geom.isEmpty():
+            continue
+        geom = QgsGeometry(geom)
+        if ct is not None:
+            geom.transform(ct)
+        if not search_rect.intersects(geom.boundingBox()):
+            continue
+        inside = engine.intersects(geom.constGet())
+        stats["used"] += 1
+        stats["inside"] += int(inside)
+        for f in fields:
+            try:
+                ok = math.isfinite(float(feat[f]))
+            except (TypeError, ValueError):
+                ok = False
+            if ok:
+                stats["fields"][f]["used"] += 1
+                stats["fields"][f]["inside"] += int(inside)
+    return stats
+
+
 def write_geotiff(path, array, xmin, ymax, res, crs):
     nrow, ncol = array.shape
     ds = gdal.GetDriverByName("GTiff").Create(

@@ -47,6 +47,16 @@ def tr(key, **kwargs):
     return text.format(**kwargs) if kwargs else text
 
 
+def fmt(value, decimals=0):
+    """Number in the interface language: 4.969 / 39,8 (pt, es) or 4,969 / 39.8 (en)."""
+    if value is None:
+        return "-"
+    text = f"{value:,.{decimals}f}"  # 4,969.8
+    if current_language() in ("pt", "es"):
+        text = text.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+    return text
+
+
 STRINGS = {
     # ---------------------------------------------------------------- general
     "help": {"pt": "Ajuda", "en": "Help", "es": "Ayuda"},
@@ -182,8 +192,50 @@ STRINGS = {
     "p2_subtitle": {"pt": "Expanda as camadas pelas setas e marque os atributos desejados.",
                     "en": "Expand the layers with the arrows and tick the fields you want.",
                     "es": "Expanda las capas con las flechas y marque los atributos deseados."},
+    "p2_subtitle_area": {
+        "pt": "Talhão: {area} ha. Expanda as camadas pelas setas e marque os atributos desejados.",
+        "en": "Field: {area} ha. Expand the layers with the arrows and tick the fields you want.",
+        "es": "Lote: {area} ha. Expanda las capas con las flechas y marque los atributos deseados."},
+    "p2_count": {"pt": "{n} ({density} amostras/ha)", "en": "{n} ({density} samples/ha)",
+                 "es": "{n} ({density} muestras/ha)"},
+    "p2_tip_count": {
+        "pt": "{inside} amostras com valor dentro do talhão ({density} amostras/ha). Na interpolação "
+              "serão usadas {used}, incluindo as que estão até {tol} m fora do contorno.",
+        "en": "{inside} samples with a value inside the field ({density} samples/ha). Interpolation "
+              "will use {used}, including those up to {tol} m outside the boundary.",
+        "es": "{inside} muestras con valor dentro del lote ({density} muestras/ha). En la interpolación "
+              "se usarán {used}, incluidas las que están hasta {tol} m fuera del contorno."},
     "p2_col_layer": {"pt": "Camada / atributo", "en": "Layer / field", "es": "Capa / atributo"},
-    "p2_col_points": {"pt": "Pontos na área", "en": "Points in area", "es": "Puntos en el área"},
+    "p2_no_crs": {"pt": "sem SRC", "en": "no CRS", "es": "sin SRC"},
+    "p2_tip_ok": {"pt": "{crs}: sistema projetado em metros, pronto para interpolar.",
+                  "en": "{crs}: projected system in metres, ready to interpolate.",
+                  "es": "{crs}: sistema proyectado en metros, listo para interpolar."},
+    "p2_tip_geographic": {
+        "pt": "{crs} é um sistema geográfico (graus). O sistema de coordenadas deverá ser projetado "
+              "para um sistema em metros, por exemplo SIRGAS 2000 / UTM 22S (EPSG:31982). "
+              "Use Vetor > Gerenciar dados > Reprojetar camada.",
+        "en": "{crs} is a geographic system (degrees). The coordinate system must be projected to a "
+              "system in metres, for example a UTM zone. Use Vector > Data Management Tools > "
+              "Reproject Layer.",
+        "es": "{crs} es un sistema geográfico (grados). El sistema de coordenadas deberá proyectarse "
+              "a un sistema en metros, por ejemplo una zona UTM. Use Vectorial > Herramientas de "
+              "gestión de datos > Reproyectar capa."},
+    "p2_tip_not_meters": {
+        "pt": "{crs} é projetado, mas a unidade não é o metro. O sistema de coordenadas deverá ser "
+              "projetado para um sistema em metros, por exemplo SIRGAS 2000 / UTM 22S (EPSG:31982).",
+        "en": "{crs} is projected but its unit is not the metre. The coordinate system must be "
+              "projected to a system in metres, for example a UTM zone.",
+        "es": "{crs} es proyectado, pero su unidad no es el metro. El sistema de coordenadas deberá "
+              "proyectarse a un sistema en metros, por ejemplo una zona UTM."},
+    "p2_tip_invalid": {
+        "pt": "A camada não tem sistema de coordenadas definido. Defina o SRC correto e projete para "
+              "um sistema em metros, por exemplo SIRGAS 2000 / UTM 22S (EPSG:31982).",
+        "en": "The layer has no coordinate system. Set the correct CRS and project it to a system in "
+              "metres, for example a UTM zone.",
+        "es": "La capa no tiene sistema de coordenadas. Defina el SRC correcto y proyéctelo a un "
+              "sistema en metros, por ejemplo una zona UTM."},
+    "p2_col_points": {"pt": "Amostras no talhão (densidade)", "en": "Samples in field (density)",
+                      "es": "Muestras en el lote (densidad)"},
     "expand_all": {"pt": "Expandir tudo", "en": "Expand all", "es": "Expandir todo"},
     "collapse_all": {"pt": "Recolher tudo", "en": "Collapse all", "es": "Contraer todo"},
     "check_all": {"pt": "Marcar tudo", "en": "Check all", "es": "Marcar todo"},
@@ -209,20 +261,49 @@ STRINGS = {
     "help_page2": {
         "pt": "<b>Etapa 2: Camadas de pontos e atributos</b><br><br>"
               "Aparecem apenas as camadas de pontos com amostras dentro do contorno ampliado pela "
-              "tolerância. O número ao lado indica quantos pontos estão nessa área.<br><br>"
+              "tolerância. O cabeçalho mostra a área do talhão em hectares.<br><br>"
+              "<b>Amostras no talhão (densidade):</b> na linha da camada, o número de pontos dentro "
+              "do talhão; na linha de cada atributo, quantos desses pontos têm valor naquele "
+              "atributo. Entre parênteses está a densidade amostral (amostras/ha), que indica o "
+              "quanto a amostragem consegue captar a variabilidade espacial: quanto menor a "
+              "densidade, maior a distância entre amostras e mais suavizado tende a ficar o mapa. "
+              "Passe o cursor sobre o número para ver quantas amostras serão usadas na "
+              "interpolação, incluindo a tolerância.<br><br>"
+              "O código EPSG aparece entre colchetes após o nome de cada camada. O ícone de alerta "
+              "à direita indica que a camada não está em um sistema projetado em metros; passe o "
+              "cursor sobre ele para ver como corrigir.<br><br>"
               "Clique na <b>seta</b> de cada camada para expandir ou recolher os atributos "
               "numéricos e marque os que deseja interpolar. Marcar a camada seleciona todos os "
               "atributos dela.<br><br>"
               "Cada atributo marcado gera um raster interpolado e uma coluna na grade final.",
         "en": "<b>Step 2: Point layers and fields</b><br><br>"
               "Only point layers with samples inside the boundary enlarged by the tolerance are "
-              "listed. The number beside each layer is how many points fall in that area.<br><br>"
+              "listed. The header shows the field area in hectares.<br><br>"
+              "<b>Samples in field (density):</b> on the layer row, the number of points inside the "
+              "field; on each field row, how many of those points have a value for that attribute. "
+              "In brackets is the sampling density (samples/ha), which indicates how well the "
+              "sampling captures spatial variability: the lower the density, the larger the "
+              "distance between samples and the smoother the map tends to be. Hover over the number "
+              "to see how many samples interpolation will use, including the tolerance.<br><br>"
+              "The EPSG code is shown in brackets after each layer name. The warning icon on the "
+              "right means the layer is not in a projected system in metres; hover over it to see "
+              "how to fix it.<br><br>"
               "Click the <b>arrow</b> of each layer to expand or collapse its numeric fields and "
               "tick the ones to interpolate. Ticking a layer selects all of its fields.<br><br>"
               "Each ticked field produces an interpolated raster and a column in the final grid.",
         "es": "<b>Paso 2: Capas de puntos y atributos</b><br><br>"
               "Solo aparecen las capas de puntos con muestras dentro del contorno ampliado por la "
-              "tolerancia. El número al lado indica cuántos puntos hay en esa área.<br><br>"
+              "tolerancia. El encabezado muestra el área del lote en hectáreas.<br><br>"
+              "<b>Muestras en el lote (densidad):</b> en la fila de la capa, el número de puntos "
+              "dentro del lote; en la fila de cada atributo, cuántos de esos puntos tienen valor en "
+              "ese atributo. Entre paréntesis está la densidad de muestreo (muestras/ha), que indica "
+              "cuánto capta el muestreo la variabilidad espacial: cuanto menor la densidad, mayor la "
+              "distancia entre muestras y más suavizado tiende a quedar el mapa. Pase el cursor "
+              "sobre el número para ver cuántas muestras usará la interpolación, incluida la "
+              "tolerancia.<br><br>"
+              "El código EPSG aparece entre corchetes tras el nombre de cada capa. El icono de alerta "
+              "a la derecha indica que la capa no está en un sistema proyectado en metros; pase el "
+              "cursor sobre él para ver cómo corregirlo.<br><br>"
               "Haga clic en la <b>flecha</b> de cada capa para expandir o contraer sus atributos "
               "numéricos y marque los que desea interpolar. Marcar la capa selecciona todos sus "
               "atributos.<br><br>"
@@ -286,15 +367,15 @@ STRINGS = {
                     "en": "Check your choices and click Run.",
                     "es": "Revise sus elecciones y haga clic en Ejecutar."},
     "p4_summary": {
-        "pt": "<b>Contorno:</b> {boundary} ({crs})<br><b>Tolerância:</b> {tol} m<br>"
+        "pt": "<b>Contorno:</b> {boundary} ({crs}), {area} ha<br><b>Tolerância:</b> {tol} m<br>"
               "<b>Pasta de saída:</b> {folder}<br><br><b>Atributos ({n}):</b><ul>{items}</ul>"
               "<b>IDW:</b> P = {power}; raio = {radius}; pixel = {pixel} m<br>"
               "<b>Estilo:</b> graduado, {classes} classes, quebras naturais (Jenks), {ramp}",
-        "en": "<b>Boundary:</b> {boundary} ({crs})<br><b>Tolerance:</b> {tol} m<br>"
+        "en": "<b>Boundary:</b> {boundary} ({crs}), {area} ha<br><b>Tolerance:</b> {tol} m<br>"
               "<b>Output folder:</b> {folder}<br><br><b>Fields ({n}):</b><ul>{items}</ul>"
               "<b>IDW:</b> P = {power}; radius = {radius}; pixel = {pixel} m<br>"
               "<b>Style:</b> graduated, {classes} classes, natural breaks (Jenks), {ramp}",
-        "es": "<b>Contorno:</b> {boundary} ({crs})<br><b>Tolerancia:</b> {tol} m<br>"
+        "es": "<b>Contorno:</b> {boundary} ({crs}), {area} ha<br><b>Tolerancia:</b> {tol} m<br>"
               "<b>Carpeta de salida:</b> {folder}<br><br><b>Atributos ({n}):</b><ul>{items}</ul>"
               "<b>IDW:</b> P = {power}; radio = {radius}; píxel = {pixel} m<br>"
               "<b>Estilo:</b> graduado, {classes} clases, cortes naturales (Jenks), {ramp}"},

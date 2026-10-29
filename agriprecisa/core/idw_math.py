@@ -112,3 +112,10 @@ def idw_grid(xs, ys, zs, xmin, ymax, ncol, nrow, res, power, radius, callback=No
         if callback is not None and callback(end / gx.size) is False:
             return None
     return out.reshape(nrow, ncol)
+
+
+def sample_density(n_samples, area_ha):
+    """Samples per hectare; None when the area is not positive."""
+    if area_ha is None or area_ha <= 0:
+        return None
+    return n_samples / area_ha

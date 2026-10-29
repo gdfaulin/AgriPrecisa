@@ -91,3 +91,10 @@ def test_unique_prefixes_repeated_field_gets_layer_name():
     out = unique_prefixes([("Coleta 2025", "pH"), ("Coleta 2026", "pH"), ("Coleta 2026", "argila")])
     assert out == ["Coleta_2025_pH", "Coleta_2026_pH", "argila"]
     assert len(set(out)) == 3
+
+
+def test_sample_density():
+    from agriprecisa.core.idw_math import sample_density
+    assert sample_density(50, 25.0) == pytest.approx(2.0)
+    assert sample_density(10, 0) is None
+    assert sample_density(10, None) is None
