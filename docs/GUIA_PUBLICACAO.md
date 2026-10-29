@@ -2,10 +2,9 @@
 
 Este guia leva o AgriPrecisa do seu computador até o repositório oficial (plugins.qgis.org), de onde qualquer pessoa poderá instalá-lo pelo próprio QGIS. O caminho principal não usa terminal, tudo é feito pelo navegador e pelo QGIS.
 
-Você vai precisar de dois arquivos:
+> **Atualizações no GitHub são automáticas.** O repositório github.com/gdfaulin/AgriPrecisa já existe, e, a partir da versão 1.0.2, o Claude publica cada nova versão diretamente nele (ramo, testes, pull request e mesclagem). As instruções dessa automação estão no arquivo `CLAUDE.md` do repositório. A Etapa 2 abaixo fica só como registro de como o repositório foi criado. O que continua com você é enviar o ZIP ao plugins.qgis.org (Etapas 3 a 5).
 
-- **agriprecisa-1.0.0.zip**: o complemento, que é o que vai para o repositório do QGIS.
-- **AgriPrecisa-repositorio.zip**: o projeto completo (complemento, testes, licença, README), que vai para o GitHub.
+O arquivo que você vai usar é o **agriprecisa-X.Y.Z.zip**, entregue pelo Claude no chat a cada versão. É o complemento que vai para o repositório do QGIS.
 
 ---
 
@@ -25,7 +24,7 @@ Você vai precisar de dois arquivos:
 
 ---
 
-## Etapa 2. Criar o repositório no GitHub
+## Etapa 2. Criar o repositório no GitHub (já feito)
 
 O repositório do QGIS exige um endereço público com o código (`repository`) e um local para receber relatos de problemas (`tracker`). Os metadados já apontam para **github.com/gdfaulin/AgriPrecisa**.
 
@@ -60,7 +59,7 @@ O repositório do QGIS usa a identidade da OSGeo (Open Source Geospatial Foundat
 ## Etapa 4. Enviar o complemento
 
 1. Em https://plugins.qgis.org, já logado, clique em **Upload a plugin** (https://plugins.qgis.org/plugins/add/).
-2. Escolha `agriprecisa-1.0.0.zip` e envie.
+2. Escolha o ZIP da versão mais recente e envie.
 3. O site valida o pacote automaticamente: nome da pasta, `metadata.txt`, campos obrigatórios, arquivo `LICENSE` e versão única. O pacote já foi conferido contra essas regras.
 4. A primeira versão fica **aguardando aprovação** de um membro da equipe do QGIS. O prazo costuma ser de alguns dias. Você recebe um e-mail quando for aprovada.
 5. Depois de aprovada, qualquer pessoa encontra o AgriPrecisa em *Complementos > Gerenciar e instalar complementos > Tudo*.
@@ -69,19 +68,29 @@ O repositório do QGIS usa a identidade da OSGeo (Open Source Geospatial Foundat
 
 ## Etapa 5. Publicar novas versões
 
-Cada envio precisa de um número de versão **novo**. Use a lógica `maior.menor.correção`:
+Cada envio precisa de um número de versão **novo**, no formato `maior.menor.correção`:
 
-- `1.0.1`: correção de erro;
+- `1.0.3`: correção de erro ou ajuste pequeno;
 - `1.1.0`: nova ferramenta ou nova opção;
 - `2.0.0`: mudança grande, que altera o funcionamento.
 
-Para cada nova versão:
+**O que o Claude faz automaticamente** quando você pede uma alteração e diz para publicar:
 
-1. Altere `version=` em `agriprecisa/metadata.txt`.
-2. Acrescente uma linha no campo `changelog=` do mesmo arquivo e no `CHANGELOG.md`.
-3. Gere o novo ZIP (peça para mim ou use a Etapa 6).
-4. Envie em plugins.qgis.org, na página do AgriPrecisa, botão **Add version**.
-5. Atualize os arquivos no GitHub.
+1. aumenta a versão e registra a mudança no histórico (`metadata.txt` e `CHANGELOG.md`);
+2. roda os testes automáticos e o teste completo dentro do QGIS;
+3. gera o ZIP e testa o ZIP final;
+4. publica no GitHub: cria um ramo, envia, abre um *pull request* (pedido de inclusão) e o mescla no ramo principal;
+5. envia o ZIP para você no chat.
+
+**O que você faz:**
+
+1. Instala o ZIP no seu QGIS e confere (Etapa 1).
+2. Entra em https://plugins.qgis.org, abre a página do AgriPrecisa e clica em **Add version**.
+3. Escolhe o ZIP e envia.
+
+Para pedir ao Claude, basta algo como: *"Publique a nova versão do AgriPrecisa no GitHub."*
+
+> O GitHub não permite que o Claude crie a página de *release* (versão para download) nesta configuração. Isso não afeta a publicação: o código fica no GitHub e o ZIP vai para o plugins.qgis.org.
 
 ---
 
