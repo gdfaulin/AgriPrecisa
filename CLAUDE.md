@@ -6,8 +6,19 @@ Complemento do QGIS com ferramentas de agricultura de precisão, de Gustavo Di C
 
 - Responder sempre em português do Brasil, em linguagem clara, sem travessões.
 - O autor não é programador. **O Claude cuida de todo o git e do GitHub**; não pedir que ele rode comandos. Quando algo exigir ação dele (por exemplo, enviar o ZIP ao plugins.qgis.org), explicar passo a passo, pelo navegador.
-- Perguntas de esclarecimento em formato de opções clicáveis.
+- **Sempre fazer perguntas antes de implementar**, em formato de opções clicáveis, para entender as expectativas do autor e para sugerir melhorias. Mesmo quando o pedido parecer claro, perguntar sobre alternativas, detalhes de comportamento e melhorias possíveis antes de alterar o código.
 - Regra permanente: **todo bug corrigido ganha um teste de regressão** (em `tests/` ou em `tests/integration/run_qgis_integration.py`).
+
+## Propósito didático (vale para todos os complementos do autor)
+
+Os complementos são usados em aula (por exemplo, Laboratório de Agricultura de Precisão) e devem **facilitar operações complexas que o autor ensina em sala**, para que os alunos assimilem os conceitos enquanto usam a ferramenta. Por isso:
+
+- Interfaces visuais e autoexplicativas: controles como barras deslizantes, gráficos e prévias ajudam mais que campos numéricos soltos.
+- Cada parâmetro técnico vem acompanhado de uma explicação curta, em linguagem simples, do que ele faz e de quando usar cada valor (por exemplo, potência do IDW, raio de busca, tamanho do pixel).
+- Mostrar números que ajudam a interpretar o resultado (área, densidade amostral, quantidade de amostras usadas) e avisos claros quando algo está errado (SRC fora de metros).
+- Botão de Ajuda em toda janela, explicando o conceito por trás da etapa, não só os campos.
+- Seguir o layout e o padrão das ferramentas nativas do QGIS, para o aluno reconhecer a interface.
+- Ao propor uma mudança, avaliar e comentar como ela ajuda (ou atrapalha) o entendimento dos alunos.
 
 ## Estrutura
 
