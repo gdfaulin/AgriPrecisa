@@ -33,7 +33,7 @@ class CrossValidationDialog(QDialog):
                  n_val, exclusion, mean, map_coverage=None):
         super().__init__(parent)
         self.setWindowTitle(tr("cv_title"))
-        self.resize(700, 540)
+        self.resize(720, 620)
         i, j = best
         best_rmse = float(rmse[i, j])
         pct = abs(best_rmse / mean * 100) if mean else float("nan")

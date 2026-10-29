@@ -367,7 +367,7 @@ class IdwWizard(QWizard):
         self.setButtonText(QWizard.WizardButton.FinishButton, tr("run"))
         self.setButtonText(QWizard.WizardButton.CancelButton, tr("cancel"))
         self.setMinimumSize(880, 680)
-        self.resize(1000, 880)
+        self.resize(1140, 880)
 
         self.boundary = None
         self.selected_only = False

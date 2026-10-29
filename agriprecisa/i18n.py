@@ -345,13 +345,12 @@ STRINGS = {
               "variabilidade mudam de um atributo para outro. Escolha o atributo no topo; as barras, "
               "a curva e a prévia passam a valer para ele. A tabela mostra os parâmetros de todos e a "
               "origem de cada um (padrão, automático ou manual).<br><br>"
-              "<b>Layout Didático:</b> barras deslizantes com explicações que mudam conforme o valor, a "
-              "curva de peso × distância e uma prévia do mapa com os seus dados. Mova as barras e "
-              "observe como o mapa muda. Os links <i>Saiba mais</i> trazem a explicação técnica.<br>"
-              "<b>Layout Padrão:</b> campos numéricos livres, com P acima de 3 e raio sem limite. "
-              "O modo escolhido fica salvo para a próxima vez.<br><br>"
+              "<b>Barras deslizantes:</b> P de 0,5 a 5,0 e raio de 1× a 6× a distância de cobertura, "
+              "com explicações que mudam conforme o valor. Mova as barras e observe a curva de peso, "
+              "a influência de cada vizinha e a prévia do mapa. Os links <i>Saiba mais</i> trazem a "
+              "explicação técnica.<br><br>"
               "<b>Potência P:</b> quanto maior, mais rápido o peso cai com a distância.<br>"
-              "<b>Raio de busca:</b> no Layout Didático, é definido em múltiplos da distância de "
+              "<b>Raio de busca:</b> é definido em múltiplos da distância de "
               "cobertura (distância que cobre 95% do talhão); o valor em metros aparece acima da "
               "barra.<br>"
               "<b>Ajuste automático / para todos:</b> a validação cruzada testa combinações e indica, "
@@ -366,13 +365,12 @@ STRINGS = {
               "variability change from one attribute to another. Choose the attribute at the top; "
               "the sliders, curve and preview then apply to it. The table shows the parameters of all "
               "attributes and where each came from (default, auto-fit or manual).<br><br>"
-              "<b>Teaching layout:</b> sliders with explanations that change with the value, the "
-              "weight × distance curve and a map preview with your data. Move the sliders and "
-              "watch the map change. The <i>Learn more</i> links give the technical explanation.<br>"
-              "<b>Standard layout:</b> free numeric fields, with P above 3 and unlimited radius. "
-              "The chosen mode is remembered.<br><br>"
+              "<b>Sliders:</b> P from 0.5 to 5.0 and radius from 1× to 6× the coverage distance, with "
+              "explanations that change with the value. Move the sliders and watch the weight curve, "
+              "the influence of each neighbour and the map preview. The <i>Learn more</i> links give the "
+              "technical explanation.<br><br>"
               "<b>Power P:</b> the higher it is, the faster the weight falls with distance.<br>"
-              "<b>Search radius:</b> in the teaching layout it is set in multiples of the coverage "
+              "<b>Search radius:</b> it is set in multiples of the coverage "
               "distance (distance covering 95% of the field); the value in metres is shown above "
               "the slider.<br>"
               "<b>Auto-fit / Auto-fit all:</b> cross-validation tests combinations and points "
@@ -386,14 +384,12 @@ STRINGS = {
               "variabilidad cambian de un atributo a otro. Elija el atributo arriba; las barras, la "
               "curva y la vista previa pasan a valer para él. La tabla muestra los parámetros de todos "
               "y el origen de cada uno (por defecto, automático o manual).<br><br>"
-              "<b>Diseño didáctico:</b> barras deslizantes con explicaciones que cambian con el "
-              "valor, la curva peso × distancia y una vista previa del mapa con sus datos. Mueva "
-              "las barras y observe cómo cambia el mapa. Los enlaces <i>Saber más</i> traen la "
-              "explicación técnica.<br>"
-              "<b>Diseño estándar:</b> campos numéricos libres, con P mayor que 3 y radio sin límite. "
-              "El modo elegido se recuerda.<br><br>"
+              "<b>Barras deslizantes:</b> P de 0,5 a 5,0 y radio de 1× a 6× la distancia de cobertura, "
+              "con explicaciones que cambian con el valor. Mueva las barras y observe la curva de peso, "
+              "la influencia de cada vecina y la vista previa. Los enlaces <i>Saber más</i> traen la "
+              "explicación técnica.<br><br>"
               "<b>Potencia P:</b> cuanto mayor, más rápido cae el peso con la distancia.<br>"
-              "<b>Radio de búsqueda:</b> en el diseño didáctico se define en múltiplos de la distancia de "
+              "<b>Radio de búsqueda:</b> se define en múltiplos de la distancia de "
               "cobertura (distancia que cubre el 95% del lote); el valor en metros aparece sobre la "
               "barra.<br>"
               "<b>Ajuste automático / para todos:</b> la validación cruzada prueba combinaciones e "
@@ -402,21 +398,6 @@ STRINGS = {
               "<b>Tamaño del píxel:</b> lado de cada píxel y de cada celda de la cuadrícula final. "
               "Por defecto 5 m."},
     "learn_more": {"pt": "Saiba mais", "en": "Learn more", "es": "Saber más"},
-    "p3_mode": {"pt": "Modo:", "en": "Mode:", "es": "Modo:"},
-    "p3_mode_student": {"pt": "Layout Didático", "en": "Teaching layout", "es": "Diseño didáctico"},
-    "p3_mode_advanced": {"pt": "Layout Padrão", "en": "Standard layout", "es": "Diseño estándar"},
-    "p3_mode_student_tip": {
-        "pt": "Barras deslizantes com explicações, curva peso × distância e prévia do mapa. Ideal para aulas.",
-        "en": "Sliders with explanations, weight × distance curve and map preview. Ideal for classes.",
-        "es": "Barras deslizantes con explicaciones, curva peso × distancia y vista previa. Ideal para clases."},
-    "p3_mode_advanced_tip": {
-        "pt": "Campos numéricos livres, com P acima de 3 e raio sem limite.",
-        "en": "Free numeric fields, with P above 3 and unlimited radius.",
-        "es": "Campos numéricos libres, con P mayor que 3 y radio sin límite."},
-    "p3_advanced_note": {
-        "pt": "No Layout Padrão é possível usar P acima de 3 e raio sem limite (0).",
-        "en": "The standard layout allows P above 3 and an unlimited radius (0).",
-        "es": "El diseño estándar permite P mayor que 3 y radio sin límite (0)."},
     "p3_power_group": {"pt": "Potência (P)", "en": "Power (P)", "es": "Potencia (P)"},
     "p3_power_value": {"pt": "P = {p}", "en": "P = {p}", "es": "P = {p}"},
     "p3_power_low": {
@@ -500,11 +481,11 @@ STRINGS = {
         "es": "Distancia de cobertura: el 95% del lote está a menos de {spacing} m de una muestra "
               "({density} muestras/ha)."},
     "p3_spacing_none": {
-        "pt": "Não foi possível estimar o espaçamento entre amostras. Use o Layout Padrão para "
-              "definir o raio em metros.",
-        "en": "The sample spacing could not be estimated. Use the standard layout to set the radius in metres.",
-        "es": "No se pudo estimar el espaciamiento entre muestras. Use el diseño estándar para definir "
-              "el radio en metros."},
+        "pt": "Não foi possível medir a distância de cobertura deste atributo; o raio fica fixo em 100 m. "
+              "Verifique se há amostras dentro do talhão.",
+        "en": "The coverage distance of this attribute could not be measured; the radius stays at 100 m. Check that there are samples inside the field.",
+        "es": "No se pudo medir la distancia de cobertura de este atributo; el radio queda en 100 m. "
+              "Verifique que haya muestras dentro del lote."},
     "p3_radius_value": {"pt": "Raio = {mult} × {spacing} m = {radius} m",
                         "en": "Radius = {mult} × {spacing} m = {radius} m",
                         "es": "Radio = {mult} × {spacing} m = {radius} m"},
@@ -562,13 +543,85 @@ STRINGS = {
               "Radios menores dejan huecos; radios mayores suavizan y hacen el cálculo más lento. En "
               "investigación, el alcance del semivariograma es una buena referencia.<br><br>"
               "Con varios atributos marcados, vale el de muestreo más disperso."},
-    "p3_curve_group": {"pt": "Peso das amostras × distância", "en": "Sample weight × distance",
-                       "es": "Peso de las muestras × distancia"},
-    "p3_curve_x": {"pt": "distância até a amostra", "en": "distance to the sample",
-                   "es": "distancia a la muestra"},
-    "p3_curve_y": {"pt": "peso", "en": "weight", "es": "peso"},
+    "p3_curve_ref_point": {"pt": "1 = distância típica ({d} m)", "en": "1 = typical distance ({d} m)",
+                           "es": "1 = distancia típica ({d} m)"},
+    "p3_curve_tip": {
+        "pt": "Peso 1/d^P relativo ao de uma amostra na distância típica entre um pixel e a amostra mais "
+              "próxima. Perto da amostra o peso tende ao infinito, por isso o eixo é cortado em 4.",
+        "en": "Weight 1/d^P relative to a sample at the typical distance between a pixel and its nearest "
+              "sample. Near the sample the weight tends to infinity, so the axis is cut at 4.",
+        "es": "Peso 1/d^P relativo al de una muestra a la distancia típica entre un píxel y su muestra más "
+              "cercana. Cerca de la muestra el peso tiende al infinito, por eso el eje se corta en 4."},
+    "p3_bars_tip": {
+        "pt": "Parte de cada amostra (λ = w / Σw) no valor de um pixel típico do talhão. As partes somam 100%.",
+        "en": "Share of each sample (λ = w / Σw) in the value of a typical pixel of the field. Shares add up to 100%.",
+        "es": "Parte de cada muestra (λ = w / Σw) en el valor de un píxel típico del lote. Las partes suman 100%."},
+    "p3_bars_title": {"pt": "Influência no pixel típico", "en": "Influence on a typical pixel",
+                      "es": "Influencia en el píxel típico"},
+    "p3_bars_row": {"pt": "{k}ª ({d} m)", "en": "#{k} ({d} m)", "es": "{k}.ª ({d} m)"},
+    "p3_bars_rest": {"pt": "outras {n}", "en": "other {n}", "es": "otras {n}"},
+    "p3_bars_total": {"pt": "{n} no raio = 100%", "en": "{n} in radius = 100%",
+                      "es": "{n} en el radio = 100%"},
+    "p3_bars_empty": {"pt": "Nenhuma amostra dentro do raio no pixel típico. Aumente o raio.",
+                      "en": "No sample within the radius at the typical pixel. Increase the radius.",
+                      "es": "Ninguna muestra dentro del radio en el píxel típico. Aumente el radio."},
+    "p3_weight_more": {
+        "pt": "<b>Como o IDW calcula os pesos</b> (Shepard, 1968)<br><br>"
+              "Cada amostra i recebe o peso <b>w<sub>i</sub> = 1 / d<sub>i</sub><sup>P</sup></b>, em que "
+              "d<sub>i</sub> é a distância entre o pixel e a amostra. O valor do pixel é a média "
+              "ponderada <b>ẑ = Σ w<sub>i</sub> z<sub>i</sub> / Σ w<sub>i</sub></b>. Assim, o que "
+              "conta é a fatia de cada amostra, <b>λ<sub>i</sub> = w<sub>i</sub> / Σ w<sub>j</sub></b>, "
+              "e as fatias somam 100%.<ul>"
+              "<li><b>Perto da amostra</b> o peso cresce sem limite: um pixel exatamente sobre uma "
+              "amostra recebe o valor dela (o IDW é um interpolador exato). Por isso o eixo do "
+              "gráfico é cortado.</li>"
+              "<li><b>A curva</b> mostra o peso relativo ao de uma amostra na distância típica entre "
+              "um pixel e a amostra mais próxima do seu talhão: vale 1 nesse ponto. Com P maior, ela "
+              "cai mais rápido, e as amostras distantes perdem importância.</li>"
+              "<li><b>As barras</b> mostram, num pixel típico do talhão, a fatia de cada amostra "
+              "dentro do raio. Mova a barra do P e veja a influência se concentrar na mais próxima "
+              "(P alto) ou se distribuir entre as vizinhas (P baixo).</li></ul>"
+              "Referência: Shepard, D. (1968). A two-dimensional interpolation function for "
+              "irregularly-spaced data. <i>Proceedings of the 23rd ACM National Conference</i>, 517-524.",
+        "en": "<b>How IDW computes the weights</b> (Shepard, 1968)<br><br>"
+              "Each sample i gets the weight <b>w<sub>i</sub> = 1 / d<sub>i</sub><sup>P</sup></b>, where "
+              "d<sub>i</sub> is the distance between the pixel and the sample. The pixel value is the "
+              "weighted mean <b>ẑ = Σ w<sub>i</sub> z<sub>i</sub> / Σ w<sub>i</sub></b>. So what matters "
+              "is each sample's share, <b>λ<sub>i</sub> = w<sub>i</sub> / Σ w<sub>j</sub></b>, and the "
+              "shares add up to 100%.<ul>"
+              "<li><b>Near the sample</b> the weight grows without limit: a pixel exactly on a sample "
+              "takes its value (IDW is an exact interpolator). That is why the chart axis is cut.</li>"
+              "<li><b>The curve</b> shows the weight relative to a sample at the typical distance "
+              "between a pixel and its nearest sample in your field: it equals 1 there. With a higher "
+              "P it falls faster and distant samples lose importance.</li>"
+              "<li><b>The bars</b> show, for a typical pixel of the field, the share of each sample "
+              "within the radius. Move the P slider and watch the influence concentrate on the "
+              "nearest sample (high P) or spread among neighbours (low P).</li></ul>"
+              "Reference: Shepard, D. (1968). A two-dimensional interpolation function for "
+              "irregularly-spaced data. <i>Proceedings of the 23rd ACM National Conference</i>, 517-524.",
+        "es": "<b>Cómo calcula el IDW los pesos</b> (Shepard, 1968)<br><br>"
+              "Cada muestra i recibe el peso <b>w<sub>i</sub> = 1 / d<sub>i</sub><sup>P</sup></b>, donde "
+              "d<sub>i</sub> es la distancia entre el píxel y la muestra. El valor del píxel es el "
+              "promedio ponderado <b>ẑ = Σ w<sub>i</sub> z<sub>i</sub> / Σ w<sub>i</sub></b>. Así, lo que "
+              "cuenta es la parte de cada muestra, <b>λ<sub>i</sub> = w<sub>i</sub> / Σ w<sub>j</sub></b>, "
+              "y las partes suman 100%.<ul>"
+              "<li><b>Cerca de la muestra</b> el peso crece sin límite: un píxel exactamente sobre una "
+              "muestra recibe su valor (el IDW es un interpolador exacto). Por eso el eje del gráfico "
+              "está cortado.</li>"
+              "<li><b>La curva</b> muestra el peso relativo al de una muestra a la distancia típica "
+              "entre un píxel y su muestra más cercana en su lote: vale 1 en ese punto. Con P mayor "
+              "cae más rápido y las muestras lejanas pierden importancia.</li>"
+              "<li><b>Las barras</b> muestran, en un píxel típico del lote, la parte de cada muestra "
+              "dentro del radio. Mueva la barra de P y vea la influencia concentrarse en la más "
+              "cercana (P alto) o repartirse entre las vecinas (P bajo).</li></ul>"
+              "Referencia: Shepard, D. (1968). A two-dimensional interpolation function for "
+              "irregularly-spaced data. <i>Proceedings of the 23rd ACM National Conference</i>, 517-524."},
+    "p3_curve_group": {"pt": "Peso das amostras (IDW)", "en": "Sample weights (IDW)",
+                       "es": "Peso de las muestras (IDW)"},
+    "p3_curve_x": {"pt": "distância até a amostra (m)", "en": "distance to the sample (m)",
+                   "es": "distancia a la muestra (m)"},
+    "p3_curve_y": {"pt": "peso relativo", "en": "relative weight", "es": "peso relativo"},
     "p3_curve_radius": {"pt": "raio", "en": "radius", "es": "radio"},
-    "p3_curve_ref": {"pt": "P = 1 e P = 3", "en": "P = 1 and P = 3", "es": "P = 1 y P = 3"},
     "p3_preview_group": {"pt": "Prévia do mapa", "en": "Map preview", "es": "Vista previa del mapa"},
     "p3_preview_attr": {"pt": "Atributo:", "en": "Attribute:", "es": "Atributo:"},
     "p3_attribute": {"pt": "Atributo:", "en": "Attribute:", "es": "Atributo:"},

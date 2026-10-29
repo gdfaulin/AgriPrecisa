@@ -7,9 +7,9 @@ power P and search radius. The attribute selector at the top drives the sliders,
 weight x distance curve and the map preview; a summary table lists P, radius and origin
 (default, cross-validation or manual) of every attribute.
 
-Student mode (default, remembered): sliders P 1.0 to 3.0 (step 0.1) and radius 1x to 4x
-the attribute's coverage distance, with simple explanations and "Learn more" links.
-Advanced mode: free numeric fields (P above 3, radius 0 = no limit).
+Single teaching layout: sliders P 0.5 to 5.0 (step 0.1) and radius 1x to 6x the attribute's
+coverage distance, with simple explanations and "Learn more" links; weight curve and the
+share of each neighbour in a typical pixel (Shepard, 1968); live map preview.
 """
 
 import numpy as np
@@ -18,23 +18,22 @@ from qgis.PyQt.QtCore import Qt, QTimer, QCoreApplication
 from qgis.PyQt.QtGui import QFont
 from qgis.PyQt.QtWidgets import (
     QWizardPage, QVBoxLayout, QHBoxLayout, QFormLayout, QGridLayout, QLabel, QSlider,
-    QDoubleSpinBox, QRadioButton, QButtonGroup, QStackedWidget, QWidget, QGroupBox,
+    QDoubleSpinBox, QWidget, QGroupBox,
     QComboBox, QMessageBox, QCheckBox, QPushButton, QApplication, QTableWidget,
     QTableWidgetItem, QAbstractItemView, QHeaderView, QProgressDialog, QScrollArea, QFrame,
 )
-from qgis.core import QgsProject, QgsSettings
+from qgis.core import QgsProject
 
 from ..core.idw_math import (
     snap_extent, sample_density, power_band, radius_band, coverage_distances,
-    suggest_parameters, STUDENT_POWER_MIN, STUDENT_POWER_MAX, STUDENT_RADIUS_MIN,
+    suggest_parameters, typical_pixel_neighbours, STUDENT_POWER_MIN, STUDENT_POWER_MAX, STUDENT_RADIUS_MIN,
     STUDENT_RADIUS_MAX, DEFAULT_RADIUS_MULTIPLE, CV_MIN_VALIDATION,
 )
 from ..core.pipeline import buffered, extract_points, edge_distances
 from ..i18n import tr, fmt
-from .widgets import WeightCurve, PreviewMap
+from .widgets import WeightCurve, PreviewMap, InfluenceBars
 from .cv_dialog import CrossValidationDialog, significant_decimals
 
-SETTINGS_KEY = "AgriPrecisa/idw_student_mode"
 POWER_TEXT = {"low": "p3_power_low", "mid": "p3_power_mid", "high": "p3_power_high"}
 RADIUS_TEXT = {"short": "p3_radius_short", "ok": "p3_radius_ok", "long": "p3_radius_long"}
 ORIGIN_TEXT = {"default": "origin_default", "cv": "origin_cv", "manual": "origin_manual"}
@@ -70,35 +69,34 @@ class ParametersPage(QWizardPage):
         self.timer.setInterval(150)
         self.timer.timeout.connect(self.refresh_preview)
 
-        # ---- top row: mode and attribute --------------------------------
-        self.radio_student = QRadioButton(tr("p3_mode_student"))
-        self.radio_advanced = QRadioButton(tr("p3_mode_advanced"))
-        self.radio_student.setToolTip(tr("p3_mode_student_tip"))
-        self.radio_advanced.setToolTip(tr("p3_mode_advanced_tip"))
-        group = QButtonGroup(self)
-        group.addButton(self.radio_student)
-        group.addButton(self.radio_advanced)
+        # ---- top row: attribute ----------------------------------------------
         self.combo_attr = QComboBox()
-        self.combo_attr.setMinimumWidth(240)
+        self.combo_attr.setMinimumWidth(260)
         self.combo_attr.currentIndexChanged.connect(self.on_attr_changed)
         top = QHBoxLayout()
-        top.addWidget(QLabel(tr("p3_mode")))
-        top.addWidget(self.radio_student)
-        top.addWidget(self.radio_advanced)
-        top.addStretch()
         top.addWidget(QLabel("<b>" + tr("p3_attribute") + "</b>"))
         top.addWidget(self.combo_attr)
+        top.addStretch()
 
         # ---- left column: power / radius (stack) and summary --------------
-        self.stack = QStackedWidget()
-        self.stack.addWidget(self._build_student())
-        self.stack.addWidget(self._build_advanced())
+        self.controls = self._build_student()
         box_s = self._build_summary()
 
         # ---- right column: curve and preview -------------------------------
         box_c = QGroupBox(tr("p3_curve_group"))
         self.curve = WeightCurve()
-        QVBoxLayout(box_c).addWidget(self.curve)
+        self.bars = InfluenceBars()
+        self.label_bars = QLabel("<b>" + tr("p3_bars_title") + "</b>")
+        self.label_bars.setWordWrap(True)
+        more_w = QLabel(_link("p3_weight_more"))
+        more_w.linkActivated.connect(self.show_more)
+        bars_col = QVBoxLayout()
+        bars_col.addWidget(self.label_bars)
+        bars_col.addWidget(self.bars, 1)
+        bars_col.addWidget(more_w, 0, Qt.AlignmentFlag.AlignRight)
+        lc = QHBoxLayout(box_c)
+        lc.addWidget(self.curve, 3)
+        lc.addLayout(bars_col, 2)
         box_m = QGroupBox(tr("p3_preview_group"))
         self.preview = PreviewMap()
         self.preview.setToolTip(tr("p3_preview_note"))
@@ -109,12 +107,12 @@ class ParametersPage(QWizardPage):
         lm.addWidget(self.preview, 1)
 
         grid = QGridLayout()
-        grid.addWidget(self.stack, 0, 0)
+        grid.addWidget(self.controls, 0, 0)
         grid.addWidget(box_s, 1, 0)
         grid.addWidget(box_c, 0, 1)
         grid.addWidget(box_m, 1, 1)
-        grid.setColumnStretch(0, 1)
-        grid.setColumnStretch(1, 1)
+        grid.setColumnStretch(0, 4)
+        grid.setColumnStretch(1, 5)
         grid.setRowStretch(1, 1)
 
         # ---- pixel size (all attributes) ------------------------------------
@@ -144,17 +142,12 @@ class ParametersPage(QWizardPage):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         scroll.setWidget(content)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(scroll)
         self.scroll = scroll
-
-        student = QgsSettings().value(SETTINGS_KEY, True, type=bool)
-        (self.radio_student if student else self.radio_advanced).setChecked(True)
-        self.stack.setCurrentIndex(0 if student else 1)
-        self.radio_student.toggled.connect(self.on_mode_changed)
 
     # ------------------------------------------------------------------ build
     def _build_student(self):
@@ -193,7 +186,7 @@ class ParametersPage(QWizardPage):
         self.slider_r.setRange(int(STUDENT_RADIUS_MIN * 10), int(STUDENT_RADIUS_MAX * 10))
         self.slider_r.setValue(int(DEFAULT_RADIUS_MULTIPLE * 10))
         self.slider_r.setTickPosition(QSlider.TickPosition.TicksBelow)
-        self.slider_r.setTickInterval(5)
+        self.slider_r.setTickInterval(10)
         self.slider_r.setPageStep(5)
         self.label_r_value = QLabel()
         self.label_r_text = QLabel()
@@ -216,31 +209,6 @@ class ParametersPage(QWizardPage):
         lay.addWidget(box_r)
         self.slider_p.valueChanged.connect(self.on_student_changed)
         self.slider_r.valueChanged.connect(self.on_student_changed)
-        return page
-
-    def _build_advanced(self):
-        page = QGroupBox(tr("p3_mode_advanced"))
-        form = QFormLayout(page)
-        self.spin_p = QDoubleSpinBox()
-        self.spin_p.setRange(0.1, 10)
-        self.spin_p.setSingleStep(0.5)
-        self.spin_p.setValue(DEFAULT_POWER)
-        self.spin_r = QDoubleSpinBox()
-        self.spin_r.setRange(0, 100000)
-        self.spin_r.setDecimals(1)
-        self.spin_r.setValue(100)
-        self.spin_r.setSuffix(" m")
-        self.spin_r.setSpecialValueText(tr("no_limit"))
-        self.label_adv_cover = QLabel()
-        self.label_adv_cover.setWordWrap(True)
-        form.addRow(tr("p3_power"), self.spin_p)
-        form.addRow(tr("p3_radius"), self.spin_r)
-        form.addRow(self.label_adv_cover)
-        note = QLabel(tr("p3_advanced_note"))
-        note.setWordWrap(True)
-        form.addRow(note)
-        self.spin_p.valueChanged.connect(self.on_advanced_changed)
-        self.spin_r.valueChanged.connect(self.on_advanced_changed)
         return page
 
     def _build_summary(self):
@@ -286,6 +254,8 @@ class ParametersPage(QWizardPage):
         old_state = self.state
         self.keys, self.labels, self.state = [], {}, {}
         self.points_cache, self.edge_cache, self.cv_cache = {}, {}, {}
+        self.neigh_cache = {}
+        self.px, self.py = px, py
         for layer, field in w.items:
             key = (layer.id(), field)
             self.keys.append(key)
@@ -329,9 +299,6 @@ class ParametersPage(QWizardPage):
         return self.points_cache[key]
 
     # --------------------------------------------------------------- values
-    def is_student(self):
-        return self.radio_student.isChecked()
-
     def cur(self):
         return self.state.get(self.current, {})
 
@@ -371,8 +338,6 @@ class ParametersPage(QWizardPage):
         if cover:
             mult = STUDENT_RADIUS_MAX if st["radius"] == 0 else st["radius"] / cover
             self.slider_r.setValue(int(round(min(max(mult, STUDENT_RADIUS_MIN), STUDENT_RADIUS_MAX) * 10)))
-        self.spin_p.setValue(st["power"])
-        self.spin_r.setValue(st["radius"])
         self._loading = False
         self.table.blockSignals(True)
         self.table.selectRow(index)
@@ -380,7 +345,6 @@ class ParametersPage(QWizardPage):
         text = (tr("p3_spacing", spacing=fmt(cover), density=fmt(st.get("density"), 1))
                 if cover else tr("p3_spacing_none"))
         self.label_spacing.setText(text)
-        self.label_adv_cover.setText(text)
         self.preview.set_points(*self.points_for(self.current))
         self.refresh_table()
         self.update_texts()
@@ -409,11 +373,6 @@ class ParametersPage(QWizardPage):
             self.set_current(power=p, radius=r)
         self.update_texts()
 
-    def on_advanced_changed(self, *args):
-        if not self._loading and self.current is not None:
-            self.set_current(power=self.spin_p.value(), radius=self.spin_r.value())
-        self.update_texts()
-
     def update_texts(self):
         p = self.power()
         self.label_p_value.setText("<b>" + tr("p3_power_value", p=fmt(p, 1)) + "</b>")
@@ -431,11 +390,23 @@ class ParametersPage(QWizardPage):
         self.update_visuals()
 
     def update_visuals(self):
-        # reference distance for "weight = 1": half the coverage distance, so the curves for
-        # P = 1, 2 and 3 are clearly different within the search radius
-        d_min = max(self.spin_px.value(), (self.spacing or 100.0) / 2.0)
-        self.curve.set_params(self.power(), self.radius(), self.spacing, d_min)
+        # weight relative to the typical pixel-to-sample distance (Shepard, 1968): it is 1 there,
+        # grows without limit towards the sample and decays beyond
+        d_ref = self.typical or (self.spacing or 10.0) / 2.0
+        self.curve.set_params(self.power(), self.radius(), d_ref)
         self.timer.start()
+
+    def neighbour_distances(self):
+        """Sorted distances from a typical pixel to every sample of the current attribute."""
+        key = self.current
+        if key is None:
+            return np.array([])
+        if key not in self.neigh_cache:
+            xs, ys, _ = self.points_for(key)
+            self.neigh_cache[key] = typical_pixel_neighbours(self.px, self.py, xs, ys, radius=0)
+        d = self.neigh_cache[key]
+        r = self.radius()
+        return d[d <= r] if r > 0 else d
 
     def refresh_table(self):
         for row, key in enumerate(self.keys):
@@ -456,22 +427,10 @@ class ParametersPage(QWizardPage):
                 item.setFont(font)
             self.table.item(row, SUM_ORIGIN).setToolTip(tr(ORIGIN_TIP[st["origin"]]))
 
-    def on_mode_changed(self, student):
-        if student:
-            # student sliders have limits: bring every attribute inside them
-            for st in self.state.values():
-                st["power"] = min(max(st["power"], STUDENT_POWER_MIN), STUDENT_POWER_MAX)
-                if st.get("coverage"):
-                    mult = STUDENT_RADIUS_MAX if st["radius"] == 0 else st["radius"] / st["coverage"]
-                    mult = min(max(mult, STUDENT_RADIUS_MIN), STUDENT_RADIUS_MAX)
-                    st["radius"] = round(mult * st["coverage"], 1)
-        self.stack.setCurrentIndex(0 if student else 1)
-        QgsSettings().setValue(SETTINGS_KEY, bool(student))
-        self.on_attr_changed(self.combo_attr.currentIndex())
-
     # ------------------------------------------------------------- preview
     def refresh_preview(self):
         self.preview.compute(self.power(), self.radius())
+        self.bars.set_data(self.neighbour_distances(), self.power())
 
     def show_more(self, key):
         box = QMessageBox(self)

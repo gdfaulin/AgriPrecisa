@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.0 (2026)
+- Step 3 has a single layout (the standard layout was removed); sliders now cover P from 0.5 to 5.0 and the radius from 1x to 6x the coverage distance.
+- Weight chart corrected after Shepard (1968): the IDW weight 1/d^P is shown relative to the weight at the typical pixel-to-sample distance (equal to 1 there), grows without limit near the sample (axis cut at 4) and has distance ticks. The artificial plateau at distance 0 and the grey reference curves were removed (regression test).
+- New bars "Influence on a typical pixel": share of each neighbouring sample, lambda = w_i / sum w_j (100 % in total), with the real samples of the attribute.
+- Cross-validation table and fine search cover P from 0.5 to 5.0 and radius up to 6x (regression test).
+- "Learn more" about how IDW computes the weights, with reference.
+
 ## 1.3.2 (2026)
 - Step 1: the output folder comes filled in: the last folder used or, the first time, the "AgriPrecisa" subfolder inside the QGIS project folder, created automatically. If the project is not saved and there is no previous folder, a hint asks to save the project or choose a folder.
 
