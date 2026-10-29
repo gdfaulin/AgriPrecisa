@@ -326,37 +326,204 @@ STRINGS = {
         "pt": "<b>Etapa 3: Parâmetros do IDW</b><br><br>"
               "O IDW (inverso da distância ponderada) estima cada pixel pela média das amostras "
               "vizinhas, dando mais peso às mais próximas.<br><br>"
-              "<b>Potência P:</b> controla quanto o peso cai com a distância. P = 1 gera mapa mais "
-              "suave; P = 2 é o mais usado; P acima de 3 cria 'ilhas' em volta das amostras.<br><br>"
-              "<b>Raio de busca:</b> só as amostras dentro desse raio entram no cálculo. Use um valor "
-              "maior que a distância entre amostras (em grade de 1 ponto por hectare, cerca de "
-              "100 m). Com 0 (Sem limite), todas são usadas. Pixels sem amostra no raio ficam sem "
-              "valor.<br><br>"
-              "<b>Tamanho do pixel:</b> lado de cada pixel do raster e de cada célula da grade "
-              "vetorial. Padrão de 5 m.",
+              "<b>Modo aluno:</b> barras deslizantes com explicações que mudam conforme o valor, a "
+              "curva de peso × distância e uma prévia do mapa com os seus dados. Mova as barras e "
+              "observe como o mapa muda. Os links <i>Saiba mais</i> trazem a explicação técnica.<br>"
+              "<b>Modo avançado:</b> campos numéricos livres, com P acima de 3 e raio sem limite. "
+              "O modo escolhido fica salvo para a próxima vez.<br><br>"
+              "<b>Potência P:</b> quanto maior, mais rápido o peso cai com a distância.<br>"
+              "<b>Raio de busca:</b> no modo aluno, é definido em múltiplos do espaçamento médio "
+              "entre amostras; o valor em metros aparece acima da barra.<br>"
+              "<b>Tamanho do pixel:</b> lado de cada pixel e de cada célula da grade final. "
+              "Padrão de 5 m.",
         "en": "<b>Step 3: IDW parameters</b><br><br>"
               "IDW (Inverse Distance Weighting) estimates each pixel as the average of nearby "
               "samples, giving more weight to the closest ones.<br><br>"
-              "<b>Power P:</b> how fast the weight falls with distance. P = 1 gives a smoother map; "
-              "P = 2 is the most common; P above 3 creates 'bull's-eyes' around samples.<br><br>"
-              "<b>Search radius:</b> only samples within this radius are used. Use a value larger "
-              "than the sample spacing (about 100 m for a 1 sample per hectare grid). With 0 "
-              "(No limit), all samples are used. Pixels with no sample within the radius stay "
-              "empty.<br><br>"
-              "<b>Pixel size:</b> side of each raster pixel and of each vector grid cell. "
-              "Default 5 m.",
+              "<b>Student mode:</b> sliders with explanations that change with the value, the "
+              "weight × distance curve and a map preview with your data. Move the sliders and "
+              "watch the map change. The <i>Learn more</i> links give the technical explanation.<br>"
+              "<b>Advanced mode:</b> free numeric fields, with P above 3 and unlimited radius. "
+              "The chosen mode is remembered.<br><br>"
+              "<b>Power P:</b> the higher it is, the faster the weight falls with distance.<br>"
+              "<b>Search radius:</b> in student mode it is set in multiples of the mean sample "
+              "spacing; the value in metres is shown above the slider.<br>"
+              "<b>Pixel size:</b> side of each pixel and of each final grid cell. Default 5 m.",
         "es": "<b>Paso 3: Parámetros del IDW</b><br><br>"
               "El IDW (inverso de la distancia ponderada) estima cada píxel como el promedio de las "
               "muestras vecinas, dando más peso a las más cercanas.<br><br>"
-              "<b>Potencia P:</b> controla cuánto cae el peso con la distancia. P = 1 da un mapa más "
-              "suave; P = 2 es el más usado; P mayor que 3 crea 'islas' alrededor de las "
-              "muestras.<br><br>"
-              "<b>Radio de búsqueda:</b> solo se usan las muestras dentro de este radio. Use un valor "
-              "mayor que la distancia entre muestras (unos 100 m en una grilla de 1 punto por "
-              "hectárea). Con 0 (Sin límite), se usan todas. Los píxeles sin muestras en el radio "
-              "quedan vacíos.<br><br>"
-              "<b>Tamaño del píxel:</b> lado de cada píxel del ráster y de cada celda de la "
-              "cuadrícula vectorial. Por defecto 5 m."},
+              "<b>Modo estudiante:</b> barras deslizantes con explicaciones que cambian con el "
+              "valor, la curva peso × distancia y una vista previa del mapa con sus datos. Mueva "
+              "las barras y observe cómo cambia el mapa. Los enlaces <i>Saber más</i> traen la "
+              "explicación técnica.<br>"
+              "<b>Modo avanzado:</b> campos numéricos libres, con P mayor que 3 y radio sin límite. "
+              "El modo elegido se recuerda.<br><br>"
+              "<b>Potencia P:</b> cuanto mayor, más rápido cae el peso con la distancia.<br>"
+              "<b>Radio de búsqueda:</b> en modo estudiante se define en múltiplos del espaciamiento "
+              "medio entre muestras; el valor en metros aparece sobre la barra.<br>"
+              "<b>Tamaño del píxel:</b> lado de cada píxel y de cada celda de la cuadrícula final. "
+              "Por defecto 5 m."},
+    "learn_more": {"pt": "Saiba mais", "en": "Learn more", "es": "Saber más"},
+    "p3_mode": {"pt": "Modo:", "en": "Mode:", "es": "Modo:"},
+    "p3_mode_student": {"pt": "Aluno (visual)", "en": "Student (visual)", "es": "Estudiante (visual)"},
+    "p3_mode_advanced": {"pt": "Avançado (valores livres)", "en": "Advanced (free values)",
+                         "es": "Avanzado (valores libres)"},
+    "p3_advanced_note": {
+        "pt": "No modo avançado é possível usar P acima de 3 e raio sem limite (0).",
+        "en": "Advanced mode allows P above 3 and an unlimited radius (0).",
+        "es": "El modo avanzado permite P mayor que 3 y radio sin límite (0)."},
+    "p3_power_group": {"pt": "Potência (P)", "en": "Power (P)", "es": "Potencia (P)"},
+    "p3_power_value": {"pt": "P = {p}", "en": "P = {p}", "es": "P = {p}"},
+    "p3_power_low": {
+        "pt": "P baixo: suaviza o mapa, porque amostras mais distantes também influenciam cada "
+              "pixel. Geralmente usado quando a variável muda pouco no talhão (variabilidade menor).",
+        "en": "Low P: smooths the map, because more distant samples also influence each pixel. "
+              "Usually used when the variable changes little across the field (lower variability).",
+        "es": "P bajo: suaviza el mapa, porque las muestras más lejanas también influyen en cada "
+              "píxel. Se usa generalmente cuando la variable cambia poco en el lote (menor variabilidad)."},
+    "p3_power_mid": {
+        "pt": "P intermediário: equilíbrio entre suavizar e respeitar cada amostra. O valor 2 é o "
+              "mais usado e é um bom ponto de partida.",
+        "en": "Intermediate P: balance between smoothing and honouring each sample. P = 2 is the "
+              "most common choice and a good starting point.",
+        "es": "P intermedio: equilibrio entre suavizar y respetar cada muestra. P = 2 es el más "
+              "usado y un buen punto de partida."},
+    "p3_power_high": {
+        "pt": "P alto: dá mais peso às amostras próximas e realça diferenças locais. Geralmente usado "
+              "quando a variável muda muito em curtas distâncias (variabilidade maior). Valores altos "
+              "criam 'ilhas' em volta das amostras.",
+        "en": "High P: gives more weight to nearby samples and highlights local differences. Usually "
+              "used when the variable changes a lot over short distances (higher variability). High "
+              "values create 'islands' around the samples.",
+        "es": "P alto: da más peso a las muestras cercanas y resalta diferencias locales. Se usa "
+              "generalmente cuando la variable cambia mucho en distancias cortas (mayor variabilidad). "
+              "Valores altos crean 'islas' alrededor de las muestras."},
+    "p3_power_more": {
+        "pt": "<b>Potência P do IDW</b><br><br>O valor de cada pixel é a média ponderada das amostras "
+              "vizinhas, com peso 1/d<sup>P</sup> (d = distância até a amostra).<ul>"
+              "<li><b>P baixo (perto de 1):</b> o peso cai devagar com a distância e amostras mais "
+              "distantes também influenciam. O mapa fica suave e mostra a tendência geral da área. "
+              "Combina com variáveis de baixa variabilidade ou com dependência espacial de longo "
+              "alcance.</li>"
+              "<li><b>P = 2:</b> o valor mais usado na literatura e nos programas de agricultura de "
+              "precisão; equilibra suavização e fidelidade às amostras.</li>"
+              "<li><b>P alto (perto de 3 ou mais):</b> o peso cai rápido e cada pixel fica parecido "
+              "com a amostra mais próxima. Realça variações locais, mas cria o efeito 'olho de boi' "
+              "(manchas circulares em volta das amostras). Combina com variáveis de alta "
+              "variabilidade em curtas distâncias e amostragem densa.</li></ul>"
+              "Para escolher com critério, compare os mapas na prévia. Em pesquisa, use a validação "
+              "cruzada: retire cada amostra, estime-a pelas demais e compare o erro entre valores "
+              "de P. Quando a dependência espacial é bem descrita por um semivariograma, a krigagem "
+              "costuma ser preferível ao IDW.",
+        "en": "<b>IDW power P</b><br><br>Each pixel is the weighted average of nearby samples, with "
+              "weight 1/d<sup>P</sup> (d = distance to the sample).<ul>"
+              "<li><b>Low P (near 1):</b> the weight falls slowly with distance and more distant "
+              "samples also count. The map is smooth and shows the general trend. Suits variables "
+              "with low variability or long-range spatial dependence.</li>"
+              "<li><b>P = 2:</b> the most common value in the literature and in precision agriculture "
+              "software; balances smoothing and fidelity to the samples.</li>"
+              "<li><b>High P (near 3 or more):</b> the weight falls quickly and each pixel resembles "
+              "the nearest sample. Highlights local variation but creates the 'bull's-eye' effect "
+              "(circular spots around samples). Suits variables with high short-range variability "
+              "and dense sampling.</li></ul>"
+              "To choose with criteria, compare the maps in the preview. In research, use "
+              "cross-validation: remove each sample, estimate it from the others and compare the "
+              "error between P values. When spatial dependence is well described by a "
+              "semivariogram, kriging is usually preferable to IDW.",
+        "es": "<b>Potencia P del IDW</b><br><br>Cada píxel es el promedio ponderado de las muestras "
+              "vecinas, con peso 1/d<sup>P</sup> (d = distancia a la muestra).<ul>"
+              "<li><b>P bajo (cerca de 1):</b> el peso cae lentamente con la distancia y las muestras "
+              "más lejanas también influyen. El mapa queda suave y muestra la tendencia general. "
+              "Adecuado para variables de baja variabilidad o dependencia espacial de largo "
+              "alcance.</li>"
+              "<li><b>P = 2:</b> el valor más usado en la literatura y en los programas de agricultura "
+              "de precisión; equilibra suavizado y fidelidad a las muestras.</li>"
+              "<li><b>P alto (cerca de 3 o más):</b> el peso cae rápido y cada píxel se parece a la "
+              "muestra más cercana. Resalta variaciones locales, pero crea el efecto 'ojo de buey' "
+              "(manchas circulares alrededor de las muestras). Adecuado para variables de alta "
+              "variabilidad en distancias cortas y muestreo denso.</li></ul>"
+              "Para elegir con criterio, compare los mapas en la vista previa. En investigación, use "
+              "la validación cruzada: retire cada muestra, estímela con las demás y compare el error "
+              "entre valores de P. Cuando la dependencia espacial está bien descrita por un "
+              "semivariograma, el kriging suele ser preferible al IDW."},
+    "p3_radius_group": {"pt": "Raio de busca", "en": "Search radius", "es": "Radio de búsqueda"},
+    "p3_spacing": {
+        "pt": "Espaçamento médio entre amostras: {spacing} m ({density} amostras/ha).",
+        "en": "Mean sample spacing: {spacing} m ({density} samples/ha).",
+        "es": "Espaciamiento medio entre muestras: {spacing} m ({density} muestras/ha)."},
+    "p3_spacing_none": {
+        "pt": "Não foi possível estimar o espaçamento entre amostras. Use o modo avançado para "
+              "definir o raio em metros.",
+        "en": "The sample spacing could not be estimated. Use advanced mode to set the radius in metres.",
+        "es": "No se pudo estimar el espaciamiento entre muestras. Use el modo avanzado para definir "
+              "el radio en metros."},
+    "p3_radius_value": {"pt": "Raio = {mult} × {spacing} m = {radius} m",
+                        "en": "Radius = {mult} × {spacing} m = {radius} m",
+                        "es": "Radio = {mult} × {spacing} m = {radius} m"},
+    "p3_radius_short": {
+        "pt": "Raio curto: cada pixel enxerga poucas amostras. O mapa fica mais local e podem surgir "
+              "falhas (pixels sem valor, em cinza na prévia).",
+        "en": "Short radius: each pixel sees few samples. The map is more local and gaps may appear "
+              "(pixels without value, grey in the preview).",
+        "es": "Radio corto: cada píxel ve pocas muestras. El mapa es más local y pueden aparecer "
+              "huecos (píxeles sin valor, en gris en la vista previa)."},
+    "p3_radius_ok": {
+        "pt": "Raio recomendado: cada pixel considera várias amostras vizinhas, cerca de 2 vezes o "
+              "espaçamento entre elas.",
+        "en": "Recommended radius: each pixel considers several neighbouring samples, about twice "
+              "the spacing between them.",
+        "es": "Radio recomendado: cada píxel considera varias muestras vecinas, cerca de 2 veces el "
+              "espaciamiento entre ellas."},
+    "p3_radius_long": {
+        "pt": "Raio longo: o mapa fica mais suave e sem falhas, mas detalhes locais se perdem e o "
+              "cálculo fica mais lento.",
+        "en": "Long radius: the map is smoother and without gaps, but local detail is lost and "
+              "processing is slower.",
+        "es": "Radio largo: el mapa queda más suave y sin huecos, pero se pierden detalles locales y "
+              "el cálculo es más lento."},
+    "p3_radius_more": {
+        "pt": "<b>Raio de busca</b><br><br>Só as amostras dentro do raio entram no cálculo de cada "
+              "pixel. O espaçamento médio entre amostras é estimado pela densidade amostral: "
+              "√(10.000 m² ÷ amostras por hectare). Com 1 amostra/ha, o espaçamento é de cerca de "
+              "100 m.<br><br>Um raio de 1,5 a 2,5 vezes o espaçamento garante várias vizinhas em "
+              "cada pixel. Raios menores deixam falhas; raios maiores suavizam e deixam o cálculo "
+              "mais lento. Em pesquisa, o alcance do semivariograma é uma boa referência para o "
+              "raio.<br><br>Quando há mais de um atributo marcado, a barra usa o de menor "
+              "densidade, para que nenhum mapa fique com falhas.",
+        "en": "<b>Search radius</b><br><br>Only samples within the radius are used for each pixel. "
+              "The mean sample spacing is estimated from the sampling density: "
+              "√(10,000 m² ÷ samples per hectare). With 1 sample/ha, the spacing is about "
+              "100 m.<br><br>A radius of 1.5 to 2.5 times the spacing ensures several neighbours "
+              "per pixel. Smaller radii leave gaps; larger radii smooth the map and slow "
+              "processing. In research, the semivariogram range is a good reference for the "
+              "radius.<br><br>When several attributes are ticked, the slider uses the one with "
+              "the lowest density, so that no map has gaps.",
+        "es": "<b>Radio de búsqueda</b><br><br>Solo las muestras dentro del radio entran en el "
+              "cálculo de cada píxel. El espaciamiento medio se estima a partir de la densidad de "
+              "muestreo: √(10.000 m² ÷ muestras por hectárea). Con 1 muestra/ha, el espaciamiento "
+              "es de unos 100 m.<br><br>Un radio de 1,5 a 2,5 veces el espaciamiento garantiza "
+              "varias vecinas por píxel. Radios menores dejan huecos; radios mayores suavizan y "
+              "hacen el cálculo más lento. En investigación, el alcance del semivariograma es una "
+              "buena referencia para el radio.<br><br>Cuando hay varios atributos marcados, la "
+              "barra usa el de menor densidad, para que ningún mapa quede con huecos."},
+    "p3_curve_group": {"pt": "Peso das amostras × distância", "en": "Sample weight × distance",
+                       "es": "Peso de las muestras × distancia"},
+    "p3_curve_x": {"pt": "distância até a amostra", "en": "distance to the sample",
+                   "es": "distancia a la muestra"},
+    "p3_curve_y": {"pt": "peso", "en": "weight", "es": "peso"},
+    "p3_curve_radius": {"pt": "raio", "en": "radius", "es": "radio"},
+    "p3_curve_ref": {"pt": "P = 1 e P = 3", "en": "P = 1 and P = 3", "es": "P = 1 y P = 3"},
+    "p3_preview_group": {"pt": "Prévia do mapa", "en": "Map preview", "es": "Vista previa del mapa"},
+    "p3_preview_attr": {"pt": "Atributo:", "en": "Attribute:", "es": "Atributo:"},
+    "p3_preview_n": {"pt": "{n} amostras", "en": "{n} samples", "es": "{n} muestras"},
+    "p3_preview_note": {
+        "pt": "Prévia em baixa resolução, só para comparar parâmetros. Vermelho = valores baixos, "
+              "verde = valores altos, cinza = pixels sem amostras no raio. Pontos pretos = amostras.",
+        "en": "Low-resolution preview, only to compare parameters. Red = low values, green = high "
+              "values, grey = pixels without samples in the radius. Black dots = samples.",
+        "es": "Vista previa de baja resolución, solo para comparar parámetros. Rojo = valores bajos, "
+              "verde = valores altos, gris = píxeles sin muestras en el radio. Puntos negros = muestras."},
+    "p3_preview_empty": {"pt": "Sem amostras para a prévia.", "en": "No samples for the preview.",
+                         "es": "Sin muestras para la vista previa."},
 
     # ---------------------------------------------------------------- page 4
     "p4_title": {"pt": "Etapa 4 de 4: Resumo", "en": "Step 4 of 4: Summary", "es": "Paso 4 de 4: Resumen"},

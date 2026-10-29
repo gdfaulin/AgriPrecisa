@@ -98,3 +98,26 @@ def test_sample_density():
     assert sample_density(50, 25.0) == pytest.approx(2.0)
     assert sample_density(10, 0) is None
     assert sample_density(10, None) is None
+
+
+def test_mean_spacing_one_sample_per_hectare_is_100m():
+    from agriprecisa.core.idw_math import mean_spacing
+    assert mean_spacing(1.0) == pytest.approx(100.0)
+    assert mean_spacing(4.0) == pytest.approx(50.0)
+    assert mean_spacing(0) is None and mean_spacing(None) is None
+
+
+def test_power_and_radius_bands():
+    from agriprecisa.core.idw_math import power_band, radius_band
+    assert [power_band(p) for p in (1.0, 1.4, 1.5, 2.0, 2.5, 2.6, 3.0)] == \
+        ["low", "low", "mid", "mid", "mid", "high", "high"]
+    assert [radius_band(m) for m in (1.0, 1.5, 2.5, 3.0)] == ["short", "ok", "ok", "long"]
+
+
+def test_relative_weights_decay_faster_with_higher_power():
+    from agriprecisa.core.idw_math import relative_weights
+    d = [5, 10, 20, 40]
+    w1, w3 = relative_weights(d, 1, 5), relative_weights(d, 3, 5)
+    assert w1[0] == pytest.approx(1.0) and w3[0] == pytest.approx(1.0)
+    assert w1[-1] == pytest.approx(0.125) and w3[-1] == pytest.approx(0.125 ** 3)
+    assert all(w3[1:] < w1[1:])

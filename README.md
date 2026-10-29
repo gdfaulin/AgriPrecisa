@@ -20,7 +20,7 @@ Developed by Gustavo Di Chiacchio Faulin at Fatec Pompeia "Shunji Nishimura" (Ce
 
 1. **Boundary and output folder.** The bounding box of the field boundary defines the interpolation area. A tolerance (default 50 m) keeps samples slightly outside the boundary (e.g. machine turns). Selected features only can be used.
 2. **Points and fields.** Only point layers with samples near the field are listed; expand each layer and tick the numeric fields to interpolate.
-3. **IDW parameters.** Power *P* (default 2), search radius (default 100 m, 0 = no limit) and pixel size (default 5 m).
+3. **IDW parameters.** *Student mode* (default): sliders for the power *P* (1 to 3) and the search radius (multiples of the mean sample spacing), with explanations, a weight × distance curve and a live map preview. *Advanced mode*: free values for *P*, radius (0 = no limit) and pixel size (default 5 m).
 4. **Outputs.** One GeoTIFF per field, one GeoPackage polygon grid with `<field>_mean` columns, and one styled copy per field in the *Interpolated* group.
 
 IDW estimate at each pixel centre:

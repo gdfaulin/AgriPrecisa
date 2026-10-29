@@ -139,7 +139,6 @@ popups = []
 QMessageBox.question = staticmethod(lambda *a, **k: (popups.append(a[2]), QMessageBox.StandardButton.Yes)[1])
 QMessageBox.warning = staticmethod(lambda *a, **k: (popups.append(a[2]), QMessageBox.StandardButton.Ok)[1])
 wz = idw_wizard.IdwWizard()
-wz.resize(760, 520)
 wz.show()
 p1 = wz.currentPage()
 p1.combo.setCurrentIndex(p1.combo.findData(boundary.id()))
@@ -183,6 +182,85 @@ app.processEvents()
 shot = os.environ.get("AGRIPRECISA_SHOT")
 if shot:
     wz.grab().save(shot)
+
+# 3c) Step 3 (student mode): sliders, texts, spacing, curve and live preview
+from qgis.core import QgsSettings
+QgsSettings().remove("AgriPrecisa/idw_student_mode")   # first run -> student mode
+for k in range(amostras.childCount()):
+    amostras.child(k).setCheckState(0, Qt.CheckState.Checked)
+wz.next()
+p3 = wz.currentPage()
+print("Step 3 page:", p3.title())
+if not p3.radio_student.isChecked():
+    errors.append("step 3 should open in student mode by default")
+print("Spacing:", round(p3.spacing, 1), "m; radius:", p3.radius(), "m; P:", p3.power())
+# densities: argila 7/2.5 = 2.8, pH 6/2.5 = 2.4 -> sparsest = 2.4 -> spacing = sqrt(10000/2.4)
+if abs(p3.spacing - (10000 / 2.4) ** 0.5) > 0.01:
+    errors.append("mean spacing should use the sparsest attribute (pH, 2.4 samples/ha)")
+if abs(p3.radius() - round(2 * p3.spacing, 1)) > 0.05:
+    errors.append("default radius should be 2x the spacing")
+p3.slider_p.setValue(30)
+p3.slider_r.setValue(12)
+app.processEvents()
+print("P text:", p3.label_p_text.text()[:60], "...")
+print("R value:", p3.label_r_value.text())
+print("R text:", p3.label_r_text.text()[:50], "...")
+if "P alto" not in p3.label_p_text.text() or "Saiba mais" not in p3.label_p_text.text():
+    errors.append("high-P text or 'Saiba mais' link missing")
+if "Raio curto" not in p3.label_r_text.text():
+    errors.append("short-radius text missing")
+p3.slider_p.setValue(10)
+if "P baixo" not in p3.label_p_text.text():
+    errors.append("low-P text missing")
+p3.slider_p.setValue(20)
+p3.slider_r.setValue(20)
+p3.refresh_preview()
+print("Preview range:", p3.preview.value_range)
+# Regression: the inside/outside mask was always empty (temporary point geometry freed
+# before GEOS used it), so the preview showed nothing.
+inside_cells = int(p3.preview.mask.sum())
+print("Preview cells inside the field:", inside_cells, "of", p3.preview.mask.size)
+cell_area = p3.preview.grid[4] ** 2
+if not (0.9 * 25000 < inside_cells * cell_area < 1.1 * 25000):
+    errors.append("preview mask should cover about the field area (25000 m2)")
+if p3.preview.image is None or p3.preview.value_range is None:
+    errors.append("live preview not rendered")
+if p3.curve.power != 2.0:
+    errors.append("weight curve not following P")
+# preview attribute selector
+p3.combo_attr.setCurrentIndex(1)
+p3.refresh_preview()
+print("Preview attribute:", p3.combo_attr.currentText(), "| samples:", p3.preview.points[2].size)
+if p3.preview.points[2].size != 19:
+    errors.append("preview for pH should use the 19 non-empty samples")
+p3.combo_attr.setCurrentIndex(0)
+p3.refresh_preview()
+app.processEvents()
+cmp_dir = os.environ.get("AGRIPRECISA_SHOT_CMP")
+if cmp_dir:
+    for pv in (10, 30):
+        p3.slider_p.setValue(pv)
+        p3.refresh_preview()
+        app.processEvents()
+        p3.stack.currentWidget().grab().save(os.path.join(cmp_dir, f"p{pv}.png"))
+    p3.slider_p.setValue(20)
+    p3.refresh_preview()
+shot3 = os.environ.get("AGRIPRECISA_SHOT3")
+if shot3:
+    wz.grab().save(shot3)
+# switch to advanced: values carried over; mode remembered
+p3.radio_advanced.setChecked(True)
+print("Advanced:", p3.spin_p.value(), p3.spin_r.value())
+if p3.spin_p.value() != 2.0 or abs(p3.spin_r.value() - round(2 * p3.spacing, 1)) > 0.1:
+    errors.append("values not carried to advanced mode")
+if QgsSettings().value("AgriPrecisa/idw_student_mode", True, type=bool):
+    errors.append("mode choice not remembered")
+p3.spin_p.setValue(5.0)
+p3.radio_student.setChecked(True)
+if p3.slider_p.value() != 30:
+    errors.append("P above 3 should be clamped to 3 when returning to student mode")
+p3.validatePage()
+print("Wizard values:", wz.power, wz.radius, wz.pixel)
 wz.hide()
 QgsProject.instance().removeMapLayer(geo.id())
 
