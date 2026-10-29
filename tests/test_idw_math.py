@@ -226,3 +226,45 @@ def test_best_combination_prefers_covered_minimum():
     rmse = np.array([[1.0, 0.5], [0.2, 0.9]])
     cov = np.array([[1.0, 1.0], [0.5, 1.0]])       # 0.2 has poor coverage
     assert best_combination(rmse, cov) == (0, 1)
+
+
+def test_suggest_parameters_differs_between_attributes():
+    # two attributes on the same sensor passes: one smooth (long-range dependence) and one
+    # with strong short-range variation; each must get its own parameters
+    from agriprecisa.core.idw_math import suggest_parameters, coverage_distances
+    rng = np.random.default_rng(3)
+    xs = np.concatenate([np.arange(0, 300, 2.0) for _ in range(15)])
+    ys = np.repeat(np.arange(15) * 20.0 + 10, 150)
+    smooth = 2 + xs / 150 + rng.normal(0, 0.02, xs.size)
+    rough = np.sin(xs / 6.0) * np.cos(ys / 7.0) + rng.normal(0, 0.02, xs.size)
+    edge = np.minimum.reduce([xs, ys, 300 - xs, 300 - ys])
+    px, py = _grid(60, 5.0)
+    typical, cover = coverage_distances(px, py, xs, ys)
+    a = suggest_parameters(xs, ys, smooth, edge, cover, typical)
+    b = suggest_parameters(xs, ys, rough, edge, cover, typical)
+    assert a["n_val"] == 60 and b["n_val"] == 60
+    assert (a["power"], a["multiple"]) != (b["power"], b["multiple"])
+    assert a["multiple"] >= b["multiple"]           # smooth field tolerates a larger radius
+
+
+def test_suggest_parameters_few_samples():
+    from agriprecisa.core.idw_math import suggest_parameters
+    xs, ys = _grid(3, 10.0)
+    r = suggest_parameters(xs, ys, np.arange(9.0), np.full(9, 100.0), 7.0, 3.0)
+    assert r == {"error": "few", "n_val": 9}
+
+
+def test_suggested_radius_never_leaves_gaps_in_the_map():
+    # Regression: the short-range attribute got radius 1x the coverage distance, which by
+    # definition leaves ~5 % of the field without value (grey strips between passes).
+    from agriprecisa.core.idw_math import suggest_parameters, coverage_distances, MIN_PIXEL_COVERAGE
+    rng = np.random.default_rng(3)
+    xs = np.concatenate([np.arange(0, 300, 2.0) for _ in range(15)])
+    ys = np.repeat(np.arange(15) * 20.0 + 10, 150)
+    rough = np.sin(xs / 6.0) * np.cos(ys / 7.0) + rng.normal(0, 0.02, xs.size)
+    edge = np.minimum.reduce([xs, ys, 300 - xs, 300 - ys])
+    px, py = _grid(130, 2.3)                                 # fine pixels, not aligned to passes
+    typical, cover, nearest = coverage_distances(px, py, xs, ys, return_nearest=True)
+    r = suggest_parameters(xs, ys, rough, edge, cover, typical, pixel_nearest=nearest)
+    assert np.mean(nearest <= r["radius"]) >= MIN_PIXEL_COVERAGE
+    assert r["map_coverage"][0] < MIN_PIXEL_COVERAGE        # 1x is reported as leaving gaps

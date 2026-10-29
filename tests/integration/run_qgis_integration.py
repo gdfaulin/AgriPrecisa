@@ -138,6 +138,8 @@ from qgis.PyQt.QtCore import Qt
 popups = []
 QMessageBox.question = staticmethod(lambda *a, **k: (popups.append(a[2]), QMessageBox.StandardButton.Yes)[1])
 QMessageBox.warning = staticmethod(lambda *a, **k: (popups.append(a[2]), QMessageBox.StandardButton.Ok)[1])
+infos = []
+QMessageBox.information = staticmethod(lambda *a, **k: (infos.append(a[2]), QMessageBox.StandardButton.Ok)[1])
 wz = idw_wizard.IdwWizard()
 wz.show()
 p1 = wz.currentPage()
@@ -240,6 +242,23 @@ print("Preview attribute:", p3.combo_attr.currentText(), "| samples:", p3.previe
 if p3.preview.points[2].size != 19:
     errors.append("preview for pH should use the 19 non-empty samples")
 p3.combo_attr.setCurrentIndex(0)
+# each attribute keeps its own parameters
+p3.slider_p.setValue(30)
+p3.combo_attr.setCurrentIndex(1)                     # pH
+if p3.slider_p.value() != 20 or p3.power() != 2.0:
+    errors.append("pH should keep its own (default) P when argila changes")
+p3.combo_attr.setCurrentIndex(0)                     # back to argila
+if p3.slider_p.value() != 30:
+    errors.append("argila lost its own P after switching attributes")
+origins = [p3.table.item(r, 3).text() for r in range(p3.table.rowCount())]
+print("Summary table:", [[p3.table.item(r, c).text() for c in range(4)] for r in range(p3.table.rowCount())])
+if origins != ["manual", "padrão"]:
+    errors.append(f"origins should be manual / padrão, got {origins}")
+p3.table.selectRow(1)
+if p3.combo_attr.currentIndex() != 1:
+    errors.append("clicking a summary row should select that attribute")
+p3.combo_attr.setCurrentIndex(0)
+p3.slider_p.setValue(20)
 p3.refresh_preview()
 app.processEvents()
 cmp_dir = os.environ.get("AGRIPRECISA_SHOT_CMP")
@@ -266,21 +285,24 @@ p3.radio_student.setChecked(True)
 if p3.slider_p.value() != 30:
     errors.append("P above 3 should be clamped to 3 when returning to student mode")
 p3.validatePage()
-print("Wizard values:", wz.power, wz.radius, wz.pixel)
+print("Wizard params:", wz.params, wz.param_origins, wz.pixel)
+if len(wz.params) != 2 or wz.params[0][0] != 3.0 or wz.params[1][0] != 2.0:
+    errors.append("wizard should hand one (P, radius) per attribute to the job")
 wz.hide()
 
 # 3d) Sensor passes (like EC): coverage distance and cross-validation
 import math as _m
 import numpy as _np
 rng = _np.random.default_rng(7)
-ce = QgsVectorLayer("Point?crs=EPSG:31982&field=CE:double", "ce_sensor", "memory")
+ce = QgsVectorLayer("Point?crs=EPSG:31982&field=CE:double&field=CE2:double", "ce_sensor", "memory")
 cfeats = []
 for yy in _np.arange(5, 150, 15.0):                  # passes every 15 m
     for xx in _np.arange(-5, 206, 2.0):              # points every 2 m along the pass
         f2 = QgsFeature(ce.fields())
         f2.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(X0 + xx, Y0 + yy)))
         val = 2 + 0.01 * xx + 0.5 * _m.sin(yy / 30.0) + rng.normal(0, 0.05)
-        f2.setAttributes([float(val)])
+        val2 = _m.sin(xx / 6.0) * _m.cos(yy / 7.0) + rng.normal(0, 0.02)   # short-range
+        f2.setAttributes([float(val), float(val2)])
         cfeats.append(f2)
 ce.dataProvider().addFeatures(cfeats)
 QgsProject.instance().addMapLayer(ce)
@@ -296,6 +318,7 @@ wz2.next()
 q2 = wz2.currentPage()
 item_ce = q2.tree.findItems("ce_sensor [EPSG:31982]", Qt.MatchFlag.MatchExactly, 0)[0]
 item_ce.child(0).setCheckState(0, Qt.CheckState.Checked)
+item_ce.child(1).setCheckState(0, Qt.CheckState.Checked)
 wz2.next()
 q3 = wz2.currentPage()
 n_ce = q3.preview.points[2].size
@@ -308,31 +331,77 @@ if not (q3.spacing > density_spacing and 6.5 < q3.spacing < 7.6):
 if q3.check_points.isChecked():
     errors.append("many samples: preview should start with samples hidden")
 q3.radio_student.setChecked(True)
-q3.run_cross_validation()
+q3.select_attribute(0)
+q3.run_cv_this()
 if not dialogs:
     errors.append("cross-validation dialog not shown")
 else:
     dlg = dialogs[-1]
-    print("CV summary:", dlg.result_summary, "| table", dlg.table.rowCount(), "x", dlg.table.columnCount())
-    print("CV label:", q3.label_cv.text()[:80])
+    print("CV (CE):", dlg.result_summary)
     best_p = dlg.result_summary["power"]
     if abs(q3.slider_p.value() / 10.0 - best_p) > 1e-6:
         errors.append("'Aplicar' did not move the P slider to the suggested value")
     if abs(q3.slider_r.value() / 10.0 - dlg.result_summary["multiple"]) > 1e-6:
         errors.append("'Aplicar' did not move the radius slider")
-    if "Sugestão" not in q3.label_cv.text() or "0,0391" not in q3.label_cv.text():
-        errors.append("suggestion text missing")
+    if q3.table.item(0, 3).text() != "validação" or q3.table.item(1, 3).text() != "padrão":
+        errors.append("'Sugerir para este' must change only the selected attribute")
     shot_cv = os.environ.get("AGRIPRECISA_SHOT_CV")
     if shot_cv:
         dlg.show(); app.processEvents()
         if dlg.table.height() < dlg.table.minimumHeight():
             errors.append("cross-validation table is cut")
         dlg.grab().save(shot_cv); dlg.hide()
+q3.run_cv_all()
+print("CV all:", q3.last_cv_all)
+st_ce, st_ce2 = (q3.state[k] for k in q3.keys)
+print("Per attribute:", {q3.labels[k]: (q3.state[k]["power"], q3.state[k]["radius"]) for k in q3.keys})
+if [q3.table.item(r, 3).text() for r in range(2)] != ["validação", "validação"]:
+    errors.append("'Sugerir para todos' should apply validation to every attribute")
+if (st_ce["power"], st_ce["radius"]) == (st_ce2["power"], st_ce2["radius"]):
+    errors.append("CE (smooth) and CE2 (short-range) should get different parameters")
+if not infos or "CE2" not in infos[-1]:
+    errors.append("summary message of 'Sugerir para todos' missing")
+q3.select_attribute(1)
 q3.refresh_preview(); app.processEvents()
+# Regression: a suggested radius of 1,5x read "Raio curto" (10,8 / 7,23 = 1,49 before rounding)
+if "Raio recomendado" not in q3.label_r_text.text():
+    errors.append("1,5x radius should be described as recommended")
+# Regression: texts of step 3 overlapped when the content did not fit the window
+content = q3.scroll.widget()
+print("Step 3 content min height:", content.minimumSizeHint().height(), "| visible:", q3.scroll.viewport().height(),
+      "| scrollbar:", q3.scroll.verticalScrollBar().isVisible())
+for lbl in (q3.label_p_text, q3.label_r_text, q3.label_spacing):
+    if lbl.height() < lbl.minimumHeight():
+        errors.append("step 3 text squeezed below its minimum height")
 shot4 = os.environ.get("AGRIPRECISA_SHOT4")
 if shot4:
     wz2.grab().save(shot4)
 wz2.hide()
+
+class _Log(QgsProcessingFeedback):
+    def __init__(self):
+        super().__init__()
+        self.lines = []
+    def pushInfo(self, info):
+        self.lines.append(info)
+    def reportError(self, error, fatalError=False):
+        self.lines.append("ERROR " + error)
+
+i18n.set_language("pt")
+log = _Log()
+res_auto = processing.run("agriprecisa:idw_vector_grid", {
+    "BOUNDARY": boundary, "POINTS": ce, "FIELDS": ["CE", "CE2"], "TOLERANCE": 50,
+    "POWER": 2, "RADIUS": 0, "PIXEL": 5, "AUTO_PARAMS": True,
+    "RASTER_FOLDER": os.path.join(tmp, "auto"), "OUTPUT": os.path.join(tmp, "auto.gpkg")},
+    feedback=log)
+auto_lines = [l for l in log.lines if "validação cruzada" in l]
+print("Processing auto:", auto_lines)
+if len(auto_lines) != 2 or any(l.startswith("ERROR") for l in auto_lines):
+    errors.append("Processing AUTO_PARAMS should cross-validate each field")
+auto_grid = QgsVectorLayer(res_auto["OUTPUT"], "a", "ogr")
+if not {"CE_mean", "CE2_mean"} <= {f.name() for f in auto_grid.fields()}:
+    errors.append("Processing AUTO_PARAMS output missing mean fields")
+
 QgsProject.instance().removeMapLayer(ce.id())
 QgsProject.instance().removeMapLayer(geo.id())
 

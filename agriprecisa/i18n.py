@@ -326,6 +326,10 @@ STRINGS = {
         "pt": "<b>Etapa 3: Parâmetros do IDW</b><br><br>"
               "O IDW (inverso da distância ponderada) estima cada pixel pela média das amostras "
               "vizinhas, dando mais peso às mais próximas.<br><br>"
+              "<b>Cada atributo tem seus próprios P e raio</b>, porque a dependência espacial e a "
+              "variabilidade mudam de um atributo para outro. Escolha o atributo no topo; as barras, "
+              "a curva e a prévia passam a valer para ele. A tabela mostra os parâmetros de todos e a "
+              "origem de cada um (padrão, validação ou manual).<br><br>"
               "<b>Modo aluno:</b> barras deslizantes com explicações que mudam conforme o valor, a "
               "curva de peso × distância e uma prévia do mapa com os seus dados. Mova as barras e "
               "observe como o mapa muda. Os links <i>Saiba mais</i> trazem a explicação técnica.<br>"
@@ -335,14 +339,18 @@ STRINGS = {
               "<b>Raio de busca:</b> no modo aluno, é definido em múltiplos da distância de "
               "cobertura (distância que cobre 95% do talhão); o valor em metros aparece acima da "
               "barra.<br>"
-              "<b>Sugerir P e raio:</b> a validação cruzada testa combinações e indica a de menor "
-              "erro para os seus dados.<br>"
+              "<b>Sugerir para este / para todos:</b> a validação cruzada testa combinações e indica, "
+              "para cada atributo, a de menor erro.<br>"
               "<b>Mostrar amostras:</b> liga ou desliga os pontos na prévia.<br>"
               "<b>Tamanho do pixel:</b> lado de cada pixel e de cada célula da grade final. "
               "Padrão de 5 m.",
         "en": "<b>Step 3: IDW parameters</b><br><br>"
               "IDW (Inverse Distance Weighting) estimates each pixel as the average of nearby "
               "samples, giving more weight to the closest ones.<br><br>"
+              "<b>Each attribute has its own P and radius</b>, because spatial dependence and "
+              "variability change from one attribute to another. Choose the attribute at the top; "
+              "the sliders, curve and preview then apply to it. The table shows the parameters of all "
+              "attributes and where each came from (default, validation or manual).<br><br>"
               "<b>Student mode:</b> sliders with explanations that change with the value, the "
               "weight × distance curve and a map preview with your data. Move the sliders and "
               "watch the map change. The <i>Learn more</i> links give the technical explanation.<br>"
@@ -352,13 +360,17 @@ STRINGS = {
               "<b>Search radius:</b> in student mode it is set in multiples of the coverage "
               "distance (distance covering 95% of the field); the value in metres is shown above "
               "the slider.<br>"
-              "<b>Suggest P and radius:</b> cross-validation tests combinations and points out the "
-              "one with the lowest error for your data.<br>"
+              "<b>Suggest for this one / for all:</b> cross-validation tests combinations and points "
+              "out, for each attribute, the one with the lowest error.<br>"
               "<b>Show samples:</b> turns the points on or off in the preview.<br>"
               "<b>Pixel size:</b> side of each pixel and of each final grid cell. Default 5 m.",
         "es": "<b>Paso 3: Parámetros del IDW</b><br><br>"
               "El IDW (inverso de la distancia ponderada) estima cada píxel como el promedio de las "
               "muestras vecinas, dando más peso a las más cercanas.<br><br>"
+              "<b>Cada atributo tiene su propio P y radio</b>, porque la dependencia espacial y la "
+              "variabilidad cambian de un atributo a otro. Elija el atributo arriba; las barras, la "
+              "curva y la vista previa pasan a valer para él. La tabla muestra los parámetros de todos "
+              "y el origen de cada uno (por defecto, validación o manual).<br><br>"
               "<b>Modo estudiante:</b> barras deslizantes con explicaciones que cambian con el "
               "valor, la curva peso × distancia y una vista previa del mapa con sus datos. Mueva "
               "las barras y observe cómo cambia el mapa. Los enlaces <i>Saber más</i> traen la "
@@ -369,8 +381,8 @@ STRINGS = {
               "<b>Radio de búsqueda:</b> en modo estudiante se define en múltiplos de la distancia de "
               "cobertura (distancia que cubre el 95% del lote); el valor en metros aparece sobre la "
               "barra.<br>"
-              "<b>Sugerir P y radio:</b> la validación cruzada prueba combinaciones e indica la de "
-              "menor error para sus datos.<br>"
+              "<b>Sugerir para este / para todos:</b> la validación cruzada prueba combinaciones e "
+              "indica, para cada atributo, la de menor error.<br>"
               "<b>Mostrar muestras:</b> enciende o apaga los puntos en la vista previa.<br>"
               "<b>Tamaño del píxel:</b> lado de cada píxel y de cada celda de la cuadrícula final. "
               "Por defecto 5 m."},
@@ -400,15 +412,15 @@ STRINGS = {
         "es": "P intermedio: equilibrio entre suavizar y respetar cada muestra. P = 2 es el más "
               "usado y un buen punto de partida."},
     "p3_power_high": {
-        "pt": "P alto: dá mais peso às amostras próximas e realça diferenças locais. Geralmente usado "
-              "quando a variável muda muito em curtas distâncias (variabilidade maior). Valores altos "
-              "criam 'ilhas' em volta das amostras.",
-        "en": "High P: gives more weight to nearby samples and highlights local differences. Usually "
-              "used when the variable changes a lot over short distances (higher variability). High "
-              "values create 'islands' around the samples.",
-        "es": "P alto: da más peso a las muestras cercanas y resalta diferencias locales. Se usa "
-              "generalmente cuando la variable cambia mucho en distancias cortas (mayor variabilidad). "
-              "Valores altos crean 'islas' alrededor de las muestras."},
+        "pt": "P alto: dá mais peso às amostras próximas. Geralmente usado quando a variável muda "
+              "muito em curtas distâncias (variabilidade maior). Valores altos criam 'ilhas' em volta "
+              "das amostras.",
+        "en": "High P: gives more weight to nearby samples. Usually used when the variable changes a "
+              "lot over short distances (higher variability). High values create 'islands' around the "
+              "samples.",
+        "es": "P alto: da más peso a las muestras cercanas. Se usa generalmente cuando la variable "
+              "cambia mucho en distancias cortas (mayor variabilidad). Valores altos crean 'islas' "
+              "alrededor de las muestras."},
     "p3_power_more": {
         "pt": "<b>Potência P do IDW</b><br><br>O valor de cada pixel é a média ponderada das amostras "
               "vizinhas, com peso 1/d<sup>P</sup> (d = distância até a amostra).<ul>"
@@ -537,18 +549,60 @@ STRINGS = {
     "p3_curve_ref": {"pt": "P = 1 e P = 3", "en": "P = 1 and P = 3", "es": "P = 1 y P = 3"},
     "p3_preview_group": {"pt": "Prévia do mapa", "en": "Map preview", "es": "Vista previa del mapa"},
     "p3_preview_attr": {"pt": "Atributo:", "en": "Attribute:", "es": "Atributo:"},
+    "p3_attribute": {"pt": "Atributo:", "en": "Attribute:", "es": "Atributo:"},
+    "p3_summary_group": {"pt": "Parâmetros por atributo", "en": "Parameters per attribute",
+                         "es": "Parámetros por atributo"},
+    "sum_col_attr": {"pt": "Atributo", "en": "Attribute", "es": "Atributo"},
+    "sum_col_p": {"pt": "P", "en": "P", "es": "P"},
+    "sum_col_r": {"pt": "Raio", "en": "Radius", "es": "Radio"},
+    "sum_col_origin": {"pt": "Origem", "en": "Origin", "es": "Origen"},
+    "origin_default": {"pt": "padrão", "en": "default", "es": "por defecto"},
+    "origin_cv": {"pt": "validação", "en": "validation", "es": "validación"},
+    "origin_manual": {"pt": "manual", "en": "manual", "es": "manual"},
+    "origin_default_tip": {"pt": "Valor inicial: P = 2 e raio de 2 vezes a distância de cobertura.",
+                           "en": "Initial value: P = 2 and radius of twice the coverage distance.",
+                           "es": "Valor inicial: P = 2 y radio de 2 veces la distancia de cobertura."},
+    "origin_cv_tip": {"pt": "Sugerido pela validação cruzada deste atributo.",
+                      "en": "Suggested by this attribute's cross-validation.",
+                      "es": "Sugerido por la validación cruzada de este atributo."},
+    "origin_manual_tip": {"pt": "Ajustado pelo usuário.", "en": "Set by the user.",
+                          "es": "Ajustado por el usuario."},
+    "cv_this": {"pt": "Sugerir para este", "en": "Suggest for this one", "es": "Sugerir para este"},
+    "cv_this_tip": {"pt": "Validação cruzada do atributo selecionado, com a tabela de erro por P e raio.",
+                    "en": "Cross-validation of the selected attribute, with the error table by P and radius.",
+                    "es": "Validación cruzada del atributo seleccionado, con la tabla de error por P y radio."},
+    "cv_all": {"pt": "Sugerir para todos", "en": "Suggest for all", "es": "Sugerir para todos"},
+    "cv_all_tip": {"pt": "Faz a validação cruzada de cada atributo e aplica P e raio próprios a cada um.",
+                   "en": "Cross-validates each attribute and applies its own P and radius to each one.",
+                   "es": "Valida cada atributo y aplica a cada uno su propio P y radio."},
+    "cv_all_progress": {"pt": "Validação cruzada: {label}...", "en": "Cross-validation: {label}...",
+                        "es": "Validación cruzada: {label}..."},
+    "cv_all_done": {"pt": "Parâmetros sugeridos e aplicados a cada atributo:\n\n{lines}",
+                    "en": "Parameters suggested and applied to each attribute:\n\n{lines}",
+                    "es": "Parámetros sugeridos y aplicados a cada atributo:\n\n{lines}"},
+    "cv_all_line": {"pt": "{label}: P = {p}, raio {mult}× ({radius} m), RMSE = {rmse}",
+                    "en": "{label}: P = {p}, radius {mult}× ({radius} m), RMSE = {rmse}",
+                    "es": "{label}: P = {p}, radio {mult}× ({radius} m), RMSE = {rmse}"},
+    "cv_all_fail_line": {"pt": "{label}: não aplicado. {reason}", "en": "{label}: not applied. {reason}",
+                         "es": "{label}: no aplicado. {reason}"},
+    "cv_reason_cover": {"pt": "Não foi possível medir a distância de cobertura deste atributo.",
+                        "en": "The coverage distance of this attribute could not be measured.",
+                        "es": "No se pudo medir la distancia de cobertura de este atributo."},
+    "p4_item": {"pt": "<li>{layer}: <b>{field}</b> · P = {p} · raio = {r} ({origin})</li>",
+                "en": "<li>{layer}: <b>{field}</b> · P = {p} · radius = {r} ({origin})</li>",
+                "es": "<li>{layer}: <b>{field}</b> · P = {p} · radio = {r} ({origin})</li>"},
+    "alg_p_auto": {
+        "pt": "Escolher P e raio de cada atributo por validação cruzada (substitui os valores acima)",
+        "en": "Choose P and radius of each attribute by cross-validation (replaces the values above)",
+        "es": "Elegir P y radio de cada atributo por validación cruzada (reemplaza los valores de arriba)"},
+    "alg_log_auto": {"pt": "{label}: P = {p}, raio = {r} m (validação cruzada, RMSE = {rmse})",
+                     "en": "{label}: P = {p}, radius = {r} m (cross-validation, RMSE = {rmse})",
+                     "es": "{label}: P = {p}, radio = {r} m (validación cruzada, RMSE = {rmse})"},
+    "alg_log_auto_fail": {
+        "pt": "{label}: validação cruzada não foi possível ({reason}); usando P = {p} e raio = {r}.",
+        "en": "{label}: cross-validation not possible ({reason}); using P = {p} and radius = {r}.",
+        "es": "{label}: validación cruzada no posible ({reason}); usando P = {p} y radio = {r}."},
     "p3_show_samples": {"pt": "Mostrar amostras", "en": "Show samples", "es": "Mostrar muestras"},
-    "cv_button": {"pt": "Sugerir P e raio (validação cruzada)", "en": "Suggest P and radius (cross-validation)",
-                  "es": "Sugerir P y radio (validación cruzada)"},
-    "cv_tip": {"pt": "Testa combinações de P e raio e indica a de menor erro para o atributo da prévia.",
-               "en": "Tests combinations of P and radius and points out the one with the lowest error for the preview attribute.",
-               "es": "Prueba combinaciones de P y radio e indica la de menor error para el atributo de la vista previa."},
-    "cv_hint": {"pt": "Não sabe qual P e raio usar? Deixe os dados indicarem.",
-                "en": "Not sure which P and radius to use? Let the data decide.",
-                "es": "¿No sabe qué P y radio usar? Deje que los datos lo indiquen."},
-    "cv_done": {"pt": "Sugestão: P = {p} e raio {mult}× ({radius} m), RMSE = {rmse}.",
-                "en": "Suggestion: P = {p} and radius {mult}× ({radius} m), RMSE = {rmse}.",
-                "es": "Sugerencia: P = {p} y radio {mult}× ({radius} m), RMSE = {rmse}."},
     "cv_title": {"pt": "Validação cruzada do IDW", "en": "IDW cross-validation",
                  "es": "Validación cruzada del IDW"},
     "cv_few": {"pt": "Só {n} amostras atendem aos critérios de validação (mínimo {min}). Aumente a "
@@ -581,6 +635,9 @@ STRINGS = {
     "cv_cell_tip": {"pt": "{cov}% das amostras de validação foram estimadas (em cinza quando abaixo de 95%).",
                     "en": "{cov}% of the validation samples were estimated (grey when below 95%).",
                     "es": "{cov}% de las muestras de validación fueron estimadas (en gris por debajo de 95%)."},
+    "cv_gap_tip": {"pt": "Este raio deixaria {gap}% do talhão sem valor (falhas no mapa), por isso não pode ser sugerido.",
+                   "en": "This radius would leave {gap}% of the field without value (gaps in the map), so it cannot be suggested.",
+                   "es": "Este radio dejaría el {gap}% del lote sin valor (huecos en el mapa), por eso no puede sugerirse."},
     "cv_best": {
         "pt": "<b>Melhor combinação: P = {p} e raio {mult}× ({radius} m).</b> Erro médio (RMSE) = {rmse}, "
               "cerca de {pct}% da média. O P foi refinado em passos de 0,1 para o raio escolhido.",
@@ -591,13 +648,16 @@ STRINGS = {
     "cv_explain": {
         "pt": "Cada número da tabela é o erro médio ao estimar as amostras de validação como se elas "
               "não existissem. Quanto menor, melhor o mapa representa os dados. Compare as linhas (P) e "
-              "as colunas (raio) para ver como cada parâmetro muda o erro.",
+              "as colunas (raio) para ver como cada parâmetro muda o erro. Valores em cinza deixariam "
+              "falhas no mapa e não são sugeridos.",
         "en": "Each number in the table is the average error when estimating the validation samples as "
               "if they did not exist. The lower, the better the map represents the data. Compare rows (P) "
-              "and columns (radius) to see how each parameter changes the error.",
+              "and columns (radius) to see how each parameter changes the error. Grey values would leave "
+              "gaps in the map and are not suggested.",
         "es": "Cada número de la tabla es el error medio al estimar las muestras de validación como si no "
               "existieran. Cuanto menor, mejor representa el mapa los datos. Compare filas (P) y columnas "
-              "(radio) para ver cómo cada parámetro cambia el error."},
+              "(radio) para ver cómo cada parámetro cambia el error. Los valores en gris dejarían huecos "
+              "en el mapa y no se sugieren."},
     "cv_apply": {"pt": "Aplicar", "en": "Apply", "es": "Aplicar"},
     "cv_close": {"pt": "Fechar", "en": "Close", "es": "Cerrar"},
     "cv_more": {
@@ -667,16 +727,16 @@ STRINGS = {
                     "es": "Revise sus elecciones y haga clic en Ejecutar."},
     "p4_summary": {
         "pt": "<b>Contorno:</b> {boundary} ({crs}), {area} ha<br><b>Tolerância:</b> {tol} m<br>"
-              "<b>Pasta de saída:</b> {folder}<br><br><b>Atributos ({n}):</b><ul>{items}</ul>"
-              "<b>IDW:</b> P = {power}; raio = {radius}; pixel = {pixel} m<br>"
+              "<b>Pasta de saída:</b> {folder}<br><br><b>Atributos e parâmetros do IDW ({n}):</b><ul>{items}</ul>"
+              "<b>Pixel:</b> {pixel} m<br>"
               "<b>Estilo:</b> graduado, {classes} classes, quebras naturais (Jenks), {ramp}",
         "en": "<b>Boundary:</b> {boundary} ({crs}), {area} ha<br><b>Tolerance:</b> {tol} m<br>"
-              "<b>Output folder:</b> {folder}<br><br><b>Fields ({n}):</b><ul>{items}</ul>"
-              "<b>IDW:</b> P = {power}; radius = {radius}; pixel = {pixel} m<br>"
+              "<b>Output folder:</b> {folder}<br><br><b>Attributes and IDW parameters ({n}):</b><ul>{items}</ul>"
+              "<b>Pixel:</b> {pixel} m<br>"
               "<b>Style:</b> graduated, {classes} classes, natural breaks (Jenks), {ramp}",
         "es": "<b>Contorno:</b> {boundary} ({crs}), {area} ha<br><b>Tolerancia:</b> {tol} m<br>"
-              "<b>Carpeta de salida:</b> {folder}<br><br><b>Atributos ({n}):</b><ul>{items}</ul>"
-              "<b>IDW:</b> P = {power}; radio = {radius}; píxel = {pixel} m<br>"
+              "<b>Carpeta de salida:</b> {folder}<br><br><b>Atributos y parámetros del IDW ({n}):</b><ul>{items}</ul>"
+              "<b>Píxel:</b> {pixel} m<br>"
               "<b>Estilo:</b> graduado, {classes} clases, cortes naturales (Jenks), {ramp}"},
     "help_page4": {
         "pt": "<b>Etapa 4: Resumo</b><br><br>Ao clicar em <b>Executar</b>:<br>"
@@ -701,6 +761,8 @@ STRINGS = {
     # ---------------------------------------------------------------- pipeline
     "log_interpolating": {"pt": "Interpolando {label}...", "en": "Interpolating {label}...",
                           "es": "Interpolando {label}..."},
+    "log_params": {"pt": "  {label}: P = {p}, raio = {r}", "en": "  {label}: P = {p}, radius = {r}",
+                   "es": "  {label}: P = {p}, radio = {r}"},
     "log_fixing": {"pt": "Corrigindo geometrias do contorno...", "en": "Fixing boundary geometries...",
                    "es": "Corrigiendo geometrías del contorno..."},
     "log_grid": {"pt": "Criando a grade de polígonos...", "en": "Creating the polygon grid...",
@@ -761,6 +823,7 @@ STRINGS = {
               "zonal, a média de cada atributo em cada célula.\n\n"
               "O retângulo envolvente do contorno define a área da interpolação. A tolerância aceita "
               "pontos um pouco fora do contorno. Raio 0 usa todas as amostras.\n\n"
+              "Opção: escolher P e raio de cada atributo por validação cruzada.\n\n"
               "As camadas devem estar em um sistema projetado em metros. A saída é carregada com estilo "
               "graduado (5 classes, Jenks, RdYlGn) do primeiro atributo. Para uma camada estilizada por "
               "atributo, use o assistente em Vetor > AgriPrecisa.",
@@ -769,6 +832,7 @@ STRINGS = {
               "field in each cell.\n\n"
               "The boundary bounding box defines the interpolation area. The tolerance accepts points "
               "slightly outside the boundary. Radius 0 uses all samples.\n\n"
+              "Option: choose P and radius of each attribute by cross-validation.\n\n"
               "Layers must be in a projected CRS in metres. The output is loaded with a graduated style "
               "(5 classes, Jenks, RdYlGn) on the first field. For one styled layer per field, use the "
               "wizard in Vector > AgriPrecisa.",
@@ -777,6 +841,7 @@ STRINGS = {
               "zonal, el promedio de cada atributo en cada celda.\n\n"
               "El rectángulo envolvente del contorno define el área de interpolación. La tolerancia "
               "acepta puntos algo fuera del contorno. Radio 0 usa todas las muestras.\n\n"
+              "Opción: elegir P y radio de cada atributo por validación cruzada.\n\n"
               "Las capas deben estar en un SRC proyectado en metros. La salida se carga con estilo "
               "graduado (5 clases, Jenks, RdYlGn) del primer atributo. Para una capa con estilo por "
               "atributo, use el asistente en Vectorial > AgriPrecisa."},

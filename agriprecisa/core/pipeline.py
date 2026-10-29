@@ -12,7 +12,7 @@ import os
 from osgeo import gdal
 from qgis import processing
 from qgis.core import (
-    QgsCoordinateTransform, QgsFeatureRequest, QgsGeometry, QgsRectangle,
+    QgsCoordinateTransform, QgsFeatureRequest, QgsGeometry, QgsRectangle, QgsPointXY,
     QgsProcessingException, QgsProcessingMultiStepFeedback, QgsProcessingUtils,
     QgsGraduatedSymbolRenderer, QgsClassificationJenks, QgsStyle, QgsFillSymbol,
 )
@@ -161,6 +161,45 @@ def sample_stats(source, fields, boundary_geom, boundary_crs, search_rect, trans
     return stats
 
 
+def field_cell_centres(boundary_geom, max_side=90):
+    """
+    Centres of a coarse grid (about ``max_side`` cells on the longest side) that fall
+    inside the field. Used to measure the coverage distance of each attribute.
+    Returns (xs, ys, grid, mask) with grid = (xmin, ymax, ncol, nrow, res).
+    """
+    import numpy as np
+    bb = boundary_geom.boundingBox()
+    res = max(max(bb.width(), bb.height()) / max_side, 0.5)
+    xmin, ymin, xmax, ymax, ncol, nrow = snap_extent(
+        bb.xMinimum(), bb.yMinimum(), bb.xMaximum(), bb.yMaximum(), res)
+    engine = QgsGeometry.createGeometryEngine(boundary_geom.constGet())
+    engine.prepareGeometry()
+    mask = np.zeros((nrow, ncol), dtype=bool)
+    for r in range(nrow):
+        y = ymax - (r + 0.5) * res
+        for c in range(ncol):
+            # keep a reference to the point geometry while GEOS uses it (a temporary
+            # QgsGeometry is freed too early and the test always returned False)
+            pt = QgsGeometry.fromPointXY(QgsPointXY(xmin + (c + 0.5) * res, y))
+            mask[r, c] = engine.intersects(pt.constGet())
+    rows, cols = np.nonzero(mask)
+    return xmin + (cols + 0.5) * res, ymax - (rows + 0.5) * res, (xmin, ymax, ncol, nrow, res), mask
+
+
+def edge_distances(boundary_geom, xs, ys):
+    """Distance of each sample to the field border; -1 for samples outside the field."""
+    import numpy as np
+    engine = QgsGeometry.createGeometryEngine(boundary_geom.constGet())
+    engine.prepareGeometry()
+    border = QgsGeometry(boundary_geom.constGet().boundary())
+    out = np.full(len(xs), -1.0)
+    for k, (x, y) in enumerate(zip(xs, ys)):
+        pt = QgsGeometry.fromPointXY(QgsPointXY(float(x), float(y)))
+        if engine.intersects(pt.constGet()):
+            out[k] = border.distance(pt)
+    return out
+
+
 def write_geotiff(path, array, xmin, ymax, res, crs):
     nrow, ncol = array.shape
     ds = gdal.GetDriverByName("GTiff").Create(
@@ -205,10 +244,14 @@ class IdwJob:
     output_path    : .gpkg path for the final polygon grid
     raster_folder  : folder for the interpolated GeoTIFFs
     stamp          : text added to raster file names (avoids overwriting)
+    params         : optional list of (power, radius), one per item; each attribute has
+                     its own spatial dependence, so each may have its own IDW parameters.
+                     When omitted, ``power`` and ``radius`` are used for every item.
     """
 
     def __init__(self, boundary_input, boundary_extent, boundary_crs, items,
-                 tolerance, power, radius, pixel, raster_folder, output_path, stamp=""):
+                 tolerance, power, radius, pixel, raster_folder, output_path, stamp="",
+                 params=None):
         self.boundary_input = boundary_input
         self.boundary_extent = boundary_extent
         self.boundary_crs = boundary_crs
@@ -220,6 +263,11 @@ class IdwJob:
         self.raster_folder = raster_folder
         self.output_path = output_path
         self.stamp = stamp
+        if params is None:
+            params = [(self.power, self.radius)] * len(items)
+        if len(params) != len(items):
+            raise ValueError("params must have one (power, radius) per item")
+        self.params = [(float(p), float(r)) for p, r in params]
 
     def grid(self):
         e = self.boundary_extent
@@ -248,7 +296,7 @@ def run_idw_job(job, context, feedback):
     layers, warnings = [], []
 
     # 1) IDW for each field
-    for (source, field), prefix in zip(job.items, prefixes):
+    for (source, field), prefix, (power, radius) in zip(job.items, prefixes, job.params):
         steps.setCurrentStep(step)
         step += 1
         label = f"{field} ({name_of(source)})"
@@ -263,7 +311,9 @@ def run_idw_job(job, context, feedback):
             steps.setProgress(frac * 100.0)
             return not feedback.isCanceled()
 
-        grid = idw_grid(xs, ys, zs, xmin, ymax, ncol, nrow, res, job.power, job.radius, cb)
+        feedback.pushInfo(tr("log_params", label=label, p=f"{power:g}",
+                             r=tr("no_limit") if radius == 0 else f"{radius:.1f} m"))
+        grid = idw_grid(xs, ys, zs, xmin, ymax, ncol, nrow, res, power, radius, cb)
         if grid is None or feedback.isCanceled():
             raise QgsProcessingException(tr("canceled"))
         raster = os.path.join(
@@ -271,7 +321,8 @@ def run_idw_job(job, context, feedback):
             f"IDW_{safe_name(name_of(source), 25)}_{safe_name(field, 25)}{job.stamp}.tif")
         write_geotiff(raster, grid, xmin, ymax, res, crs)
         layers.append({"prefix": prefix, "field": field, "label": label,
-                       "mean_field": prefix + "_mean", "raster": raster, "n": len(zs)})
+                       "mean_field": prefix + "_mean", "raster": raster, "n": len(zs),
+                       "power": power, "radius": radius})
 
     if not layers:
         raise QgsProcessingException(tr("err_nothing_interpolated") + "\n" + "\n".join(warnings))
