@@ -8,11 +8,15 @@ from qgis.core import (
     QgsProcessingAlgorithm, QgsProcessingException, QgsProcessingParameterFeatureSource,
     QgsProcessingParameterField, QgsProcessingParameterNumber,
     QgsProcessingParameterFolderDestination, QgsProcessingParameterVectorDestination,
-    QgsProcessingLayerPostProcessorInterface,
+    QgsProcessingLayerPostProcessorInterface, QgsProcessingParameterBoolean,
 )
 
 from ..core.compat import SRC_POINT, SRC_POLYGON, FIELD_NUMERIC, NUMBER_DOUBLE
-from ..core.pipeline import IdwJob, run_idw_job, crs_in_meters, features_extent, style_graduated
+from ..core.pipeline import (
+    IdwJob, run_idw_job, crs_in_meters, features_extent, style_graduated, boundary_geometry,
+    field_cell_centres, edge_distances, extract_points, buffered,
+)
+from ..core.idw_math import coverage_distances, suggest_parameters, CV_MIN_VALIDATION
 from ..i18n import tr
 
 ICON = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icon.png")
@@ -46,6 +50,7 @@ class IdwGridAlgorithm(QgsProcessingAlgorithm):
     POWER = "POWER"
     RADIUS = "RADIUS"
     PIXEL = "PIXEL"
+    AUTO_PARAMS = "AUTO_PARAMS"
     RASTER_FOLDER = "RASTER_FOLDER"
     OUTPUT = "OUTPUT"
 
@@ -89,6 +94,8 @@ class IdwGridAlgorithm(QgsProcessingAlgorithm):
             self.RADIUS, tr("alg_p_radius"), NUMBER_DOUBLE, 100.0, minValue=0.0))
         self.addParameter(QgsProcessingParameterNumber(
             self.PIXEL, tr("alg_p_pixel"), NUMBER_DOUBLE, 5.0, minValue=0.1))
+        self.addParameter(QgsProcessingParameterBoolean(
+            self.AUTO_PARAMS, tr("alg_p_auto"), defaultValue=False))
         self.addParameter(QgsProcessingParameterFolderDestination(
             self.RASTER_FOLDER, tr("alg_p_folder")))
         self.addParameter(QgsProcessingParameterVectorDestination(
@@ -122,14 +129,23 @@ class IdwGridAlgorithm(QgsProcessingAlgorithm):
         os.makedirs(folder, exist_ok=True)
         output = self.parameterAsOutputLayer(parameters, self.OUTPUT, context)
 
+        tolerance = self.parameterAsDouble(parameters, self.TOLERANCE, context)
+        power = self.parameterAsDouble(parameters, self.POWER, context)
+        radius = self.parameterAsDouble(parameters, self.RADIUS, context)
+        params = [(power, radius)] * len(fields)
+        if self.parameterAsBoolean(parameters, self.AUTO_PARAMS, context):
+            params = self.cross_validated_params(boundary, points, fields, extent, tolerance,
+                                                 power, radius, context, feedback)
+
         job = IdwJob(
+            params=params,
             boundary_input=parameters[self.BOUNDARY],
             boundary_extent=extent,
             boundary_crs=boundary.sourceCrs(),
             items=[(points, f) for f in fields],
-            tolerance=self.parameterAsDouble(parameters, self.TOLERANCE, context),
-            power=self.parameterAsDouble(parameters, self.POWER, context),
-            radius=self.parameterAsDouble(parameters, self.RADIUS, context),
+            tolerance=tolerance,
+            power=power,
+            radius=radius,
             pixel=self.parameterAsDouble(parameters, self.PIXEL, context),
             raster_folder=folder,
             output_path=output,
@@ -143,3 +159,38 @@ class IdwGridAlgorithm(QgsProcessingAlgorithm):
         for info in result["layers"]:
             feedback.pushInfo(tr("done_line", label=info["label"], n=info["n"]))
         return {self.OUTPUT: output, self.RASTER_FOLDER: folder}
+
+    def cross_validated_params(self, boundary, points, fields, extent, tolerance,
+                               power, radius, context, feedback):
+        """
+        (power, radius) for each field chosen by its own cross-validation; each attribute
+        has its own spatial dependence and variability. Falls back to the given values.
+        """
+        geom = boundary_geometry(boundary.getFeatures())
+        px, py, _, _ = field_cell_centres(geom)
+        rect = buffered(extent, tolerance)
+        crs = boundary.sourceCrs()
+        out = []
+        for f in fields:
+            if feedback.isCanceled():
+                raise QgsProcessingException(tr("canceled"))
+            label = f"{f} ({points.sourceName()})"
+            feedback.pushInfo(tr("cv_all_progress", label=label))
+            xs, ys, zs = extract_points(points, f, rect, crs, context.transformContext())
+            typical, cover, nearest = coverage_distances(px, py, xs, ys, return_nearest=True)
+            res = None
+            if cover:
+                res = suggest_parameters(xs, ys, zs, edge_distances(geom, xs, ys), cover, typical,
+                                         pixel_nearest=nearest)
+            if res is None or res.get("error"):
+                reason = (tr("cv_reason_cover") if res is None else
+                          tr("cv_few", n=res["n_val"], min=CV_MIN_VALIDATION)
+                          if res["error"] == "few" else tr("cv_failed"))
+                feedback.reportError(tr("alg_log_auto_fail", label=label, reason=reason,
+                                        p=f"{power:g}", r=f"{radius:g} m"), fatalError=False)
+                out.append((power, radius))
+                continue
+            feedback.pushInfo(tr("alg_log_auto", label=label, p=f"{res['power']:g}",
+                                 r=f"{res['radius']:.1f}", rmse=f"{res['best_rmse']:.4g}"))
+            out.append((res["power"], res["radius"]))
+        return out

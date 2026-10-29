@@ -181,7 +181,7 @@ def nearest_distances(px, py, xs, ys):
     return out
 
 
-def coverage_distances(px, py, xs, ys):
+def coverage_distances(px, py, xs, ys, return_nearest=False):
     """
     (typical, coverage) distances from field pixels to the nearest sample:
     typical  = median  -> how far a usual pixel is from data (used as exclusion zone)
@@ -191,8 +191,9 @@ def coverage_distances(px, py, xs, ys):
     d = nearest_distances(px, py, xs, ys)
     d = d[np.isfinite(d)]
     if d.size == 0:
-        return None, None
-    return float(np.percentile(d, 50)), float(np.percentile(d, 95))
+        return (None, None, d) if return_nearest else (None, None)
+    typical, cover = float(np.percentile(d, 50)), float(np.percentile(d, 95))
+    return (typical, cover, d) if return_nearest else (typical, cover)
 
 
 def select_validation_samples(xs, ys, zs, edge_dist, n_target=60, edge_buffer=0.0,
@@ -289,9 +290,64 @@ def best_combination(rmse, coverage, min_coverage=0.95):
     """(i, j) of the lowest RMSE among combinations covering at least ``min_coverage``."""
     valid = np.isfinite(rmse) & (coverage >= min_coverage)
     if not valid.any():
-        valid = np.isfinite(rmse)
+        valid = np.isfinite(rmse) & (coverage > 0)
     if not valid.any():
         return None
     masked = np.where(valid, rmse, np.inf)
     i, j = np.unravel_index(int(np.argmin(masked)), rmse.shape)
     return int(i), int(j)
+
+
+CV_POWERS = [1.0, 1.5, 2.0, 2.5, 3.0]
+CV_MULTIPLES = [1.0, 1.5, 2.0, 3.0, 4.0]
+CV_N_TARGET = 60
+CV_MIN_VALIDATION = 10
+
+
+MIN_PIXEL_COVERAGE = 0.99   # a suggested radius must leave at most 1 % of the field without value
+
+
+def suggest_parameters(xs, ys, zs, edge_dist, coverage, typical, n_target=CV_N_TARGET,
+                       pixel_nearest=None):
+    """
+    Full cross-validation for ONE attribute (each attribute has its own spatial dependence
+    and variability, so each gets its own P and radius).
+
+    Radii tested are multiples of the attribute's coverage distance; the exclusion zone is
+    its typical pixel-to-sample distance. Returns None when there are too few validation
+    samples or no combination works; otherwise a dict with the coarse RMSE table, the best
+    cell, the power refined in 0.1 steps and the chosen radius.
+
+    ``pixel_nearest`` (distance of each field pixel to its nearest sample) makes sure the
+    suggested radius does not leave gaps in the map: radii covering less than
+    MIN_PIXEL_COVERAGE of the field are reported but cannot be chosen.
+    """
+    xs, ys, zs = (np.asarray(a, float) for a in (xs, ys, zs))
+    if not coverage or coverage <= 0 or zs.size == 0:
+        return None
+    val = select_validation_samples(xs, ys, zs, edge_dist, n_target=n_target, edge_buffer=coverage)
+    if len(val) < CV_MIN_VALIDATION:
+        return {"error": "few", "n_val": int(len(val))}
+    radii = np.array(CV_MULTIPLES) * coverage
+    exclusion = typical or 0.0
+    rmse, cov = cross_validate_idw(xs, ys, zs, val, CV_POWERS, radii, exclusion)
+    if pixel_nearest is not None and np.size(pixel_nearest):
+        pn = np.asarray(pixel_nearest, float)
+        map_cov = np.array([np.mean(pn <= r) for r in radii])
+    else:
+        map_cov = np.ones(radii.size)
+    allowed = np.where(map_cov[None, :] >= MIN_PIXEL_COVERAGE, cov, 0.0)
+    best = best_combination(rmse, allowed, min_coverage=0.95) if (allowed > 0).any() else None
+    if best is None:
+        return {"error": "failed", "n_val": int(len(val))}
+    fine = np.round(np.arange(1.0, 3.0001, 0.1), 1)
+    rf, cf = cross_validate_idw(xs, ys, zs, val, fine, radii[[best[1]]], exclusion)
+    k = best_combination(rf, cf)
+    power = float(fine[k[0]]) if k else float(CV_POWERS[best[0]])
+    return {
+        "rmse": rmse, "coverage": cov, "best": best, "power": power,
+        "multiple": CV_MULTIPLES[best[1]], "radius": float(CV_MULTIPLES[best[1]] * coverage),
+        "best_rmse": float(rf[k] if k else rmse[best]), "n_val": int(len(val)),
+        "exclusion": float(exclusion), "mean": float(np.mean(zs[val])),
+        "map_coverage": map_cov,
+    }

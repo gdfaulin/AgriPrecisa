@@ -11,9 +11,10 @@ import numpy as np
 from qgis.PyQt.QtCore import Qt, QPointF, QRectF
 from qgis.PyQt.QtGui import QColor, QImage, QPainter, QPainterPath, QPen, QBrush
 from qgis.PyQt.QtWidgets import QSizePolicy, QWidget
-from qgis.core import QgsGeometry, QgsPointXY, QgsStyle
+from qgis.core import QgsStyle
 
-from ..core.idw_math import NODATA, idw_grid, relative_weights, snap_extent
+from ..core.idw_math import NODATA, idw_grid, relative_weights
+from ..core.pipeline import field_cell_centres
 from ..i18n import tr, fmt
 
 CURVE_COLOR = QColor(26, 150, 65)        # green of the RdYlGn ramp
@@ -147,25 +148,11 @@ class PreviewMap(QWidget):
 
     def set_boundary(self, geom):
         """Prepare the preview grid and the inside/outside mask for the boundary."""
-        bb = geom.boundingBox()
-        side = max(bb.width(), bb.height())
-        res = max(side / self.MAX_CELLS_SIDE, 0.5)
-        xmin, ymin, xmax, ymax, ncol, nrow = snap_extent(
-            bb.xMinimum(), bb.yMinimum(), bb.xMaximum(), bb.yMaximum(), res)
-        self.extent = (xmin, ymin, xmax, ymax)
-        self.grid = (xmin, ymax, ncol, nrow, res)
-        engine = QgsGeometry.createGeometryEngine(geom.constGet())
-        engine.prepareGeometry()
-        mask = np.zeros((nrow, ncol), dtype=bool)
-        for r in range(nrow):
-            y = ymax - (r + 0.5) * res
-            for c in range(ncol):
-                x = xmin + (c + 0.5) * res
-                # keep a reference to the point geometry while GEOS uses it: a temporary
-                # QgsGeometry is freed too early and the test always returned False
-                pt = QgsGeometry.fromPointXY(QgsPointXY(x, y))
-                mask[r, c] = engine.intersects(pt.constGet())
+        _, _, grid, mask = field_cell_centres(geom, self.MAX_CELLS_SIDE)
+        xmin, ymax, ncol, nrow, res = grid
+        self.grid = grid
         self.mask = mask
+        self.extent = (xmin, ymax - nrow * res, xmin + ncol * res, ymax)
 
     def set_show_points(self, show):
         self.show_points = bool(show)

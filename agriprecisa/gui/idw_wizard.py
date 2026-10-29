@@ -30,7 +30,7 @@ from ..core.pipeline import (
 )
 from ..core.idw_math import snap_extent, sample_density
 from ..i18n import tr, fmt
-from .params_page import ParametersPage
+from .params_page import ParametersPage, ORIGIN_TEXT
 
 
 # ---------------------------------------------------------------------------
@@ -314,15 +314,17 @@ class SummaryPage(QWizardPage):
 
     def initializePage(self):
         w = self.wizard()
-        items = "".join(f"<li>{l.name()}: {f}</li>" for l, f in w.items)
-        radius = tr("no_limit") if w.radius == 0 else f"{w.radius:g} m"
+        origins = getattr(w, "param_origins", ["default"] * len(w.items))
+        items = "".join(
+            tr("p4_item", layer=l.name(), field=f, p=fmt(p, 1),
+               r=tr("no_limit") if r == 0 else fmt(r) + " m", origin=tr(ORIGIN_TEXT[o]))
+            for (l, f), (p, r), o in zip(w.items, w.params, origins))
         sel = f" ({tr('selected_features')})" if w.selected_only else ""
         self.text.setHtml(tr(
             "p4_summary", boundary=w.boundary.name() + sel, crs=crs_code(w.boundary.crs()),
             area=fmt(w.area_ha, 2),
             tol=f"{w.tolerance:g}", folder=w.folder, n=len(w.items), items=items,
-            power=f"{w.power:g}", radius=radius, pixel=f"{w.pixel:g}",
-            classes=N_CLASSES, ramp=COLOR_RAMP))
+            pixel=f"{w.pixel:g}", classes=N_CLASSES, ramp=COLOR_RAMP))
 
 
 # ---------------------------------------------------------------------------
@@ -340,7 +342,7 @@ class IdwWizard(QWizard):
         self.setButtonText(QWizard.WizardButton.FinishButton, tr("run"))
         self.setButtonText(QWizard.WizardButton.CancelButton, tr("cancel"))
         self.setMinimumSize(880, 680)
-        self.resize(960, 740)
+        self.resize(1000, 880)
 
         self.boundary = None
         self.selected_only = False
@@ -351,8 +353,8 @@ class IdwWizard(QWizard):
         self.tolerance = 50.0
         self.folder = ""
         self.items = []
-        self.power = 2.0
-        self.radius = 100.0
+        self.params = []          # (power, radius) per item, set in step 3
+        self.param_origins = []
         self.pixel = 5.0
 
         for page in (BoundaryPage(), PointsPage(), ParametersPage(), SummaryPage()):
@@ -395,7 +397,8 @@ def load_results(result, wizard):
     group = root.findGroup(group_name) or root.insertGroup(0, group_name)
     first = None
     for i, info in enumerate(result["layers"]):
-        name = f"{info['label']} | IDW P={wizard.power:g} {wizard.pixel:g} m"
+        r = tr("no_limit") if info["radius"] == 0 else f"R={info['radius']:.0f} m"
+        name = f"{info['label']} | IDW P={info['power']:g} {r} {wizard.pixel:g} m"
         layer = QgsVectorLayer(result["output"], name, "ogr")
         if not layer.isValid():
             result["warnings"].append(tr("warn_load", label=info["label"]))
@@ -419,8 +422,9 @@ def run_wizard(iface):
     if wizard.selected_only:
         boundary_input = QgsProcessingFeatureSourceDefinition(wizard.boundary.id(), True)
     job = IdwJob(boundary_input, wizard.boundary_extent, wizard.boundary.crs(), wizard.items,
-                 wizard.tolerance, wizard.power, wizard.radius, wizard.pixel,
-                 wizard.folder, os.path.join(wizard.folder, f"Grid_IDW{stamp}.gpkg"), stamp)
+                 wizard.tolerance, 2.0, 0.0, wizard.pixel,
+                 wizard.folder, os.path.join(wizard.folder, f"Grid_IDW{stamp}.gpkg"), stamp,
+                 params=wizard.params)
 
     progress = QProgressDialog(tr("starting"), tr("cancel"), 0, 100, iface.mainWindow())
     progress.setWindowTitle(tr("wizard_title"))

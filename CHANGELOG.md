@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.0 (2026)
+- IDW parameters per attribute (each attribute has its own spatial dependence and variability):
+  - attribute selector at the top of step 3; sliders, curve and preview apply to the chosen attribute;
+  - summary table with P, radius and origin (default, validation, manual) of every attribute;
+  - "Suggest for this one" (with the RMSE table) and "Suggest for all".
+- Each attribute starts with P = 2 and a radius of twice its own coverage distance.
+- Cross-validation never suggests a radius that leaves more than 1% of the field without value (shown in grey in the table). Regression test added.
+- Processing algorithm: new option to choose P and radius of each attribute by cross-validation.
+- Step 3 inside a scroll area (no overlapping texts on small screens); larger default window.
+- Fix: radius of exactly 1.5x was described as "short" because of rounding (regression test).
+
 ## 1.2.0 (2026)
 - Step 3: "Show samples" toggle in the map preview (hidden by default above 500 samples).
 - Search radius based on the coverage distance (95th percentile of the distance from field pixels to the nearest sample). Fixes strips without value between sensor passes, where the density-based spacing was too small.

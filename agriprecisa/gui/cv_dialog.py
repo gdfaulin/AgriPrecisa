@@ -14,8 +14,7 @@ from qgis.PyQt.QtWidgets import (
 
 from ..i18n import tr, fmt
 
-CV_POWERS = [1.0, 1.5, 2.0, 2.5, 3.0]
-CV_MULTIPLES = [1.0, 1.5, 2.0, 3.0, 4.0]
+from ..core.idw_math import CV_POWERS, CV_MULTIPLES  # noqa: E402  (shared with the core)
 BEST_COLOR = QColor(166, 217, 106)      # light green of the RdYlGn ramp
 
 
@@ -31,7 +30,7 @@ class CrossValidationDialog(QDialog):
     linkActivated = pyqtSignal(str)
 
     def __init__(self, parent, attribute, rmse, coverage, spacing, best, best_power,
-                 n_val, exclusion, mean):
+                 n_val, exclusion, mean, map_coverage=None):
         super().__init__(parent)
         self.setWindowTitle(tr("cv_title"))
         self.resize(700, 540)
@@ -68,6 +67,9 @@ class CrossValidationDialog(QDialog):
                     item.setToolTip(tr("cv_cell_tip", cov=fmt(cov * 100)))
                     if cov < 0.95:
                         item.setForeground(QColor(150, 150, 150))
+                    if map_coverage is not None and map_coverage[c] < 0.99:
+                        item.setForeground(QColor(150, 150, 150))
+                        item.setToolTip(tr("cv_gap_tip", gap=fmt((1 - map_coverage[c]) * 100, 1)))
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 if (r, c) == (i, j):
                     font = QFont(item.font())
