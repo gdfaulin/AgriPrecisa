@@ -185,16 +185,15 @@ shot = os.environ.get("AGRIPRECISA_SHOT")
 if shot:
     wz.grab().save(shot)
 
-# 3c) Step 3 (student mode): sliders, texts, spacing, curve and live preview
+# 3c) Step 3: sliders, texts, spacing, weight chart, influence bars and live preview
 from qgis.core import QgsSettings
-QgsSettings().remove("AgriPrecisa/idw_student_mode")   # first run -> student mode
 for k in range(amostras.childCount()):
     amostras.child(k).setCheckState(0, Qt.CheckState.Checked)
 wz.next()
 p3 = wz.currentPage()
 print("Step 3 page:", p3.title())
-if not p3.radio_student.isChecked():
-    errors.append("step 3 should open in student mode by default")
+if hasattr(p3, "radio_advanced") or hasattr(p3, "spin_p"):
+    errors.append("the standard layout should no longer exist in step 3")
 print("Spacing:", round(p3.spacing, 1), "m; radius:", p3.radius(), "m; P:", p3.power())
 # coverage distance of a ~55 x 50 m grid: between the typical distance and the half diagonal
 if not (p3.typical < p3.spacing < 45):
@@ -267,26 +266,33 @@ if cmp_dir:
         p3.slider_p.setValue(pv)
         p3.refresh_preview()
         app.processEvents()
-        p3.stack.currentWidget().grab().save(os.path.join(cmp_dir, f"p{pv}.png"))
+        p3.controls.parentWidget().grab().save(os.path.join(cmp_dir, f"p{pv}.png"))
     p3.slider_p.setValue(20)
     p3.refresh_preview()
 shot3 = os.environ.get("AGRIPRECISA_SHOT3")
 if shot3:
     wz.grab().save(shot3)
-# switch to advanced: values carried over; mode remembered
-p3.radio_advanced.setChecked(True)
-print("Advanced:", p3.spin_p.value(), p3.spin_r.value())
-if p3.spin_p.value() != 2.0 or abs(p3.spin_r.value() - round(2 * p3.spacing, 1)) > 0.1:
-    errors.append("values not carried to advanced mode")
-if QgsSettings().value("AgriPrecisa/idw_student_mode", True, type=bool):
-    errors.append("mode choice not remembered")
-p3.spin_p.setValue(5.0)
-p3.radio_student.setChecked(True)
-if p3.slider_p.value() != 30:
-    errors.append("P above 3 should be clamped to 3 when returning to student mode")
+# wider slider ranges replace the old standard layout: P 0.5 to 5.0, radius 1x to 6x
+if (p3.slider_p.minimum(), p3.slider_p.maximum(), p3.slider_r.minimum(), p3.slider_r.maximum()) != (5, 50, 10, 60):
+    errors.append("sliders should cover P 0.5-5.0 and radius 1x-6x")
+# weight chart follows Shepard (1968): weight 1 at the typical distance, no plateau at d = 0
+print("Curve d_ref:", round(p3.curve.d_ref, 2), "typical:", round(p3.typical, 2))
+if abs(p3.curve.d_ref - p3.typical) > 1e-6:
+    errors.append("weight curve should be relative to the typical pixel-to-sample distance")
+# influence bars: shares of a typical pixel sum to 100 %, nearest gets more with higher P
+p3.slider_p.setValue(10); p3.refresh_preview()
+low_rows, low_rest = p3.bars.shares()
+p3.slider_p.setValue(40); p3.refresh_preview()
+high_rows, high_rest = p3.bars.shares()
+print("Bars P=1:", [round(v, 3) for _, v in low_rows], "| P=4:", [round(v, 3) for _, v in high_rows])
+if abs(sum(v for _, v in high_rows) + high_rest - 1.0) > 1e-9 or not high_rows:
+    errors.append("influence shares should add up to 100 %")
+elif not high_rows[0][1] > low_rows[0][1]:
+    errors.append("higher P should give more influence to the nearest sample")
+p3.slider_p.setValue(45)                              # argila: P = 4,5 (beyond the old limit of 3)
 p3.validatePage()
 print("Wizard params:", wz.params, wz.param_origins, wz.pixel)
-if len(wz.params) != 2 or wz.params[0][0] != 3.0 or wz.params[1][0] != 2.0:
+if len(wz.params) != 2 or wz.params[0][0] != 4.5 or wz.params[1][0] != 2.0:
     errors.append("wizard should hand one (P, radius) per attribute to the job")
 wz.hide()
 
@@ -330,7 +336,6 @@ if not (q3.spacing > density_spacing and 6.5 < q3.spacing < 7.6):
     errors.append("coverage distance should see the 15 m gap between passes (~7 m), not the density spacing")
 if q3.check_points.isChecked():
     errors.append("many samples: preview should start with samples hidden")
-q3.radio_student.setChecked(True)
 q3.select_attribute(0)
 q3.run_cv_this()
 if not dialogs:
@@ -345,6 +350,10 @@ else:
         errors.append("'Aplicar' did not move the radius slider")
     if q3.table.item(0, 3).text() != "automático" or q3.table.item(1, 3).text() != "padrão":
         errors.append("'Ajuste automático' must change only the selected attribute")
+    # Regression: the suggested P (e.g. 0,6) was outside the rows of the table (P 1 to 3)
+    rows_p = [dlg.table.verticalHeaderItem(r).text() for r in range(dlg.table.rowCount())]
+    if rows_p[0] != "P = 0,5" or rows_p[-1] != "P = 5,0":
+        errors.append(f"cross-validation table should cover P 0,5 to 5,0, got {rows_p}")
     shot_cv = os.environ.get("AGRIPRECISA_SHOT_CV")
     if shot_cv:
         dlg.show(); app.processEvents()
@@ -361,16 +370,17 @@ if (st_ce["power"], st_ce["radius"]) == (st_ce2["power"], st_ce2["radius"]):
     errors.append("CE (smooth) and CE2 (short-range) should get different parameters")
 if not infos or "CE2" not in infos[-1]:
     errors.append("summary message of 'Ajuste automático para todos' missing")
-# new names of the buttons and layouts
+# names of the buttons
 if (q3.button_cv_this.text(), q3.button_cv_all.text()) != ("Ajuste automático", "Ajuste automático para todos"):
     errors.append("button texts should be 'Ajuste automático' / 'Ajuste automático para todos'")
-if (q3.radio_student.text(), q3.radio_advanced.text()) != ("Layout Didático", "Layout Padrão"):
-    errors.append("mode names should be 'Layout Didático' / 'Layout Padrão'")
 q3.select_attribute(1)
 q3.refresh_preview(); app.processEvents()
 # Regression: a suggested radius of 1,5x read "Raio curto" (10,8 / 7,23 = 1,49 before rounding)
 if "Raio recomendado" not in q3.label_r_text.text():
     errors.append("1,5x radius should be described as recommended")
+# Regression: right column (weight chart and bars) was cut when the content was wider than the window
+if content.minimumSizeHint().width() > q3.scroll.viewport().width() + 1 if (content := q3.scroll.widget()) else False:
+    errors.append("step 3 content wider than the default window")
 # Regression: texts of step 3 overlapped when the content did not fit the window
 content = q3.scroll.widget()
 print("Step 3 content min height:", content.minimumSizeHint().height(), "| visible:", q3.scroll.viewport().height(),

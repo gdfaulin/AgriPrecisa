@@ -124,8 +124,8 @@ def sample_density(n_samples, area_ha):
 # ---------------------------------------------------------------------------
 # Helpers for the didactic (student mode) parameter page
 # ---------------------------------------------------------------------------
-STUDENT_POWER_MIN, STUDENT_POWER_MAX = 1.0, 3.0
-STUDENT_RADIUS_MIN, STUDENT_RADIUS_MAX = 1.0, 4.0   # multiples of the sample spacing
+STUDENT_POWER_MIN, STUDENT_POWER_MAX = 0.5, 5.0
+STUDENT_RADIUS_MIN, STUDENT_RADIUS_MAX = 1.0, 6.0   # multiples of the coverage distance
 DEFAULT_RADIUS_MULTIPLE = 2.0
 
 
@@ -157,10 +157,50 @@ def radius_band(multiple):
     return "long"
 
 
-def relative_weights(distances, power, d_min):
-    """IDW weight relative to a sample at ``d_min`` metres: (d_min / d)^P, capped at 1."""
-    d = np.maximum(np.asarray(distances, dtype=float), d_min)
-    return (d_min / d) ** power
+def relative_weights(distances, power, d_ref):
+    """
+    IDW weight 1/d^P relative to the weight at the reference distance ``d_ref``:
+    (d_ref / d)^P. It equals 1 at d_ref, grows without limit as d -> 0 (a pixel lying on a
+    sample takes its value: IDW is an exact interpolator, Shepard 1968) and decays beyond.
+    Returns inf where d == 0.
+    """
+    d = np.asarray(distances, dtype=float)
+    with np.errstate(divide="ignore"):
+        return np.where(d > 0, (d_ref / np.where(d > 0, d, 1.0)) ** power, np.inf)
+
+
+def normalized_weights(distances, power):
+    """
+    Share of each sample in the estimate of one pixel: lambda_i = d_i^-P / sum(d_j^-P),
+    summing to 1 (Shepard, 1968). A sample at distance 0 takes 100 %.
+    """
+    d = np.asarray(distances, dtype=float)
+    if d.size == 0:
+        return d
+    zero = d <= 0
+    if zero.any():
+        return zero / zero.sum()
+    w = d ** (-power)
+    return w / w.sum()
+
+
+def typical_pixel_neighbours(px, py, xs, ys, radius, max_neighbours=None):
+    """
+    Distances (ascending) from a typical field pixel to the samples within ``radius``.
+    The typical pixel is the one whose nearest-sample distance is closest to the median of
+    all pixels, so the bars show what happens in an ordinary place of the field.
+    """
+    px, py = np.asarray(px, float), np.asarray(py, float)
+    xs, ys = np.asarray(xs, float), np.asarray(ys, float)
+    if px.size == 0 or xs.size == 0:
+        return np.array([])
+    nearest = nearest_distances(px, py, xs, ys)
+    k = int(np.argmin(np.abs(nearest - np.median(nearest))))
+    d = np.hypot(xs - px[k], ys - py[k])
+    if radius and radius > 0:
+        d = d[d <= radius]
+    d = np.sort(d)
+    return d[:max_neighbours] if max_neighbours else d
 
 
 # ---------------------------------------------------------------------------
@@ -298,8 +338,8 @@ def best_combination(rmse, coverage, min_coverage=0.95):
     return int(i), int(j)
 
 
-CV_POWERS = [1.0, 1.5, 2.0, 2.5, 3.0]
-CV_MULTIPLES = [1.0, 1.5, 2.0, 3.0, 4.0]
+CV_POWERS = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
+CV_MULTIPLES = [1.0, 1.5, 2.0, 3.0, 4.0, 6.0]
 CV_N_TARGET = 60
 CV_MIN_VALIDATION = 10
 
@@ -340,7 +380,7 @@ def suggest_parameters(xs, ys, zs, edge_dist, coverage, typical, n_target=CV_N_T
     best = best_combination(rmse, allowed, min_coverage=0.95) if (allowed > 0).any() else None
     if best is None:
         return {"error": "failed", "n_val": int(len(val))}
-    fine = np.round(np.arange(1.0, 3.0001, 0.1), 1)
+    fine = np.round(np.arange(STUDENT_POWER_MIN, STUDENT_POWER_MAX + 1e-9, 0.1), 1)
     rf, cf = cross_validate_idw(xs, ys, zs, val, fine, radii[[best[1]]], exclusion)
     k = best_combination(rf, cf)
     power = float(fine[k[0]]) if k else float(CV_POWERS[best[0]])

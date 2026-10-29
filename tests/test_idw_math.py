@@ -111,18 +111,40 @@ def test_mean_spacing_one_sample_per_hectare_is_100m():
 
 def test_power_and_radius_bands():
     from agriprecisa.core.idw_math import power_band, radius_band
-    assert [power_band(p) for p in (1.0, 1.4, 1.5, 2.0, 2.5, 2.6, 3.0)] == \
-        ["low", "low", "mid", "mid", "mid", "high", "high"]
+    assert [power_band(p) for p in (0.5, 1.0, 1.4, 1.5, 2.0, 2.5, 2.6, 5.0)] == \
+        ["low", "low", "low", "mid", "mid", "mid", "high", "high"]
     assert [radius_band(m) for m in (1.0, 1.5, 2.5, 3.0)] == ["short", "ok", "ok", "long"]
 
 
-def test_relative_weights_decay_faster_with_higher_power():
+def test_relative_weight_is_one_at_reference_and_infinite_at_zero():
+    # Regression: the chart showed weight 1 at distance 0 (a flat plateau); in IDW the
+    # weight 1/d^P grows without limit as d -> 0 (Shepard, 1968)
     from agriprecisa.core.idw_math import relative_weights
-    d = [5, 10, 20, 40]
-    w1, w3 = relative_weights(d, 1, 5), relative_weights(d, 3, 5)
-    assert w1[0] == pytest.approx(1.0) and w3[0] == pytest.approx(1.0)
-    assert w1[-1] == pytest.approx(0.125) and w3[-1] == pytest.approx(0.125 ** 3)
-    assert all(w3[1:] < w1[1:])
+    w = relative_weights([0.0, 2.0, 4.0, 8.0], 2, d_ref=4.0)
+    assert np.isinf(w[0])
+    assert w[1] == pytest.approx(4.0) and w[2] == pytest.approx(1.0) and w[3] == pytest.approx(0.25)
+    w1, w3 = relative_weights([8.0], 1, 4.0), relative_weights([8.0], 3, 4.0)
+    assert w3[0] < w1[0]                           # higher P: faster decay
+
+
+def test_normalized_weights_sum_to_one_and_concentrate_with_p():
+    from agriprecisa.core.idw_math import normalized_weights
+    d = [2.0, 4.0, 6.0, 8.0]
+    l1, l3 = normalized_weights(d, 1), normalized_weights(d, 3)
+    assert l1.sum() == pytest.approx(1.0) and l3.sum() == pytest.approx(1.0)
+    assert l1[0] == pytest.approx((1 / 2) / (1 / 2 + 1 / 4 + 1 / 6 + 1 / 8))
+    assert l3[0] > l1[0]                           # P = 3 gives more to the nearest sample
+    assert list(normalized_weights([0.0, 5.0], 2)) == [1.0, 0.0]
+    assert normalized_weights([], 2).size == 0
+
+
+def test_typical_pixel_neighbours():
+    from agriprecisa.core.idw_math import typical_pixel_neighbours
+    xs, ys = _grid(10, 10.0)
+    px, py = _grid(100, 1.0)
+    d = typical_pixel_neighbours(px, py, xs, ys, radius=20.0)
+    assert d.size >= 4 and np.all(np.diff(d) >= 0) and d.max() <= 20.0
+    assert typical_pixel_neighbours(px, py, xs, ys, 20.0, max_neighbours=3).size == 3
 
 
 # ------------------------------------------------------------- cross-validation

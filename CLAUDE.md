@@ -30,8 +30,8 @@ agriprecisa/                pasta do complemento (é o que vai no ZIP)
   core/compat.py            constantes compatíveis com QGIS 3.x e 4.x
   core/paths.py             pasta de saída padrão (última usada ou <projeto>/AgriPrecisa)
   gui/idw_wizard.py         assistente em 4 etapas
-  gui/params_page.py        Etapa 3: parâmetros por atributo, Layout Didático/Padrão, ajuste automático
-  gui/widgets.py            curva peso x distância e prévia do mapa
+  gui/params_page.py        Etapa 3: parâmetros por atributo (layout único), ajuste automático
+  gui/widgets.py            curva de peso (Shepard), barras de influência e prévia do mapa
   gui/cv_dialog.py          tabela de erro da validação cruzada
   processing_provider/      provedor e algoritmo da Caixa de Ferramentas
   i18n.py                   textos em pt, en e es (toda chave nos três idiomas)
