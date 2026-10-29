@@ -73,6 +73,8 @@ class ParametersPage(QWizardPage):
         # ---- top row: mode and attribute --------------------------------
         self.radio_student = QRadioButton(tr("p3_mode_student"))
         self.radio_advanced = QRadioButton(tr("p3_mode_advanced"))
+        self.radio_student.setToolTip(tr("p3_mode_student_tip"))
+        self.radio_advanced.setToolTip(tr("p3_mode_advanced_tip"))
         group = QButtonGroup(self)
         group.addButton(self.radio_student)
         group.addButton(self.radio_advanced)

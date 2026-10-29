@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.1 (2026)
+- New names: "Ajuste automático" / "Ajuste automático para todos" (EN: Auto-fit / Auto-fit all).
+- Modes renamed to "Layout Didático" (visual, for classes) and "Layout Padrão" (free values), with tooltips.
+- Parameter table origin "automático" for values from the auto-fit.
+
 ## 1.3.0 (2026)
 - IDW parameters per attribute (each attribute has its own spatial dependence and variability):
   - attribute selector at the top of step 3; sliders, curve and preview apply to the chosen attribute;
