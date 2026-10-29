@@ -247,8 +247,6 @@ class PointsPage(QWizardPage):
             parent.setCheckState(0, Qt.CheckState.Unchecked)
             for name in fields:
                 child = QTreeWidgetItem([name, "", ""])
-                fs = stats["fields"][name]
-                self.set_count_cell(child, fs["inside"], fs["used"])
                 child.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
                 child.setCheckState(0, Qt.CheckState.Unchecked)
                 child.setData(0, Qt.ItemDataRole.UserRole, (layer.id(), name))
@@ -258,13 +256,14 @@ class PointsPage(QWizardPage):
         self.label.setText(tr("p2_none") if found == 0 else tr("p2_found", n=found))
 
     def set_count_cell(self, item, inside, used):
-        """'4.969 (39,8 amostras/ha)', with the number of samples used in the tooltip."""
+        """'4.969 (39,8 amostras/ha)', left-aligned, shown on layer rows only;
+        the tooltip tells how many samples interpolation will use."""
         w = self.wizard()
         density = fmt(sample_density(inside, w.area_ha), 1)
         item.setText(COL_POINTS, tr("p2_count", n=fmt(inside), density=density))
         item.setToolTip(COL_POINTS, tr("p2_tip_count", inside=fmt(inside), density=density,
                                        used=fmt(used), tol=fmt(w.tolerance)))
-        item.setTextAlignment(COL_POINTS, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        item.setTextAlignment(COL_POINTS, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
 
     def set_all(self, checked):
         state = Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked

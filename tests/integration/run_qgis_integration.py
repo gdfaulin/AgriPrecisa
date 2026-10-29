@@ -162,12 +162,14 @@ if "2,50 ha" not in page.subTitle():
     errors.append("field area (2,50 ha) missing from step 2 header")
 amostras = page.tree.findItems("amostras [EPSG:31982]", Qt.MatchFlag.MatchExactly, 0)[0]
 kids = {amostras.child(k).text(0): amostras.child(k).text(2) for k in range(amostras.childCount())}
-print("Counts:", amostras.text(2), kids)
+print("Counts:", repr(amostras.text(2)), kids)
 print("Count tooltip:", amostras.toolTip(2))
 if amostras.text(2) != "7 (2,8 amostras/ha)":
-    errors.append("layer count/density should be '7 (2,8 amostras/ha)'")
-if kids.get("pH") != "6 (2,4 amostras/ha)" or kids.get("argila") != "7 (2,8 amostras/ha)":
-    errors.append("field counts should ignore empty values (pH 6, argila 7)")
+    errors.append("layer row should show '7 (2,8 amostras/ha)'")
+if any(kids.values()):
+    errors.append("attribute rows must not show counts (only layer rows)")
+if not (amostras.textAlignment(2) & int(Qt.AlignmentFlag.AlignLeft)):
+    errors.append("counts must be left-aligned")
 if "serão usadas 20" not in amostras.toolTip(2):
     errors.append("tooltip should report the 20 samples used with tolerance")
 if not rows.get("CE Limpo [EPSG:4326]", (False,))[0]:

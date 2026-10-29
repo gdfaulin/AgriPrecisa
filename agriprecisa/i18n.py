@@ -199,11 +199,11 @@ STRINGS = {
     "p2_count": {"pt": "{n} ({density} amostras/ha)", "en": "{n} ({density} samples/ha)",
                  "es": "{n} ({density} muestras/ha)"},
     "p2_tip_count": {
-        "pt": "{inside} amostras com valor dentro do talhão ({density} amostras/ha). Na interpolação "
+        "pt": "{inside} amostras dentro do talhão ({density} amostras/ha). Na interpolação "
               "serão usadas {used}, incluindo as que estão até {tol} m fora do contorno.",
-        "en": "{inside} samples with a value inside the field ({density} samples/ha). Interpolation "
+        "en": "{inside} samples inside the field ({density} samples/ha). Interpolation "
               "will use {used}, including those up to {tol} m outside the boundary.",
-        "es": "{inside} muestras con valor dentro del lote ({density} muestras/ha). En la interpolación "
+        "es": "{inside} muestras dentro del lote ({density} muestras/ha). En la interpolación "
               "se usarán {used}, incluidas las que están hasta {tol} m fuera del contorno."},
     "p2_col_layer": {"pt": "Camada / atributo", "en": "Layer / field", "es": "Capa / atributo"},
     "p2_no_crs": {"pt": "sem SRC", "en": "no CRS", "es": "sin SRC"},
@@ -262,9 +262,8 @@ STRINGS = {
         "pt": "<b>Etapa 2: Camadas de pontos e atributos</b><br><br>"
               "Aparecem apenas as camadas de pontos com amostras dentro do contorno ampliado pela "
               "tolerância. O cabeçalho mostra a área do talhão em hectares.<br><br>"
-              "<b>Amostras no talhão (densidade):</b> na linha da camada, o número de pontos dentro "
-              "do talhão; na linha de cada atributo, quantos desses pontos têm valor naquele "
-              "atributo. Entre parênteses está a densidade amostral (amostras/ha), que indica o "
+              "<b>Amostras no talhão (densidade):</b> na linha de cada camada, o número de pontos "
+              "dentro do talhão. Entre parênteses está a densidade amostral (amostras/ha), que indica o "
               "quanto a amostragem consegue captar a variabilidade espacial: quanto menor a "
               "densidade, maior a distância entre amostras e mais suavizado tende a ficar o mapa. "
               "Passe o cursor sobre o número para ver quantas amostras serão usadas na "
@@ -279,9 +278,8 @@ STRINGS = {
         "en": "<b>Step 2: Point layers and fields</b><br><br>"
               "Only point layers with samples inside the boundary enlarged by the tolerance are "
               "listed. The header shows the field area in hectares.<br><br>"
-              "<b>Samples in field (density):</b> on the layer row, the number of points inside the "
-              "field; on each field row, how many of those points have a value for that attribute. "
-              "In brackets is the sampling density (samples/ha), which indicates how well the "
+              "<b>Samples in field (density):</b> on each layer row, the number of points inside the "
+              "field. In brackets is the sampling density (samples/ha), which indicates how well the "
               "sampling captures spatial variability: the lower the density, the larger the "
               "distance between samples and the smoother the map tends to be. Hover over the number "
               "to see how many samples interpolation will use, including the tolerance.<br><br>"
@@ -294,9 +292,8 @@ STRINGS = {
         "es": "<b>Paso 2: Capas de puntos y atributos</b><br><br>"
               "Solo aparecen las capas de puntos con muestras dentro del contorno ampliado por la "
               "tolerancia. El encabezado muestra el área del lote en hectáreas.<br><br>"
-              "<b>Muestras en el lote (densidad):</b> en la fila de la capa, el número de puntos "
-              "dentro del lote; en la fila de cada atributo, cuántos de esos puntos tienen valor en "
-              "ese atributo. Entre paréntesis está la densidad de muestreo (muestras/ha), que indica "
+              "<b>Muestras en el lote (densidad):</b> en la fila de cada capa, el número de puntos "
+              "dentro del lote. Entre paréntesis está la densidad de muestreo (muestras/ha), que indica "
               "cuánto capta el muestreo la variabilidad espacial: cuanto menor la densidad, mayor la "
               "distancia entre muestras y más suavizado tiende a quedar el mapa. Pase el cursor "
               "sobre el número para ver cuántas muestras usará la interpolación, incluida la "
