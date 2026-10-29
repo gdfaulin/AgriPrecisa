@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.3 (2026)
+- Wizard step 2: sample counts and density are left-aligned and shown only on layer rows.
+
 ## 1.0.2 (2026)
 - Wizard step 2: field area in hectares in the header; samples inside the field and sampling density (samples/ha) for each layer and attribute; tooltip with the samples used including the tolerance.
 - Summary step shows the field area.
