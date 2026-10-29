@@ -343,8 +343,8 @@ else:
         errors.append("'Aplicar' did not move the P slider to the suggested value")
     if abs(q3.slider_r.value() / 10.0 - dlg.result_summary["multiple"]) > 1e-6:
         errors.append("'Aplicar' did not move the radius slider")
-    if q3.table.item(0, 3).text() != "validação" or q3.table.item(1, 3).text() != "padrão":
-        errors.append("'Sugerir para este' must change only the selected attribute")
+    if q3.table.item(0, 3).text() != "automático" or q3.table.item(1, 3).text() != "padrão":
+        errors.append("'Ajuste automático' must change only the selected attribute")
     shot_cv = os.environ.get("AGRIPRECISA_SHOT_CV")
     if shot_cv:
         dlg.show(); app.processEvents()
@@ -355,12 +355,17 @@ q3.run_cv_all()
 print("CV all:", q3.last_cv_all)
 st_ce, st_ce2 = (q3.state[k] for k in q3.keys)
 print("Per attribute:", {q3.labels[k]: (q3.state[k]["power"], q3.state[k]["radius"]) for k in q3.keys})
-if [q3.table.item(r, 3).text() for r in range(2)] != ["validação", "validação"]:
-    errors.append("'Sugerir para todos' should apply validation to every attribute")
+if [q3.table.item(r, 3).text() for r in range(2)] != ["automático", "automático"]:
+    errors.append("'Ajuste automático para todos' should apply to every attribute")
 if (st_ce["power"], st_ce["radius"]) == (st_ce2["power"], st_ce2["radius"]):
     errors.append("CE (smooth) and CE2 (short-range) should get different parameters")
 if not infos or "CE2" not in infos[-1]:
-    errors.append("summary message of 'Sugerir para todos' missing")
+    errors.append("summary message of 'Ajuste automático para todos' missing")
+# new names of the buttons and layouts
+if (q3.button_cv_this.text(), q3.button_cv_all.text()) != ("Ajuste automático", "Ajuste automático para todos"):
+    errors.append("button texts should be 'Ajuste automático' / 'Ajuste automático para todos'")
+if (q3.radio_student.text(), q3.radio_advanced.text()) != ("Layout Didático", "Layout Padrão"):
+    errors.append("mode names should be 'Layout Didático' / 'Layout Padrão'")
 q3.select_attribute(1)
 q3.refresh_preview(); app.processEvents()
 # Regression: a suggested radius of 1,5x read "Raio curto" (10,8 / 7,23 = 1,49 before rounding)

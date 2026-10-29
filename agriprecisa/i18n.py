@@ -329,17 +329,17 @@ STRINGS = {
               "<b>Cada atributo tem seus próprios P e raio</b>, porque a dependência espacial e a "
               "variabilidade mudam de um atributo para outro. Escolha o atributo no topo; as barras, "
               "a curva e a prévia passam a valer para ele. A tabela mostra os parâmetros de todos e a "
-              "origem de cada um (padrão, validação ou manual).<br><br>"
-              "<b>Modo aluno:</b> barras deslizantes com explicações que mudam conforme o valor, a "
+              "origem de cada um (padrão, automático ou manual).<br><br>"
+              "<b>Layout Didático:</b> barras deslizantes com explicações que mudam conforme o valor, a "
               "curva de peso × distância e uma prévia do mapa com os seus dados. Mova as barras e "
               "observe como o mapa muda. Os links <i>Saiba mais</i> trazem a explicação técnica.<br>"
-              "<b>Modo avançado:</b> campos numéricos livres, com P acima de 3 e raio sem limite. "
+              "<b>Layout Padrão:</b> campos numéricos livres, com P acima de 3 e raio sem limite. "
               "O modo escolhido fica salvo para a próxima vez.<br><br>"
               "<b>Potência P:</b> quanto maior, mais rápido o peso cai com a distância.<br>"
-              "<b>Raio de busca:</b> no modo aluno, é definido em múltiplos da distância de "
+              "<b>Raio de busca:</b> no Layout Didático, é definido em múltiplos da distância de "
               "cobertura (distância que cobre 95% do talhão); o valor em metros aparece acima da "
               "barra.<br>"
-              "<b>Sugerir para este / para todos:</b> a validação cruzada testa combinações e indica, "
+              "<b>Ajuste automático / para todos:</b> a validação cruzada testa combinações e indica, "
               "para cada atributo, a de menor erro.<br>"
               "<b>Mostrar amostras:</b> liga ou desliga os pontos na prévia.<br>"
               "<b>Tamanho do pixel:</b> lado de cada pixel e de cada célula da grade final. "
@@ -350,17 +350,17 @@ STRINGS = {
               "<b>Each attribute has its own P and radius</b>, because spatial dependence and "
               "variability change from one attribute to another. Choose the attribute at the top; "
               "the sliders, curve and preview then apply to it. The table shows the parameters of all "
-              "attributes and where each came from (default, validation or manual).<br><br>"
-              "<b>Student mode:</b> sliders with explanations that change with the value, the "
+              "attributes and where each came from (default, auto-fit or manual).<br><br>"
+              "<b>Teaching layout:</b> sliders with explanations that change with the value, the "
               "weight × distance curve and a map preview with your data. Move the sliders and "
               "watch the map change. The <i>Learn more</i> links give the technical explanation.<br>"
-              "<b>Advanced mode:</b> free numeric fields, with P above 3 and unlimited radius. "
+              "<b>Standard layout:</b> free numeric fields, with P above 3 and unlimited radius. "
               "The chosen mode is remembered.<br><br>"
               "<b>Power P:</b> the higher it is, the faster the weight falls with distance.<br>"
-              "<b>Search radius:</b> in student mode it is set in multiples of the coverage "
+              "<b>Search radius:</b> in the teaching layout it is set in multiples of the coverage "
               "distance (distance covering 95% of the field); the value in metres is shown above "
               "the slider.<br>"
-              "<b>Suggest for this one / for all:</b> cross-validation tests combinations and points "
+              "<b>Auto-fit / Auto-fit all:</b> cross-validation tests combinations and points "
               "out, for each attribute, the one with the lowest error.<br>"
               "<b>Show samples:</b> turns the points on or off in the preview.<br>"
               "<b>Pixel size:</b> side of each pixel and of each final grid cell. Default 5 m.",
@@ -370,31 +370,38 @@ STRINGS = {
               "<b>Cada atributo tiene su propio P y radio</b>, porque la dependencia espacial y la "
               "variabilidad cambian de un atributo a otro. Elija el atributo arriba; las barras, la "
               "curva y la vista previa pasan a valer para él. La tabla muestra los parámetros de todos "
-              "y el origen de cada uno (por defecto, validación o manual).<br><br>"
-              "<b>Modo estudiante:</b> barras deslizantes con explicaciones que cambian con el "
+              "y el origen de cada uno (por defecto, automático o manual).<br><br>"
+              "<b>Diseño didáctico:</b> barras deslizantes con explicaciones que cambian con el "
               "valor, la curva peso × distancia y una vista previa del mapa con sus datos. Mueva "
               "las barras y observe cómo cambia el mapa. Los enlaces <i>Saber más</i> traen la "
               "explicación técnica.<br>"
-              "<b>Modo avanzado:</b> campos numéricos libres, con P mayor que 3 y radio sin límite. "
+              "<b>Diseño estándar:</b> campos numéricos libres, con P mayor que 3 y radio sin límite. "
               "El modo elegido se recuerda.<br><br>"
               "<b>Potencia P:</b> cuanto mayor, más rápido cae el peso con la distancia.<br>"
-              "<b>Radio de búsqueda:</b> en modo estudiante se define en múltiplos de la distancia de "
+              "<b>Radio de búsqueda:</b> en el diseño didáctico se define en múltiplos de la distancia de "
               "cobertura (distancia que cubre el 95% del lote); el valor en metros aparece sobre la "
               "barra.<br>"
-              "<b>Sugerir para este / para todos:</b> la validación cruzada prueba combinaciones e "
+              "<b>Ajuste automático / para todos:</b> la validación cruzada prueba combinaciones e "
               "indica, para cada atributo, la de menor error.<br>"
               "<b>Mostrar muestras:</b> enciende o apaga los puntos en la vista previa.<br>"
               "<b>Tamaño del píxel:</b> lado de cada píxel y de cada celda de la cuadrícula final. "
               "Por defecto 5 m."},
     "learn_more": {"pt": "Saiba mais", "en": "Learn more", "es": "Saber más"},
     "p3_mode": {"pt": "Modo:", "en": "Mode:", "es": "Modo:"},
-    "p3_mode_student": {"pt": "Aluno (visual)", "en": "Student (visual)", "es": "Estudiante (visual)"},
-    "p3_mode_advanced": {"pt": "Avançado (valores livres)", "en": "Advanced (free values)",
-                         "es": "Avanzado (valores libres)"},
+    "p3_mode_student": {"pt": "Layout Didático", "en": "Teaching layout", "es": "Diseño didáctico"},
+    "p3_mode_advanced": {"pt": "Layout Padrão", "en": "Standard layout", "es": "Diseño estándar"},
+    "p3_mode_student_tip": {
+        "pt": "Barras deslizantes com explicações, curva peso × distância e prévia do mapa. Ideal para aulas.",
+        "en": "Sliders with explanations, weight × distance curve and map preview. Ideal for classes.",
+        "es": "Barras deslizantes con explicaciones, curva peso × distancia y vista previa. Ideal para clases."},
+    "p3_mode_advanced_tip": {
+        "pt": "Campos numéricos livres, com P acima de 3 e raio sem limite.",
+        "en": "Free numeric fields, with P above 3 and unlimited radius.",
+        "es": "Campos numéricos libres, con P mayor que 3 y radio sin límite."},
     "p3_advanced_note": {
-        "pt": "No modo avançado é possível usar P acima de 3 e raio sem limite (0).",
-        "en": "Advanced mode allows P above 3 and an unlimited radius (0).",
-        "es": "El modo avanzado permite P mayor que 3 y radio sin límite (0)."},
+        "pt": "No Layout Padrão é possível usar P acima de 3 e raio sem limite (0).",
+        "en": "The standard layout allows P above 3 and an unlimited radius (0).",
+        "es": "El diseño estándar permite P mayor que 3 y radio sin límite (0)."},
     "p3_power_group": {"pt": "Potência (P)", "en": "Power (P)", "es": "Potencia (P)"},
     "p3_power_value": {"pt": "P = {p}", "en": "P = {p}", "es": "P = {p}"},
     "p3_power_low": {
@@ -478,10 +485,10 @@ STRINGS = {
         "es": "Distancia de cobertura: el 95% del lote está a menos de {spacing} m de una muestra "
               "({density} muestras/ha)."},
     "p3_spacing_none": {
-        "pt": "Não foi possível estimar o espaçamento entre amostras. Use o modo avançado para "
+        "pt": "Não foi possível estimar o espaçamento entre amostras. Use o Layout Padrão para "
               "definir o raio em metros.",
-        "en": "The sample spacing could not be estimated. Use advanced mode to set the radius in metres.",
-        "es": "No se pudo estimar el espaciamiento entre muestras. Use el modo avanzado para definir "
+        "en": "The sample spacing could not be estimated. Use the standard layout to set the radius in metres.",
+        "es": "No se pudo estimar el espaciamiento entre muestras. Use el diseño estándar para definir "
               "el radio en metros."},
     "p3_radius_value": {"pt": "Raio = {mult} × {spacing} m = {radius} m",
                         "en": "Radius = {mult} × {spacing} m = {radius} m",
@@ -557,21 +564,21 @@ STRINGS = {
     "sum_col_r": {"pt": "Raio", "en": "Radius", "es": "Radio"},
     "sum_col_origin": {"pt": "Origem", "en": "Origin", "es": "Origen"},
     "origin_default": {"pt": "padrão", "en": "default", "es": "por defecto"},
-    "origin_cv": {"pt": "validação", "en": "validation", "es": "validación"},
+    "origin_cv": {"pt": "automático", "en": "auto-fit", "es": "automático"},
     "origin_manual": {"pt": "manual", "en": "manual", "es": "manual"},
     "origin_default_tip": {"pt": "Valor inicial: P = 2 e raio de 2 vezes a distância de cobertura.",
                            "en": "Initial value: P = 2 and radius of twice the coverage distance.",
                            "es": "Valor inicial: P = 2 y radio de 2 veces la distancia de cobertura."},
-    "origin_cv_tip": {"pt": "Sugerido pela validação cruzada deste atributo.",
-                      "en": "Suggested by this attribute's cross-validation.",
-                      "es": "Sugerido por la validación cruzada de este atributo."},
+    "origin_cv_tip": {"pt": "Obtido pelo ajuste automático (validação cruzada deste atributo).",
+                      "en": "Obtained by auto-fit (cross-validation of this attribute).",
+                      "es": "Obtenido por el ajuste automático (validación cruzada de este atributo)."},
     "origin_manual_tip": {"pt": "Ajustado pelo usuário.", "en": "Set by the user.",
                           "es": "Ajustado por el usuario."},
-    "cv_this": {"pt": "Sugerir para este", "en": "Suggest for this one", "es": "Sugerir para este"},
+    "cv_this": {"pt": "Ajuste automático", "en": "Auto-fit", "es": "Ajuste automático"},
     "cv_this_tip": {"pt": "Validação cruzada do atributo selecionado, com a tabela de erro por P e raio.",
                     "en": "Cross-validation of the selected attribute, with the error table by P and radius.",
                     "es": "Validación cruzada del atributo seleccionado, con la tabla de error por P y radio."},
-    "cv_all": {"pt": "Sugerir para todos", "en": "Suggest for all", "es": "Sugerir para todos"},
+    "cv_all": {"pt": "Ajuste automático para todos", "en": "Auto-fit all", "es": "Ajuste automático para todos"},
     "cv_all_tip": {"pt": "Faz a validação cruzada de cada atributo e aplica P e raio próprios a cada um.",
                    "en": "Cross-validates each attribute and applies its own P and radius to each one.",
                    "es": "Valida cada atributo y aplica a cada uno su propio P y radio."},
