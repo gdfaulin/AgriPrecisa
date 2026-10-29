@@ -30,6 +30,7 @@ from ..core.pipeline import (
 )
 from ..core.idw_math import snap_extent, sample_density
 from ..i18n import tr, fmt
+from .params_page import ParametersPage
 
 
 # ---------------------------------------------------------------------------
@@ -223,6 +224,7 @@ class PointsPage(QWizardPage):
         w = self.wizard()
         self.setSubTitle(tr("p2_subtitle_area", area=fmt(w.area_ha, 2)))
         self.tree.clear()
+        w.layer_stats = {}
         rect = buffered(w.boundary_extent, w.tolerance)
         tctx = QgsProject.instance().transformContext()
         found = 0
@@ -238,6 +240,7 @@ class PointsPage(QWizardPage):
                 continue
             if stats["used"] == 0:
                 continue
+            w.layer_stats[layer.id()] = stats
             found += 1
             parent = QTreeWidgetItem([layer_label(layer), "", ""])
             self.set_count_cell(parent, stats["inside"], stats["used"])
@@ -295,72 +298,6 @@ class PointsPage(QWizardPage):
 
 
 # ---------------------------------------------------------------------------
-# Page 3: IDW parameters
-# ---------------------------------------------------------------------------
-class ParametersPage(QWizardPage):
-    help_key = "help_page3"
-
-    def __init__(self):
-        super().__init__()
-        self.setTitle(tr("p3_title"))
-        self.setSubTitle(tr("p3_subtitle"))
-
-        self.spin_p = QDoubleSpinBox()
-        self.spin_p.setRange(0.1, 10)
-        self.spin_p.setSingleStep(0.5)
-        self.spin_p.setValue(2.0)
-
-        self.spin_r = QDoubleSpinBox()
-        self.spin_r.setRange(0, 100000)
-        self.spin_r.setDecimals(1)
-        self.spin_r.setValue(100)
-        self.spin_r.setSuffix(" m")
-        self.spin_r.setSpecialValueText(tr("no_limit"))
-
-        self.spin_px = QDoubleSpinBox()
-        self.spin_px.setRange(0.1, 1000)
-        self.spin_px.setDecimals(2)
-        self.spin_px.setValue(5.0)
-        self.spin_px.setSuffix(" m")
-        self.spin_px.valueChanged.connect(self.estimate)
-
-        self.label = QLabel()
-        self.label.setWordWrap(True)
-
-        form = QFormLayout()
-        form.addRow(tr("p3_power"), self.spin_p)
-        form.addRow(tr("p3_radius"), self.spin_r)
-        form.addRow(tr("p3_pixel"), self.spin_px)
-        layout = QVBoxLayout(self)
-        layout.addLayout(form)
-        layout.addWidget(self.label)
-        layout.addStretch()
-
-    def initializePage(self):
-        self.estimate()
-
-    def estimate(self):
-        w = self.wizard()
-        if w is None or w.boundary_extent is None:
-            return
-        e = w.boundary_extent
-        *_, ncol, nrow = snap_extent(e.xMinimum(), e.yMinimum(), e.xMaximum(), e.yMaximum(),
-                                     self.spin_px.value())
-        total = ncol * nrow
-        text = tr("p3_estimate", ncol=ncol, nrow=nrow, total=f"{total:,}".replace(",", "."))
-        if total > 5_000_000:
-            text += "<br>" + tr("p3_big")
-        self.label.setText(text)
-
-    def validatePage(self):
-        w = self.wizard()
-        w.power = self.spin_p.value()
-        w.radius = self.spin_r.value()
-        w.pixel = self.spin_px.value()
-        return True
-
-
-# ---------------------------------------------------------------------------
 # Page 4: summary
 # ---------------------------------------------------------------------------
 class SummaryPage(QWizardPage):
@@ -402,13 +339,15 @@ class IdwWizard(QWizard):
         self.setButtonText(QWizard.WizardButton.BackButton, tr("back"))
         self.setButtonText(QWizard.WizardButton.FinishButton, tr("run"))
         self.setButtonText(QWizard.WizardButton.CancelButton, tr("cancel"))
-        self.resize(740, 580)
+        self.setMinimumSize(880, 680)
+        self.resize(960, 740)
 
         self.boundary = None
         self.selected_only = False
         self.boundary_extent = None
         self.boundary_geom = None
         self.area_ha = 0.0
+        self.layer_stats = {}
         self.tolerance = 50.0
         self.folder = ""
         self.items = []

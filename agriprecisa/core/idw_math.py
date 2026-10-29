@@ -119,3 +119,45 @@ def sample_density(n_samples, area_ha):
     if area_ha is None or area_ha <= 0:
         return None
     return n_samples / area_ha
+
+
+# ---------------------------------------------------------------------------
+# Helpers for the didactic (student mode) parameter page
+# ---------------------------------------------------------------------------
+STUDENT_POWER_MIN, STUDENT_POWER_MAX = 1.0, 3.0
+STUDENT_RADIUS_MIN, STUDENT_RADIUS_MAX = 1.0, 4.0   # multiples of the sample spacing
+DEFAULT_RADIUS_MULTIPLE = 2.0
+
+
+def mean_spacing(density):
+    """
+    Mean distance between samples (m) for a regular grid with ``density`` samples/ha:
+    sqrt(10 000 m2 / density). None when the density is unknown or not positive.
+    """
+    if density is None or density <= 0:
+        return None
+    return math.sqrt(10000.0 / density)
+
+
+def power_band(power):
+    """'low' (< 1.5), 'mid' (1.5 to 2.5) or 'high' (> 2.5)."""
+    if power < 1.5:
+        return "low"
+    if power <= 2.5:
+        return "mid"
+    return "high"
+
+
+def radius_band(multiple):
+    """'short' (< 1.5x spacing), 'ok' (1.5x to 2.5x) or 'long' (> 2.5x)."""
+    if multiple < 1.5:
+        return "short"
+    if multiple <= 2.5:
+        return "ok"
+    return "long"
+
+
+def relative_weights(distances, power, d_min):
+    """IDW weight relative to a sample at ``d_min`` metres: (d_min / d)^P, capped at 1."""
+    d = np.maximum(np.asarray(distances, dtype=float), d_min)
+    return (d_min / d) ** power

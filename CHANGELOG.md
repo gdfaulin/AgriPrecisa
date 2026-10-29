@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.0 (2026)
+- Wizard step 3, student mode (default, remembered between runs):
+  - power P slider from 1.0 to 3.0 (step 0.1) with simple explanation and "Learn more";
+  - search radius slider in multiples (1x to 4x) of the mean sample spacing, estimated from the sampling density;
+  - weight x distance curve with P = 1 and P = 3 references and the radius marker;
+  - live low-resolution map preview with the real samples, attribute selector and colour bar.
+- Advanced mode keeps the free numeric fields (P above 3, unlimited radius).
+- Fix (found during development): preview mask was empty because a temporary point geometry was freed before GEOS used it (regression test added).
+
 ## 1.0.3 (2026)
 - Wizard step 2: sample counts and density are left-aligned and shown only on layer rows.
 
