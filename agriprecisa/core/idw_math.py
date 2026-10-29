@@ -161,3 +161,137 @@ def relative_weights(distances, power, d_min):
     """IDW weight relative to a sample at ``d_min`` metres: (d_min / d)^P, capped at 1."""
     d = np.maximum(np.asarray(distances, dtype=float), d_min)
     return (d_min / d) ** power
+
+
+# ---------------------------------------------------------------------------
+# Coverage distance and cross-validation (automatic choice of P and radius)
+# ---------------------------------------------------------------------------
+def nearest_distances(px, py, xs, ys):
+    """Distance from each point (px, py) to the nearest sample (xs, ys), in blocks."""
+    px, py = np.asarray(px, float), np.asarray(py, float)
+    xs, ys = np.asarray(xs, float), np.asarray(ys, float)
+    out = np.full(px.size, np.inf)
+    if xs.size == 0:
+        return out
+    block = max(1, int(4_000_000 // xs.size))
+    for s in range(0, px.size, block):
+        e = min(s + block, px.size)
+        d2 = (px[s:e, None] - xs[None, :]) ** 2 + (py[s:e, None] - ys[None, :]) ** 2
+        out[s:e] = np.sqrt(d2.min(axis=1))
+    return out
+
+
+def coverage_distances(px, py, xs, ys):
+    """
+    (typical, coverage) distances from field pixels to the nearest sample:
+    typical  = median  -> how far a usual pixel is from data (used as exclusion zone)
+    coverage = 95th percentile -> 95 % of the field is within this distance of a sample
+    Works for regular grids and for sensor passes (dense along the line, sparse between lines).
+    """
+    d = nearest_distances(px, py, xs, ys)
+    d = d[np.isfinite(d)]
+    if d.size == 0:
+        return None, None
+    return float(np.percentile(d, 50)), float(np.percentile(d, 95))
+
+
+def select_validation_samples(xs, ys, zs, edge_dist, n_target=60, edge_buffer=0.0,
+                              sd_limit=3.0, n_strata=3, seed=42):
+    """
+    Indices of validation samples for cross-validation:
+      * only samples inside the field and at least ``edge_buffer`` m from its border
+        (``edge_dist`` < 0 marks samples outside the field);
+      * outliers removed: values beyond ``sd_limit`` standard deviations from the mean;
+      * spread over the whole field (spatial blocks) and balanced across ``n_strata``
+        value classes (low, medium, high), so extremes of the real variability are kept.
+    Fixed ``seed``: the same data always give the same selection.
+    """
+    xs, ys, zs = (np.asarray(a, float) for a in (xs, ys, zs))
+    edge_dist = np.asarray(edge_dist, float)
+    ok = edge_dist >= max(edge_buffer, 0.0)
+    if zs.size:
+        mean, sd = zs.mean(), zs.std()
+        if sd > 0:
+            ok &= np.abs(zs - mean) <= sd_limit * sd
+    cand = np.flatnonzero(ok)
+    if cand.size <= n_target:
+        return cand
+
+    cz = zs[cand]
+    cuts = np.quantile(cz, np.linspace(0, 1, n_strata + 1)[1:-1])
+    strata = np.searchsorted(cuts, cz, side="right")
+
+    g = int(math.ceil(math.sqrt(n_target)))
+    cx, cy = xs[cand], ys[cand]
+    span_x = max(cx.max() - cx.min(), 1e-9)
+    span_y = max(cy.max() - cy.min(), 1e-9)
+    bx = np.minimum(((cx - cx.min()) / span_x * g).astype(int), g - 1)
+    by = np.minimum(((cy - cy.min()) / span_y * g).astype(int), g - 1)
+    block = bx * g + by
+
+    rng = np.random.default_rng(seed)
+    pools = {}
+    for k in rng.permutation(cand.size):
+        pools.setdefault(int(block[k]), []).append(int(k))
+    counts = np.zeros(n_strata, dtype=int)
+    chosen = []
+    while len(chosen) < n_target and any(pools.values()):
+        for b in rng.permutation(sorted(pools)):
+            pool = pools[int(b)]
+            if not pool:
+                continue
+            # take the candidate of this block whose value class is least represented
+            j = min(range(len(pool)), key=lambda t: counts[strata[pool[t]]])
+            k = pool.pop(j)
+            counts[strata[k]] += 1
+            chosen.append(k)
+            if len(chosen) >= n_target:
+                break
+    return np.sort(cand[np.array(chosen, dtype=int)])
+
+
+def cross_validate_idw(xs, ys, zs, val_idx, powers, radii, exclusion):
+    """
+    Cross-validation of IDW with an exclusion zone.
+
+    Each validation sample is predicted from the other samples, ignoring every sample
+    closer than ``exclusion`` m (its own sensor-pass neighbours), so the error reflects
+    a pixel that is as far from data as a typical pixel of the map.
+
+    Returns (rmse, coverage): arrays shaped (len(powers), len(radii)); ``coverage`` is the
+    fraction of validation samples that had at least one neighbour within the radius.
+    """
+    xs, ys, zs = (np.asarray(a, float) for a in (xs, ys, zs))
+    powers = np.asarray(powers, float)
+    radii = np.asarray(radii, float)
+    sq = np.zeros((powers.size, radii.size))
+    hits = np.zeros((powers.size, radii.size))
+    idx_all = np.arange(xs.size)
+    val_idx = np.asarray(val_idx, int)
+    for i in val_idx:
+        d = np.hypot(xs - xs[i], ys - ys[i])
+        keep = (d > exclusion) & (idx_all != i)
+        for rj, r in enumerate(radii):
+            m = keep & (d <= r)
+            if not m.any():
+                continue
+            w = d[m][None, :] ** (-powers[:, None])
+            est = (w @ zs[m]) / w.sum(axis=1)
+            sq[:, rj] += (est - zs[i]) ** 2
+            hits[:, rj] += 1
+    with np.errstate(invalid="ignore", divide="ignore"):
+        rmse = np.sqrt(np.where(hits > 0, sq / np.maximum(hits, 1), np.nan))
+    coverage = hits / max(val_idx.size, 1)
+    return rmse, coverage
+
+
+def best_combination(rmse, coverage, min_coverage=0.95):
+    """(i, j) of the lowest RMSE among combinations covering at least ``min_coverage``."""
+    valid = np.isfinite(rmse) & (coverage >= min_coverage)
+    if not valid.any():
+        valid = np.isfinite(rmse)
+    if not valid.any():
+        return None
+    masked = np.where(valid, rmse, np.inf)
+    i, j = np.unravel_index(int(np.argmin(masked)), rmse.shape)
+    return int(i), int(j)

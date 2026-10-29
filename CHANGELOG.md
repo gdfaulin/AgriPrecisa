@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.0 (2026)
+- Step 3: "Show samples" toggle in the map preview (hidden by default above 500 samples).
+- Search radius based on the coverage distance (95th percentile of the distance from field pixels to the nearest sample). Fixes strips without value between sensor passes, where the density-based spacing was too small.
+- "Suggest P and radius" button: cross-validation with up to 60 validation samples spread over the field, away from the border, without outliers (beyond 3 SD) and balanced across low, medium and high values; exclusion zone around each validated sample; RMSE table by P and radius with "Apply".
+
 ## 1.1.0 (2026)
 - Wizard step 3, student mode (default, remembered between runs):
   - power P slider from 1.0 to 3.0 (step 0.1) with simple explanation and "Learn more";

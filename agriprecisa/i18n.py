@@ -332,8 +332,12 @@ STRINGS = {
               "<b>Modo avançado:</b> campos numéricos livres, com P acima de 3 e raio sem limite. "
               "O modo escolhido fica salvo para a próxima vez.<br><br>"
               "<b>Potência P:</b> quanto maior, mais rápido o peso cai com a distância.<br>"
-              "<b>Raio de busca:</b> no modo aluno, é definido em múltiplos do espaçamento médio "
-              "entre amostras; o valor em metros aparece acima da barra.<br>"
+              "<b>Raio de busca:</b> no modo aluno, é definido em múltiplos da distância de "
+              "cobertura (distância que cobre 95% do talhão); o valor em metros aparece acima da "
+              "barra.<br>"
+              "<b>Sugerir P e raio:</b> a validação cruzada testa combinações e indica a de menor "
+              "erro para os seus dados.<br>"
+              "<b>Mostrar amostras:</b> liga ou desliga os pontos na prévia.<br>"
               "<b>Tamanho do pixel:</b> lado de cada pixel e de cada célula da grade final. "
               "Padrão de 5 m.",
         "en": "<b>Step 3: IDW parameters</b><br><br>"
@@ -345,8 +349,12 @@ STRINGS = {
               "<b>Advanced mode:</b> free numeric fields, with P above 3 and unlimited radius. "
               "The chosen mode is remembered.<br><br>"
               "<b>Power P:</b> the higher it is, the faster the weight falls with distance.<br>"
-              "<b>Search radius:</b> in student mode it is set in multiples of the mean sample "
-              "spacing; the value in metres is shown above the slider.<br>"
+              "<b>Search radius:</b> in student mode it is set in multiples of the coverage "
+              "distance (distance covering 95% of the field); the value in metres is shown above "
+              "the slider.<br>"
+              "<b>Suggest P and radius:</b> cross-validation tests combinations and points out the "
+              "one with the lowest error for your data.<br>"
+              "<b>Show samples:</b> turns the points on or off in the preview.<br>"
               "<b>Pixel size:</b> side of each pixel and of each final grid cell. Default 5 m.",
         "es": "<b>Paso 3: Parámetros del IDW</b><br><br>"
               "El IDW (inverso de la distancia ponderada) estima cada píxel como el promedio de las "
@@ -358,8 +366,12 @@ STRINGS = {
               "<b>Modo avanzado:</b> campos numéricos libres, con P mayor que 3 y radio sin límite. "
               "El modo elegido se recuerda.<br><br>"
               "<b>Potencia P:</b> cuanto mayor, más rápido cae el peso con la distancia.<br>"
-              "<b>Radio de búsqueda:</b> en modo estudiante se define en múltiplos del espaciamiento "
-              "medio entre muestras; el valor en metros aparece sobre la barra.<br>"
+              "<b>Radio de búsqueda:</b> en modo estudiante se define en múltiplos de la distancia de "
+              "cobertura (distancia que cubre el 95% del lote); el valor en metros aparece sobre la "
+              "barra.<br>"
+              "<b>Sugerir P y radio:</b> la validación cruzada prueba combinaciones e indica la de "
+              "menor error para sus datos.<br>"
+              "<b>Mostrar muestras:</b> enciende o apaga los puntos en la vista previa.<br>"
               "<b>Tamaño del píxel:</b> lado de cada píxel y de cada celda de la cuadrícula final. "
               "Por defecto 5 m."},
     "learn_more": {"pt": "Saiba mais", "en": "Learn more", "es": "Saber más"},
@@ -447,9 +459,12 @@ STRINGS = {
               "semivariograma, el kriging suele ser preferible al IDW."},
     "p3_radius_group": {"pt": "Raio de busca", "en": "Search radius", "es": "Radio de búsqueda"},
     "p3_spacing": {
-        "pt": "Espaçamento médio entre amostras: {spacing} m ({density} amostras/ha).",
-        "en": "Mean sample spacing: {spacing} m ({density} samples/ha).",
-        "es": "Espaciamiento medio entre muestras: {spacing} m ({density} muestras/ha)."},
+        "pt": "Distância de cobertura: 95% do talhão fica a até {spacing} m de uma amostra "
+              "({density} amostras/ha).",
+        "en": "Coverage distance: 95% of the field is within {spacing} m of a sample "
+              "({density} samples/ha).",
+        "es": "Distancia de cobertura: el 95% del lote está a menos de {spacing} m de una muestra "
+              "({density} muestras/ha)."},
     "p3_spacing_none": {
         "pt": "Não foi possível estimar o espaçamento entre amostras. Use o modo avançado para "
               "definir o raio em metros.",
@@ -467,12 +482,12 @@ STRINGS = {
         "es": "Radio corto: cada píxel ve pocas muestras. El mapa es más local y pueden aparecer "
               "huecos (píxeles sin valor, en gris en la vista previa)."},
     "p3_radius_ok": {
-        "pt": "Raio recomendado: cada pixel considera várias amostras vizinhas, cerca de 2 vezes o "
-              "espaçamento entre elas.",
+        "pt": "Raio recomendado: cada pixel considera várias amostras vizinhas, cerca de 2 vezes a "
+              "distância de cobertura.",
         "en": "Recommended radius: each pixel considers several neighbouring samples, about twice "
-              "the spacing between them.",
-        "es": "Radio recomendado: cada píxel considera varias muestras vecinas, cerca de 2 veces el "
-              "espaciamiento entre ellas."},
+              "the coverage distance.",
+        "es": "Radio recomendado: cada píxel considera varias muestras vecinas, cerca de 2 veces la "
+              "distancia de cobertura."},
     "p3_radius_long": {
         "pt": "Raio longo: o mapa fica mais suave e sem falhas, mas detalhes locais se perdem e o "
               "cálculo fica mais lento.",
@@ -482,29 +497,37 @@ STRINGS = {
               "el cálculo es más lento."},
     "p3_radius_more": {
         "pt": "<b>Raio de busca</b><br><br>Só as amostras dentro do raio entram no cálculo de cada "
-              "pixel. O espaçamento médio entre amostras é estimado pela densidade amostral: "
-              "√(10.000 m² ÷ amostras por hectare). Com 1 amostra/ha, o espaçamento é de cerca de "
-              "100 m.<br><br>Um raio de 1,5 a 2,5 vezes o espaçamento garante várias vizinhas em "
-              "cada pixel. Raios menores deixam falhas; raios maiores suavizam e deixam o cálculo "
-              "mais lento. Em pesquisa, o alcance do semivariograma é uma boa referência para o "
-              "raio.<br><br>Quando há mais de um atributo marcado, a barra usa o de menor "
-              "densidade, para que nenhum mapa fique com falhas.",
-        "en": "<b>Search radius</b><br><br>Only samples within the radius are used for each pixel. "
-              "The mean sample spacing is estimated from the sampling density: "
-              "√(10,000 m² ÷ samples per hectare). With 1 sample/ha, the spacing is about "
-              "100 m.<br><br>A radius of 1.5 to 2.5 times the spacing ensures several neighbours "
-              "per pixel. Smaller radii leave gaps; larger radii smooth the map and slow "
-              "processing. In research, the semivariogram range is a good reference for the "
-              "radius.<br><br>When several attributes are ticked, the slider uses the one with "
-              "the lowest density, so that no map has gaps.",
-        "es": "<b>Radio de búsqueda</b><br><br>Solo las muestras dentro del radio entran en el "
-              "cálculo de cada píxel. El espaciamiento medio se estima a partir de la densidad de "
-              "muestreo: √(10.000 m² ÷ muestras por hectárea). Con 1 muestra/ha, el espaciamiento "
-              "es de unos 100 m.<br><br>Un radio de 1,5 a 2,5 veces el espaciamiento garantiza "
-              "varias vecinas por píxel. Radios menores dejan huecos; radios mayores suavizan y "
-              "hacen el cálculo más lento. En investigación, el alcance del semivariograma es una "
-              "buena referencia para el radio.<br><br>Cuando hay varios atributos marcados, la "
-              "barra usa el de menor densidad, para que ningún mapa quede con huecos."},
+              "pixel. A barra usa a <b>distância de cobertura</b>: mede-se, para os pixels do talhão, a "
+              "distância até a amostra mais próxima, e 95% deles ficam a até essa distância.<br><br>"
+              "Ela funciona tanto para amostragem em grade quanto para sensores em passadas (como a CE), "
+              "em que os pontos ficam muito próximos na linha e distantes entre as linhas. Nesse caso, "
+              "um espaçamento calculado só pela densidade seria pequeno demais e deixaria faixas sem "
+              "valor entre as passadas.<br><br>"
+              "Um raio de 1,5 a 2,5 vezes a distância de cobertura garante várias vizinhas em cada pixel. "
+              "Raios menores deixam falhas; raios maiores suavizam e deixam o cálculo mais lento. Em "
+              "pesquisa, o alcance do semivariograma é uma boa referência.<br><br>"
+              "Com mais de um atributo marcado, vale o de menor cobertura (amostragem mais esparsa).",
+        "en": "<b>Search radius</b><br><br>Only samples within the radius are used for each pixel. The "
+              "slider uses the <b>coverage distance</b>: for the field pixels, the distance to the nearest "
+              "sample is measured, and 95% of them are within this distance.<br><br>"
+              "It works both for grid sampling and for sensor passes (such as EC), where points are very "
+              "close along the line and far apart between lines. In that case, a spacing computed from "
+              "density alone would be too small and leave strips without value between passes.<br><br>"
+              "A radius of 1.5 to 2.5 times the coverage distance ensures several neighbours per pixel. "
+              "Smaller radii leave gaps; larger radii smooth and slow processing. In research, the "
+              "semivariogram range is a good reference.<br><br>"
+              "With several attributes ticked, the one with the sparsest sampling is used.",
+        "es": "<b>Radio de búsqueda</b><br><br>Solo las muestras dentro del radio entran en el cálculo de "
+              "cada píxel. La barra usa la <b>distancia de cobertura</b>: se mide, para los píxeles del "
+              "lote, la distancia a la muestra más cercana, y el 95% de ellos está a menos de esa "
+              "distancia.<br><br>"
+              "Funciona tanto para muestreo en grilla como para sensores en pasadas (como la CE), donde "
+              "los puntos están muy cerca en la línea y lejos entre líneas. En ese caso, un espaciamiento "
+              "calculado solo por la densidad sería demasiado pequeño y dejaría franjas sin valor.<br><br>"
+              "Un radio de 1,5 a 2,5 veces la distancia de cobertura garantiza varias vecinas por píxel. "
+              "Radios menores dejan huecos; radios mayores suavizan y hacen el cálculo más lento. En "
+              "investigación, el alcance del semivariograma es una buena referencia.<br><br>"
+              "Con varios atributos marcados, vale el de muestreo más disperso."},
     "p3_curve_group": {"pt": "Peso das amostras × distância", "en": "Sample weight × distance",
                        "es": "Peso de las muestras × distancia"},
     "p3_curve_x": {"pt": "distância até a amostra", "en": "distance to the sample",
@@ -514,6 +537,118 @@ STRINGS = {
     "p3_curve_ref": {"pt": "P = 1 e P = 3", "en": "P = 1 and P = 3", "es": "P = 1 y P = 3"},
     "p3_preview_group": {"pt": "Prévia do mapa", "en": "Map preview", "es": "Vista previa del mapa"},
     "p3_preview_attr": {"pt": "Atributo:", "en": "Attribute:", "es": "Atributo:"},
+    "p3_show_samples": {"pt": "Mostrar amostras", "en": "Show samples", "es": "Mostrar muestras"},
+    "cv_button": {"pt": "Sugerir P e raio (validação cruzada)", "en": "Suggest P and radius (cross-validation)",
+                  "es": "Sugerir P y radio (validación cruzada)"},
+    "cv_tip": {"pt": "Testa combinações de P e raio e indica a de menor erro para o atributo da prévia.",
+               "en": "Tests combinations of P and radius and points out the one with the lowest error for the preview attribute.",
+               "es": "Prueba combinaciones de P y radio e indica la de menor error para el atributo de la vista previa."},
+    "cv_hint": {"pt": "Não sabe qual P e raio usar? Deixe os dados indicarem.",
+                "en": "Not sure which P and radius to use? Let the data decide.",
+                "es": "¿No sabe qué P y radio usar? Deje que los datos lo indiquen."},
+    "cv_done": {"pt": "Sugestão: P = {p} e raio {mult}× ({radius} m), RMSE = {rmse}.",
+                "en": "Suggestion: P = {p} and radius {mult}× ({radius} m), RMSE = {rmse}.",
+                "es": "Sugerencia: P = {p} y radio {mult}× ({radius} m), RMSE = {rmse}."},
+    "cv_title": {"pt": "Validação cruzada do IDW", "en": "IDW cross-validation",
+                 "es": "Validación cruzada del IDW"},
+    "cv_few": {"pt": "Só {n} amostras atendem aos critérios de validação (mínimo {min}). Aumente a "
+                     "quantidade de amostras ou use outro atributo.",
+               "en": "Only {n} samples meet the validation criteria (minimum {min}). Use more samples "
+                     "or another attribute.",
+               "es": "Solo {n} muestras cumplen los criterios de validación (mínimo {min}). Use más "
+                     "muestras u otro atributo."},
+    "cv_failed": {"pt": "Nenhuma combinação conseguiu estimar as amostras de validação. Verifique os dados.",
+                  "en": "No combination could estimate the validation samples. Check the data.",
+                  "es": "Ninguna combinación pudo estimar las muestras de validación. Verifique los datos."},
+    "cv_header": {
+        "pt": "<b>Atributo:</b> {attribute}<br><b>{n} amostras de validação</b>, espalhadas pelo talhão, "
+              "longe da borda e sem valores discrepantes. Ao validar cada uma, as amostras a menos de "
+              "{exclusion} m foram ignoradas (zona de exclusão). Distância de cobertura: {spacing} m.",
+        "en": "<b>Attribute:</b> {attribute}<br><b>{n} validation samples</b>, spread over the field, "
+              "away from the border and without outliers. When validating each one, samples closer "
+              "than {exclusion} m were ignored (exclusion zone). Coverage distance: {spacing} m.",
+        "es": "<b>Atributo:</b> {attribute}<br><b>{n} muestras de validación</b>, distribuidas en el "
+              "lote, lejos del borde y sin valores atípicos. Al validar cada una, se ignoraron las "
+              "muestras a menos de {exclusion} m (zona de exclusión). Distancia de cobertura: {spacing} m."},
+    "cv_col": {"pt": "{mult}×\n({radius} m)", "en": "{mult}×\n({radius} m)", "es": "{mult}×\n({radius} m)"},
+    "cv_axes": {"pt": "Linhas: potência P  ·  Colunas: raio de busca (múltiplos da distância de cobertura)",
+                "en": "Rows: power P  ·  Columns: search radius (multiples of the coverage distance)",
+                "es": "Filas: potencia P  ·  Columnas: radio de búsqueda (múltiplos de la distancia de cobertura)"},
+    "cv_na": {"pt": "n/d", "en": "n/a", "es": "n/d"},
+    "cv_na_tip": {"pt": "Raio curto demais: nenhuma amostra vizinha para estimar.",
+                  "en": "Radius too short: no neighbouring sample to estimate from.",
+                  "es": "Radio demasiado corto: ninguna muestra vecina para estimar."},
+    "cv_cell_tip": {"pt": "{cov}% das amostras de validação foram estimadas (em cinza quando abaixo de 95%).",
+                    "en": "{cov}% of the validation samples were estimated (grey when below 95%).",
+                    "es": "{cov}% de las muestras de validación fueron estimadas (en gris por debajo de 95%)."},
+    "cv_best": {
+        "pt": "<b>Melhor combinação: P = {p} e raio {mult}× ({radius} m).</b> Erro médio (RMSE) = {rmse}, "
+              "cerca de {pct}% da média. O P foi refinado em passos de 0,1 para o raio escolhido.",
+        "en": "<b>Best combination: P = {p} and radius {mult}× ({radius} m).</b> Mean error (RMSE) = {rmse}, "
+              "about {pct}% of the mean. P was refined in 0.1 steps for the chosen radius.",
+        "es": "<b>Mejor combinación: P = {p} y radio {mult}× ({radius} m).</b> Error medio (RMSE) = {rmse}, "
+              "cerca del {pct}% de la media. P se refinó en pasos de 0,1 para el radio elegido."},
+    "cv_explain": {
+        "pt": "Cada número da tabela é o erro médio ao estimar as amostras de validação como se elas "
+              "não existissem. Quanto menor, melhor o mapa representa os dados. Compare as linhas (P) e "
+              "as colunas (raio) para ver como cada parâmetro muda o erro.",
+        "en": "Each number in the table is the average error when estimating the validation samples as "
+              "if they did not exist. The lower, the better the map represents the data. Compare rows (P) "
+              "and columns (radius) to see how each parameter changes the error.",
+        "es": "Cada número de la tabla es el error medio al estimar las muestras de validación como si no "
+              "existieran. Cuanto menor, mejor representa el mapa los datos. Compare filas (P) y columnas "
+              "(radio) para ver cómo cada parámetro cambia el error."},
+    "cv_apply": {"pt": "Aplicar", "en": "Apply", "es": "Aplicar"},
+    "cv_close": {"pt": "Fechar", "en": "Close", "es": "Cerrar"},
+    "cv_more": {
+        "pt": "<b>Validação cruzada</b><br><br>Algumas amostras são retiradas uma de cada vez e estimadas "
+              "pelas demais, com cada combinação de P e raio. O erro (RMSE, raiz do erro quadrático "
+              "médio) mostra qual combinação reproduz melhor os valores reais.<br><br>"
+              "<b>Escolha das amostras de validação</b> (até 60, sorteio reprodutível):<ul>"
+              "<li>espalhadas por todo o talhão (o talhão é dividido em blocos);</li>"
+              "<li>longe da borda, onde o IDW tem menos vizinhos;</li>"
+              "<li>sem valores discrepantes (fora de ±3 desvios padrão), que distorceriam o erro;</li>"
+              "<li>equilibradas entre valores baixos, médios e altos, para que o ajuste valha para toda a "
+              "variabilidade, e não só para os valores próximos da média.</li></ul>"
+              "<b>Zona de exclusão:</b> dados de sensores (como a CE) têm pontos a 1 ou 2 m na mesma "
+              "passada, quase iguais entre si. Se esses vizinhos fossem usados, o erro pareceria "
+              "pequeno demais e o método escolheria sempre P alto e raio curto (Roberts et al., 2017, "
+              "<i>Ecography</i> 40: 913-929). Por isso, ao validar cada amostra, as vizinhas mais próximas "
+              "que a distância típica entre um pixel e a amostra mais próxima são ignoradas.<br><br>"
+              "Para referência, Mueller et al. (2004, <i>Soil Science</i> 169: 841-851) obtiveram o melhor "
+              "resultado com IDW de potência 1,7 em mapas de condutividade elétrica do solo.",
+        "en": "<b>Cross-validation</b><br><br>Some samples are removed one at a time and estimated from "
+              "the others with each combination of P and radius. The error (RMSE, root mean square "
+              "error) shows which combination best reproduces the real values.<br><br>"
+              "<b>Choice of validation samples</b> (up to 60, reproducible draw):<ul>"
+              "<li>spread over the whole field (the field is split into blocks);</li>"
+              "<li>away from the border, where IDW has fewer neighbours;</li>"
+              "<li>without outliers (beyond ±3 standard deviations), which would distort the error;</li>"
+              "<li>balanced among low, medium and high values, so the fit holds for all the variability, "
+              "not only for values near the mean.</li></ul>"
+              "<b>Exclusion zone:</b> sensor data (such as EC) have points 1 or 2 m apart on the same pass, "
+              "almost identical. If those neighbours were used, the error would look too small and the "
+              "method would always choose high P and a short radius (Roberts et al., 2017, "
+              "<i>Ecography</i> 40: 913-929). So, when validating each sample, neighbours closer than the "
+              "typical distance between a pixel and its nearest sample are ignored.<br><br>"
+              "For reference, Mueller et al. (2004, <i>Soil Science</i> 169: 841-851) obtained the best "
+              "results with IDW power 1.7 for soil electrical conductivity maps.",
+        "es": "<b>Validación cruzada</b><br><br>Algunas muestras se retiran una a una y se estiman con las "
+              "demás, con cada combinación de P y radio. El error (RMSE, raíz del error cuadrático medio) "
+              "muestra qué combinación reproduce mejor los valores reales.<br><br>"
+              "<b>Elección de las muestras de validación</b> (hasta 60, sorteo reproducible):<ul>"
+              "<li>distribuidas por todo el lote (el lote se divide en bloques);</li>"
+              "<li>lejos del borde, donde el IDW tiene menos vecinas;</li>"
+              "<li>sin valores atípicos (fuera de ±3 desviaciones estándar), que distorsionarían el error;</li>"
+              "<li>equilibradas entre valores bajos, medios y altos, para que el ajuste valga para toda la "
+              "variabilidad y no solo para los valores cercanos a la media.</li></ul>"
+              "<b>Zona de exclusión:</b> los datos de sensores (como la CE) tienen puntos a 1 o 2 m en la "
+              "misma pasada, casi iguales. Si se usaran esas vecinas, el error parecería demasiado pequeño "
+              "y el método elegiría siempre P alto y radio corto (Roberts et al., 2017, <i>Ecography</i> "
+              "40: 913-929). Por eso, al validar cada muestra, se ignoran las vecinas más cercanas que la "
+              "distancia típica entre un píxel y su muestra más próxima.<br><br>"
+              "Como referencia, Mueller et al. (2004, <i>Soil Science</i> 169: 841-851) obtuvieron el mejor "
+              "resultado con IDW de potencia 1,7 en mapas de conductividad eléctrica del suelo."},
     "p3_preview_n": {"pt": "{n} amostras", "en": "{n} samples", "es": "{n} muestras"},
     "p3_preview_note": {
         "pt": "Prévia em baixa resolução, só para comparar parâmetros. Vermelho = valores baixos, "

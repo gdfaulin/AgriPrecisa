@@ -141,6 +141,7 @@ class PreviewMap(QWidget):
         self.grid = None            # (xmin, ymax, ncol, nrow, res)
         self.points = (np.array([]), np.array([]), np.array([]))
         self.value_range = None
+        self.show_points = True
         ramp = QgsStyle.defaultStyle().colorRamp("RdYlGn")
         self.ramp = ramp
 
@@ -165,6 +166,18 @@ class PreviewMap(QWidget):
                 pt = QgsGeometry.fromPointXY(QgsPointXY(x, y))
                 mask[r, c] = engine.intersects(pt.constGet())
         self.mask = mask
+
+    def set_show_points(self, show):
+        self.show_points = bool(show)
+        self.update()
+
+    def cell_centres(self):
+        """Centres (x, y) of the preview cells that fall inside the field."""
+        if self.grid is None:
+            return np.array([]), np.array([])
+        xmin, ymax, ncol, nrow, res = self.grid
+        rows, cols = np.nonzero(self.mask)
+        return xmin + (cols + 0.5) * res, ymax - (rows + 0.5) * res
 
     def set_points(self, xs, ys, zs):
         self.points = (np.asarray(xs, float), np.asarray(ys, float), np.asarray(zs, float))
@@ -227,7 +240,7 @@ class PreviewMap(QWidget):
         p.setPen(QPen(QColor(255, 255, 255), 0.8))
         p.setBrush(QBrush(QColor(20, 20, 20)))
         rad = 2.2 if xs.size < 400 else 1.4
-        for x, y in zip(xs, ys):
+        for x, y in (zip(xs, ys) if self.show_points else ()):
             if xmin <= x <= xmax and ymin <= y <= ymax:
                 p.drawEllipse(QPointF(ox + (x - xmin) * scale, oy + (ymax - y) * scale), rad, rad)
 
