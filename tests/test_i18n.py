@@ -44,3 +44,15 @@ def test_language_switch():
     i18n.set_language("en")
     assert i18n.tr("p2_found", n=3) == "3 point layer(s) found in the area."
     assert i18n.tr("unknown_key") == "unknown_key"
+
+
+def test_number_format_follows_language():
+    i18n.set_language("pt")
+    assert i18n.fmt(4969) == "4.969"
+    assert i18n.fmt(39.84, 1) == "39,8"
+    assert i18n.fmt(1234.5, 2) == "1.234,50"
+    i18n.set_language("es")
+    assert i18n.fmt(1234.5, 2) == "1.234,50"
+    i18n.set_language("en")
+    assert i18n.fmt(1234.5, 2) == "1,234.50"
+    assert i18n.fmt(None) == "-"

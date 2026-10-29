@@ -18,17 +18,18 @@ from qgis.PyQt.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QMessageBox, QProgressDialog, QTextBrowser,
 )
 from qgis.core import (
-    QgsProject, QgsVectorLayer, QgsProcessingContext, QgsProcessingFeedback,
+    QgsApplication, QgsProject, QgsVectorLayer, QgsProcessingContext, QgsProcessingFeedback,
     QgsProcessingException, QgsProcessingFeatureSourceDefinition,
 )
 
 from ..core.compat import GEOM_POINT, GEOM_POLYGON
 from ..core.pipeline import (
-    IdwJob, run_idw_job, crs_in_meters, buffered, count_points, features_extent,
+    IdwJob, run_idw_job, crs_in_meters, buffered, features_extent, boundary_geometry,
+    sample_stats,
     style_graduated, rect_to_crs, N_CLASSES, COLOR_RAMP,
 )
-from ..core.idw_math import snap_extent
-from ..i18n import tr
+from ..core.idw_math import snap_extent, sample_density
+from ..i18n import tr, fmt
 
 
 # ---------------------------------------------------------------------------
@@ -75,7 +76,15 @@ class BoundaryPage(QWizardPage):
         self.combo.clear()
         for layer in QgsProject.instance().mapLayers().values():
             if isinstance(layer, QgsVectorLayer) and layer.geometryType() == GEOM_POLYGON:
-                self.combo.addItem(layer.name(), layer.id())
+                ok, tip_key = crs_status(layer.crs())
+                if ok:
+                    self.combo.addItem(layer_label(layer), layer.id())
+                else:
+                    self.combo.addItem(QgsApplication.getThemeIcon("/mIconWarning.svg"),
+                                       layer_label(layer), layer.id())
+                self.combo.setItemData(self.combo.count() - 1,
+                                       tr(tip_key, crs=crs_code(layer.crs())),
+                                       Qt.ItemDataRole.ToolTipRole)
         self.update_info()
 
     def layer(self):
@@ -95,8 +104,8 @@ class BoundaryPage(QWizardPage):
         self.check_selected.setText(tr("p1_selected_only") + f" ({n_sel})")
         ok_l = tr("ok") if crs_in_meters(layer.crs()) else tr("not_meters")
         ok_p = tr("ok") if crs_in_meters(project_crs) else tr("not_meters")
-        self.label_crs.setText(tr("p1_crs_info", layer_crs=layer.crs().authid(), ok_l=ok_l,
-                                  project_crs=project_crs.authid(), ok_p=ok_p))
+        self.label_crs.setText(tr("p1_crs_info", layer_crs=crs_code(layer.crs()), ok_l=ok_l,
+                                  project_crs=crs_code(project_crs), ok_p=ok_p))
 
     def choose_folder(self):
         folder = QFileDialog.getExistingDirectory(self, tr("p1_folder_dialog"))
@@ -109,18 +118,19 @@ class BoundaryPage(QWizardPage):
             QMessageBox.warning(self, tr("p1_boundary"), tr("p1_err_choose"))
             return False
         selected = self.check_selected.isChecked() and layer.selectedFeatureCount() > 0
-        feats = layer.getSelectedFeatures() if selected else layer.getFeatures()
+        feats = list(layer.getSelectedFeatures() if selected else layer.getFeatures())
         extent = features_extent(feats)
-        if extent is None:
+        geom = boundary_geometry(feats)
+        if extent is None or geom is None:
             QMessageBox.warning(self, tr("p1_boundary"), tr("p1_err_empty"))
             return False
         if not crs_in_meters(layer.crs()):
             QMessageBox.warning(self, tr("project_layer_title"),
-                                tr("p1_err_crs", name=layer.name(), crs=layer.crs().authid()))
+                                tr("p1_err_crs", name=layer.name(), crs=crs_code(layer.crs())))
             return False
         if not crs_in_meters(QgsProject.instance().crs()):
             answer = QMessageBox.question(self, tr("project_title"),
-                                          tr("p1_ask_project_crs", crs=QgsProject.instance().crs().authid()))
+                                          tr("p1_ask_project_crs", crs=crs_code(QgsProject.instance().crs())))
             if answer != QMessageBox.StandardButton.Yes:
                 return False
         folder = self.edit_folder.text().strip()
@@ -132,6 +142,8 @@ class BoundaryPage(QWizardPage):
         w.boundary = layer
         w.selected_only = selected
         w.boundary_extent = extent
+        w.boundary_geom = geom
+        w.area_ha = geom.area() / 10000.0
         w.tolerance = self.spin_tol.value()
         w.folder = folder
         return True
@@ -140,6 +152,42 @@ class BoundaryPage(QWizardPage):
 # ---------------------------------------------------------------------------
 # Page 2: point layers and fields (expandable tree)
 # ---------------------------------------------------------------------------
+COL_LAYER, COL_CRS, COL_POINTS = 0, 1, 2
+
+
+def crs_status(crs):
+    """Return (ok, tooltip key) describing whether the CRS can be used."""
+    if not crs.isValid():
+        return False, "p2_tip_invalid"
+    if crs.isGeographic():
+        return False, "p2_tip_geographic"
+    if not crs_in_meters(crs):
+        return False, "p2_tip_not_meters"
+    return True, "p2_tip_ok"
+
+
+def crs_code(crs):
+    if not crs.isValid():
+        return tr("p2_no_crs")
+    return crs.authid() or crs.description()
+
+
+def layer_label(layer):
+    """'Layer name [EPSG:xxxx]', as QGIS shows it in its layer selectors."""
+    return f"{layer.name()} [{crs_code(layer.crs())}]"
+
+
+def set_crs_cell(item, crs):
+    """Warning icon to the right of the layer name, with tooltip, when not in metres."""
+    ok, tip_key = crs_status(crs)
+    tip = tr(tip_key, crs=crs_code(crs))
+    item.setToolTip(COL_LAYER, tip)
+    if not ok:
+        item.setIcon(COL_CRS, QgsApplication.getThemeIcon("/mIconWarning.svg"))
+        item.setToolTip(COL_CRS, tip)
+    item.setData(COL_CRS, Qt.ItemDataRole.UserRole, ok)
+
+
 class PointsPage(QWizardPage):
     help_key = "help_page2"
 
@@ -149,8 +197,11 @@ class PointsPage(QWizardPage):
         self.setSubTitle(tr("p2_subtitle"))
 
         self.tree = QTreeWidget()
-        self.tree.setHeaderLabels([tr("p2_col_layer"), tr("p2_col_points")])
-        self.tree.setColumnWidth(0, 330)
+        # column 1 is a narrow, untitled column that only holds the warning icon,
+        # so the icon sits to the right of "Layer name [EPSG:xxxx]"
+        self.tree.setHeaderLabels([tr("p2_col_layer"), "", tr("p2_col_points")])
+        self.tree.setColumnWidth(COL_LAYER, 330)
+        self.tree.setColumnWidth(COL_CRS, 28)
 
         buttons = QHBoxLayout()
         for key, func in (("expand_all", lambda: self.tree.expandAll()),
@@ -170,6 +221,7 @@ class PointsPage(QWizardPage):
 
     def initializePage(self):
         w = self.wizard()
+        self.setSubTitle(tr("p2_subtitle_area", area=fmt(w.area_ha, 2)))
         self.tree.clear()
         rect = buffered(w.boundary_extent, w.tolerance)
         tctx = QgsProject.instance().transformContext()
@@ -181,24 +233,38 @@ class PointsPage(QWizardPage):
             if not fields:
                 continue
             try:
-                n = count_points(layer, rect, w.boundary.crs(), tctx)
+                stats = sample_stats(layer, fields, w.boundary_geom, w.boundary.crs(), rect, tctx)
             except Exception:
-                n = 0
-            if n == 0:
+                continue
+            if stats["used"] == 0:
                 continue
             found += 1
-            parent = QTreeWidgetItem([layer.name(), str(n)])
+            parent = QTreeWidgetItem([layer_label(layer), "", ""])
+            self.set_count_cell(parent, stats["inside"], stats["used"])
+            set_crs_cell(parent, layer.crs())
             parent.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable
                             | Qt.ItemFlag.ItemIsAutoTristate)
             parent.setCheckState(0, Qt.CheckState.Unchecked)
             for name in fields:
-                child = QTreeWidgetItem([name, ""])
+                child = QTreeWidgetItem([name, "", ""])
+                fs = stats["fields"][name]
+                self.set_count_cell(child, fs["inside"], fs["used"])
                 child.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
                 child.setCheckState(0, Qt.CheckState.Unchecked)
                 child.setData(0, Qt.ItemDataRole.UserRole, (layer.id(), name))
                 parent.addChild(child)
             self.tree.addTopLevelItem(parent)
+        self.tree.resizeColumnToContents(COL_LAYER)
         self.label.setText(tr("p2_none") if found == 0 else tr("p2_found", n=found))
+
+    def set_count_cell(self, item, inside, used):
+        """'4.969 (39,8 amostras/ha)', with the number of samples used in the tooltip."""
+        w = self.wizard()
+        density = fmt(sample_density(inside, w.area_ha), 1)
+        item.setText(COL_POINTS, tr("p2_count", n=fmt(inside), density=density))
+        item.setToolTip(COL_POINTS, tr("p2_tip_count", inside=fmt(inside), density=density,
+                                       used=fmt(used), tol=fmt(w.tolerance)))
+        item.setTextAlignment(COL_POINTS, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
     def set_all(self, checked):
         state = Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
@@ -221,7 +287,7 @@ class PointsPage(QWizardPage):
         if not sel:
             QMessageBox.warning(self, tr("p2_title"), tr("p2_err_none"))
             return False
-        bad = sorted({f"{l.name()} ({l.crs().authid()})" for l, _ in sel if not crs_in_meters(l.crs())})
+        bad = sorted({f"{l.name()} ({crs_code(l.crs())})" for l, _ in sel if not crs_in_meters(l.crs())})
         if bad:
             QMessageBox.warning(self, tr("project_layer_title"), tr("p2_err_crs", layers="\n".join(bad)))
             return False
@@ -316,7 +382,8 @@ class SummaryPage(QWizardPage):
         radius = tr("no_limit") if w.radius == 0 else f"{w.radius:g} m"
         sel = f" ({tr('selected_features')})" if w.selected_only else ""
         self.text.setHtml(tr(
-            "p4_summary", boundary=w.boundary.name() + sel, crs=w.boundary.crs().authid(),
+            "p4_summary", boundary=w.boundary.name() + sel, crs=crs_code(w.boundary.crs()),
+            area=fmt(w.area_ha, 2),
             tol=f"{w.tolerance:g}", folder=w.folder, n=len(w.items), items=items,
             power=f"{w.power:g}", radius=radius, pixel=f"{w.pixel:g}",
             classes=N_CLASSES, ramp=COLOR_RAMP))
@@ -341,6 +408,8 @@ class IdwWizard(QWizard):
         self.boundary = None
         self.selected_only = False
         self.boundary_extent = None
+        self.boundary_geom = None
+        self.area_ha = 0.0
         self.tolerance = 50.0
         self.folder = ""
         self.items = []

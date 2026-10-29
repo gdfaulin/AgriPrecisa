@@ -5,10 +5,12 @@ qgisMaximumVersion=4.99
 supportsQt6=True
 description=Precision agriculture tools: IDW interpolation to a pixel-sized vector grid with zonal statistics and graduated maps.
 about=AgriPrecisa gathers precision agriculture tools for QGIS, developed at Fatec Pompeia "Shunji Nishimura" (Brazil). This first release provides "IDW vector grid": soil or plant sample points are interpolated by IDW (power, search radius and pixel size set by the user) over the bounding box of the field boundary, accepting samples slightly outside the boundary through a tolerance. A polygon grid with the pixel size is clipped by the boundary and receives, by zonal statistics, the mean of every interpolated field, ready for management zones and variable rate maps. Results are styled as graduated maps (5 classes, Jenks natural breaks, RdYlGn). Available as a step-by-step wizard (Vector > AgriPrecisa) and as a Processing algorithm for batch runs and the Graphical Modeler. Interface in Portuguese, English and Spanish. Unlike general interpolation tools, it delivers the result directly as a pixel-sized vector grid clipped to the field, with one styled layer per attribute.
-version=1.0.0
+version=1.0.2
 author=Gustavo Di Chiacchio Faulin
 email=gustavo.faulin@cps.sp.gov.br
 changelog=
+    1.0.2 Wizard step 2 shows the field area (ha) and, for each layer and attribute, the samples inside the field and the sampling density (samples/ha).
+    1.0.1 Wizard shows "[EPSG:xxxx]" after each layer name and a warning icon with tooltip for layers not in a projected CRS in metres.
     1.0.0 First public release: IDW vector grid tool (wizard and Processing algorithm), Portuguese, English and Spanish interface.
 tags=precision agriculture,agriculture,interpolation,idw,zonal statistics,soil,management zones,variable rate,farming
 homepage=https://github.com/gdfaulin/AgriPrecisa

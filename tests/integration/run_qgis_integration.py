@@ -118,6 +118,72 @@ if not isinstance(rend, QgsGraduatedSymbolRenderer) or len(rend.ranges()) != 5:
     errors.append("graduated renderer with 5 classes not applied")
 print("classes:", [f"{x.lowerValue():.1f}-{x.upperValue():.1f}" for x in rend.ranges()])
 
+
+# 3b) Step 2: "name [EPSG:xxxx]" and a warning icon (with tooltip) to the right for non-metric layers
+geo = QgsVectorLayer("Point?crs=EPSG:4326&field=SHALLOW:double&field=DEEP:double", "CE Limpo", "memory")
+from qgis.core import QgsCoordinateTransform
+ct = QgsCoordinateTransform(points.crs(), geo.crs(), QgsProject.instance())
+gfeats = []
+for ft in points.getFeatures():
+    g = QgsFeature(geo.fields())
+    gg = QgsGeometry(ft.geometry()); gg.transform(ct)
+    g.setGeometry(gg); g.setAttributes([ft["argila"], ft["argila"]])
+    gfeats.append(g)
+geo.dataProvider().addFeatures(gfeats)
+QgsProject.instance().addMapLayer(geo)
+i18n.set_language("pt")
+# headless run: answer message boxes automatically instead of blocking
+from qgis.PyQt.QtWidgets import QMessageBox
+from qgis.PyQt.QtCore import Qt
+popups = []
+QMessageBox.question = staticmethod(lambda *a, **k: (popups.append(a[2]), QMessageBox.StandardButton.Yes)[1])
+QMessageBox.warning = staticmethod(lambda *a, **k: (popups.append(a[2]), QMessageBox.StandardButton.Ok)[1])
+wz = idw_wizard.IdwWizard()
+wz.resize(760, 520)
+wz.show()
+p1 = wz.currentPage()
+p1.combo.setCurrentIndex(p1.combo.findData(boundary.id()))
+p1.edit_folder.setText(tmp)
+wz.next()
+if popups:
+    print("popups:", popups)
+# Regression: with no project CRS the message read "O projeto está em , que não ..."
+if any("está em ," in m for m in popups):
+    errors.append("empty CRS name in project CRS message")
+page = wz.currentPage()
+page.tree.expandAll()
+rows = {}
+for i in range(page.tree.topLevelItemCount()):
+    it = page.tree.topLevelItem(i)
+    rows[it.text(0)] = (not it.icon(1).isNull(), it.toolTip(1), it.text(2))
+print("Step 2 rows:", {k: ("WARNING ICON" if v[0] else "no icon", v[2]) for k, v in rows.items()})
+print("Step 2 subtitle:", page.subTitle())
+if "2,50 ha" not in page.subTitle():
+    errors.append("field area (2,50 ha) missing from step 2 header")
+amostras = page.tree.findItems("amostras [EPSG:31982]", Qt.MatchFlag.MatchExactly, 0)[0]
+kids = {amostras.child(k).text(0): amostras.child(k).text(2) for k in range(amostras.childCount())}
+print("Counts:", amostras.text(2), kids)
+print("Count tooltip:", amostras.toolTip(2))
+if amostras.text(2) != "7 (2,8 amostras/ha)":
+    errors.append("layer count/density should be '7 (2,8 amostras/ha)'")
+if kids.get("pH") != "6 (2,4 amostras/ha)" or kids.get("argila") != "7 (2,8 amostras/ha)":
+    errors.append("field counts should ignore empty values (pH 6, argila 7)")
+if "serão usadas 20" not in amostras.toolTip(2):
+    errors.append("tooltip should report the 20 samples used with tolerance")
+if not rows.get("CE Limpo [EPSG:4326]", (False,))[0]:
+    errors.append("geographic layer without '[EPSG:4326]' label or warning icon")
+elif "metros" not in rows["CE Limpo [EPSG:4326]"][1]:
+    errors.append("tooltip text missing")
+if rows.get("amostras [EPSG:31982]", (True,))[0]:
+    errors.append("metric layer should be labelled [EPSG:31982] without icon")
+print("Tooltip:", rows.get("CE Limpo [EPSG:4326]", ("", ""))[1])
+app.processEvents()
+shot = os.environ.get("AGRIPRECISA_SHOT")
+if shot:
+    wz.grab().save(shot)
+wz.hide()
+QgsProject.instance().removeMapLayer(geo.id())
+
 # 4) Plugin load/unload through classFactory
 import agriprecisa
 QgsApplication.processingRegistry().removeProvider(provider)
