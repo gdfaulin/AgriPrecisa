@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.3.2 (2026)
+- Step 1: the output folder comes filled in: the last folder used or, the first time, the "AgriPrecisa" subfolder inside the QGIS project folder, created automatically. If the project is not saved and there is no previous folder, a hint asks to save the project or choose a folder.
+
 ## 1.3.1 (2026)
 - New names: "Ajuste automático" / "Ajuste automático para todos" (EN: Auto-fit / Auto-fit all).
 - Modes renamed to "Layout Didático" (visual, for classes) and "Layout Padrão" (free values), with tooltips.
