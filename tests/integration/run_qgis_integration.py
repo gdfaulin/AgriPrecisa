@@ -410,6 +410,50 @@ if not {"CE_mean", "CE2_mean"} <= {f.name() for f in auto_grid.fields()}:
 QgsProject.instance().removeMapLayer(ce.id())
 QgsProject.instance().removeMapLayer(geo.id())
 
+# 3e) Step 1 default output folder: project subfolder, created on demand, then last used
+from qgis.core import QgsSettings as _S
+proj_dir = os.path.join(tmp, "projeto_aula")
+os.makedirs(proj_dir, exist_ok=True)
+QgsProject.instance().write(os.path.join(proj_dir, "aula.qgz"))
+_S().remove("AgriPrecisa/last_output_folder")
+w3 = idw_wizard.IdwWizard()
+w3.show()
+f1 = w3.currentPage()
+expected = os.path.join(proj_dir, "AgriPrecisa")
+print("Default folder:", f1.edit_folder.text(), "|", f1.label_folder.text())
+if os.path.normpath(f1.edit_folder.text()) != os.path.normpath(expected):
+    errors.append("default output folder should be <project>/AgriPrecisa")
+f1.combo.setCurrentIndex(f1.combo.findData(boundary.id()))
+w3.next()
+if not os.path.isdir(expected):
+    errors.append("AgriPrecisa subfolder was not created")
+w3.hide()
+chosen = os.path.join(tmp, "outra_pasta")
+os.makedirs(chosen, exist_ok=True)
+w4 = idw_wizard.IdwWizard()
+w4.show()
+g1 = w4.currentPage()
+g1.edit_folder.setText(chosen)
+g1.combo.setCurrentIndex(g1.combo.findData(boundary.id()))
+w4.next()
+w4.hide()
+w5 = idw_wizard.IdwWizard()
+w5.show()
+h1 = w5.currentPage()
+print("Next run folder:", h1.edit_folder.text(), "|", h1.label_folder.text())
+if os.path.normpath(h1.edit_folder.text()) != os.path.normpath(chosen) or "Última" not in h1.label_folder.text():
+    errors.append("next run should offer the last folder used")
+w5.hide()
+QgsProject.instance().setFileName("")
+_S().remove("AgriPrecisa/last_output_folder")
+w6 = idw_wizard.IdwWizard()
+w6.show()
+k1 = w6.currentPage()
+print("Unsaved project:", repr(k1.edit_folder.text()), "|", k1.label_folder.text())
+if k1.edit_folder.text() or "Salve o projeto" not in k1.label_folder.text():
+    errors.append("unsaved project without history should leave the folder empty with a hint")
+w6.hide()
+
 # 4) Plugin load/unload through classFactory
 import agriprecisa
 QgsApplication.processingRegistry().removeProvider(provider)

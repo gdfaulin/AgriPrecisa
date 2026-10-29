@@ -110,6 +110,16 @@ STRINGS = {
     "p1_tolerance": {"pt": "Tolerância além do contorno:", "en": "Tolerance beyond boundary:",
                      "es": "Tolerancia más allá del contorno:"},
     "p1_folder": {"pt": "Pasta de saída:", "en": "Output folder:", "es": "Carpeta de salida:"},
+    "p1_folder_from_last": {"pt": "Última pasta usada.", "en": "Last folder used.",
+                            "es": "Última carpeta usada."},
+    "p1_folder_from_project": {
+        "pt": "Subpasta AgriPrecisa dentro da pasta do projeto (será criada se não existir).",
+        "en": "AgriPrecisa subfolder inside the project folder (created if it does not exist).",
+        "es": "Subcarpeta AgriPrecisa dentro de la carpeta del proyecto (se creará si no existe)."},
+    "p1_folder_none": {
+        "pt": "Salve o projeto do QGIS para usar a pasta dele, ou escolha uma pasta.",
+        "en": "Save the QGIS project to use its folder, or choose a folder.",
+        "es": "Guarde el proyecto de QGIS para usar su carpeta, o elija una carpeta."},
     "p1_folder_dialog": {"pt": "Pasta para salvar os mapas interpolados",
                          "en": "Folder to save the interpolated maps",
                          "es": "Carpeta para guardar los mapas interpolados"},
@@ -145,9 +155,9 @@ STRINGS = {
         "es": "El proyecto está en {crs}, que no es un sistema proyectado en metros.\n\n"
               "Se recomienda ajustarlo en Proyecto > Propiedades > SRC. Los cálculos usan el SRC "
               "del contorno, así que es posible continuar.\n\n¿Desea continuar de todos modos?"},
-    "p1_err_folder": {"pt": "Escolha uma pasta existente e com permissão de escrita.",
-                      "en": "Choose an existing folder with write permission.",
-                      "es": "Elija una carpeta existente y con permiso de escritura."},
+    "p1_err_folder": {"pt": "Escolha uma pasta de saída. Não foi possível criar ou gravar na pasta informada.",
+                      "en": "Choose an output folder. The folder could not be created or written to.",
+                      "es": "Elija una carpeta de salida. No se pudo crear ni escribir en la carpeta indicada."},
     "help_page1": {
         "pt": "<b>Etapa 1: Contorno e pasta de saída</b><br><br>"
               "<b>Camada de contorno:</b> polígono que delimita o talhão. O retângulo envolvente "
@@ -158,7 +168,8 @@ STRINGS = {
               "aceitos. Inclui amostras que ficaram um pouco fora do limite, por exemplo em manobras. "
               "Também define quais camadas de pontos aparecem na próxima etapa.<br><br>"
               "<b>Pasta de saída:</b> onde ficam os rasters interpolados (GeoTIFF) e a grade "
-              "vetorial final (GeoPackage).<br><br>"
+              "vetorial final (GeoPackage). Vem preenchida com a última pasta usada ou, na primeira "
+              "vez, com a subpasta AgriPrecisa dentro da pasta do projeto, criada automaticamente.<br><br>"
               "<b>Sistema de coordenadas:</b> o contorno e os pontos precisam estar em um sistema "
               "projetado em metros, como SIRGAS 2000 / UTM 22S (EPSG:31982).",
         "en": "<b>Step 1: Boundary and output folder</b><br><br>"
@@ -169,7 +180,9 @@ STRINGS = {
               "still accepted. It keeps samples slightly outside the limit, e.g. from machine "
               "turns. It also defines which point layers are listed in the next step.<br><br>"
               "<b>Output folder:</b> where the interpolated rasters (GeoTIFF) and the final "
-              "vector grid (GeoPackage) are saved.<br><br>"
+              "vector grid (GeoPackage) are saved. It is filled with the last folder used or, the "
+              "first time, with the AgriPrecisa subfolder inside the project folder, created "
+              "automatically.<br><br>"
               "<b>Coordinate system:</b> boundary and points must be in a projected CRS in "
               "metres, such as a UTM zone.",
         "es": "<b>Paso 1: Contorno y carpeta de salida</b><br><br>"
@@ -181,7 +194,9 @@ STRINGS = {
               "puntos aún se aceptan. Incluye muestras algo fuera del límite, por ejemplo en "
               "maniobras. También define qué capas de puntos aparecen en el siguiente paso.<br><br>"
               "<b>Carpeta de salida:</b> donde se guardan los ráster interpolados (GeoTIFF) y la "
-              "cuadrícula vectorial final (GeoPackage).<br><br>"
+              "cuadrícula vectorial final (GeoPackage). Viene con la última carpeta usada o, la "
+              "primera vez, con la subcarpeta AgriPrecisa dentro de la carpeta del proyecto, creada "
+              "automáticamente.<br><br>"
               "<b>Sistema de coordenadas:</b> el contorno y los puntos deben estar en un SRC "
               "proyectado en metros, como una zona UTM."},
 

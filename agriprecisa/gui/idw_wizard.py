@@ -18,6 +18,7 @@ from qgis.PyQt.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QMessageBox, QProgressDialog, QTextBrowser,
 )
 from qgis.core import (
+    QgsSettings,
     QgsApplication, QgsProject, QgsVectorLayer, QgsProcessingContext, QgsProcessingFeedback,
     QgsProcessingException, QgsProcessingFeatureSourceDefinition,
 )
@@ -30,7 +31,12 @@ from ..core.pipeline import (
 )
 from ..core.idw_math import snap_extent, sample_density
 from ..i18n import tr, fmt
+from ..core.paths import default_output_folder, prepare_output_folder
 from .params_page import ParametersPage, ORIGIN_TEXT
+
+LAST_FOLDER_KEY = "AgriPrecisa/last_output_folder"
+FOLDER_HINT = {"last": "p1_folder_from_last", "project": "p1_folder_from_project",
+               "none": "p1_folder_none"}
 
 
 # ---------------------------------------------------------------------------
@@ -58,6 +64,10 @@ class BoundaryPage(QWizardPage):
         row = QHBoxLayout()
         row.addWidget(self.edit_folder)
         row.addWidget(browse)
+        self.label_folder = QLabel()
+        self.label_folder.setWordWrap(True)
+        self.label_folder.setEnabled(False)     # greyed hint, like QGIS
+        self.edit_folder.textEdited.connect(lambda _t: self.label_folder.setText(""))
 
         self.label_crs = QLabel()
         self.label_crs.setWordWrap(True)
@@ -68,6 +78,7 @@ class BoundaryPage(QWizardPage):
         form.addRow("", self.check_selected)
         form.addRow(tr("p1_tolerance"), self.spin_tol)
         form.addRow(tr("p1_folder"), row)
+        form.addRow("", self.label_folder)
         layout = QVBoxLayout(self)
         layout.addLayout(form)
         layout.addWidget(self.label_crs)
@@ -87,6 +98,15 @@ class BoundaryPage(QWizardPage):
                                        tr(tip_key, crs=crs_code(layer.crs())),
                                        Qt.ItemDataRole.ToolTipRole)
         self.update_info()
+        if not self.edit_folder.text().strip():
+            self.fill_default_folder()
+
+    def fill_default_folder(self):
+        """Last folder used; otherwise <project folder>/AgriPrecisa; otherwise empty."""
+        last = QgsSettings().value(LAST_FOLDER_KEY, "", type=str)
+        folder, source = default_output_folder(last, QgsProject.instance().homePath())
+        self.edit_folder.setText(folder)
+        self.label_folder.setText(tr(FOLDER_HINT[source]))
 
     def layer(self):
         lid = self.combo.currentData()
@@ -109,9 +129,13 @@ class BoundaryPage(QWizardPage):
                                   project_crs=crs_code(project_crs), ok_p=ok_p))
 
     def choose_folder(self):
-        folder = QFileDialog.getExistingDirectory(self, tr("p1_folder_dialog"))
+        start = self.edit_folder.text().strip()
+        while start and not os.path.isdir(start):     # e.g. AgriPrecisa not created yet
+            start = os.path.dirname(start) if os.path.dirname(start) != start else ""
+        folder = QFileDialog.getExistingDirectory(self, tr("p1_folder_dialog"), start)
         if folder:
             self.edit_folder.setText(folder)
+            self.label_folder.setText("")
 
     def validatePage(self):
         layer = self.layer()
@@ -135,9 +159,10 @@ class BoundaryPage(QWizardPage):
             if answer != QMessageBox.StandardButton.Yes:
                 return False
         folder = self.edit_folder.text().strip()
-        if not folder or not os.path.isdir(folder) or not os.access(folder, os.W_OK):
+        if not prepare_output_folder(folder):
             QMessageBox.warning(self, tr("p1_folder"), tr("p1_err_folder"))
             return False
+        QgsSettings().setValue(LAST_FOLDER_KEY, folder)
 
         w = self.wizard()
         w.boundary = layer
