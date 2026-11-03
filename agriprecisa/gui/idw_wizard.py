@@ -16,7 +16,7 @@ from qgis.PyQt.QtWidgets import (
     QDialog, QWizard, QWizardPage, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel,
     QComboBox, QLineEdit, QPushButton, QFileDialog, QDoubleSpinBox, QCheckBox,
     QTreeWidget, QTreeWidgetItem, QMessageBox, QProgressDialog, QTextBrowser, QGroupBox,
-    QRadioButton, QGridLayout,
+    QRadioButton, QGridLayout, QSplitter, QWidget, QSizePolicy,
 )
 from qgis.core import (
     QgsSettings, QgsGeometry, QgsVectorFileWriter,
@@ -67,6 +67,37 @@ def existing_cell_size(grid_layer, boundary_geom, boundary_crs):
 # ---------------------------------------------------------------------------
 # Page 1: boundary, tolerance and output folder
 # ---------------------------------------------------------------------------
+def add_side_panel(page, left_layout, key):
+    """
+    Put ``left_layout`` (the options) on the left and a fixed explanation of every option
+    on the right, like the help panel of the Processing algorithm dialogs, so the student
+    does not need the Help button to know what each option does. The two sides are in a
+    splitter and can be resized.
+    """
+    left = QWidget()
+    left.setLayout(left_layout)
+    panel = QTextBrowser()
+    panel.setOpenLinks(False)
+    panel.setHtml(tr(key))
+    panel.setMinimumWidth(260)
+    splitter = QSplitter(Qt.Orientation.Horizontal)
+    splitter.addWidget(left)
+    splitter.addWidget(panel)
+    splitter.setChildrenCollapsible(False)
+    splitter.setStretchFactor(0, 3)
+    splitter.setStretchFactor(1, 2)
+    splitter.setSizes([640, 420])
+    # QWizard gives a page only its size hint and leaves the rest empty, unless the page
+    # expands: then both sides reach the buttons whatever the window size
+    page.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    outer = QVBoxLayout(page)
+    outer.setContentsMargins(0, 0, 0, 0)
+    outer.addWidget(splitter)
+    page.side_panel = panel
+    page.splitter = splitter
+    return panel
+
+
 class BoundaryPage(QWizardPage):
     help_key = "help_page1"
 
@@ -132,11 +163,12 @@ class BoundaryPage(QWizardPage):
         form.addRow(tr("p1_tolerance"), self.spin_tol)
         form.addRow(tr("p1_folder"), row)
         form.addRow("", self.label_folder)
-        layout = QVBoxLayout(self)
+        layout = QVBoxLayout()
         layout.addLayout(form)
         layout.addWidget(box_grid)
         layout.addWidget(self.label_crs)
         layout.addStretch()
+        add_side_panel(self, layout, "p1_panel")
 
     def initializePage(self):
         self.combo.clear()
@@ -332,10 +364,11 @@ class PointsPage(QWizardPage):
 
         self.label = QLabel()
         self.label.setWordWrap(True)
-        layout = QVBoxLayout(self)
+        layout = QVBoxLayout()
         layout.addWidget(self.tree)
         layout.addLayout(buttons)
         layout.addWidget(self.label)
+        add_side_panel(self, layout, "p2_panel")
 
     def initializePage(self):
         w = self.wizard()

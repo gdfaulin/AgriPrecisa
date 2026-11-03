@@ -5,10 +5,11 @@ qgisMaximumVersion=4.99
 supportsQt6=True
 description=Precision agriculture tools: IDW interpolation to a pixel-sized vector grid with zonal statistics and graduated maps.
 about=AgriPrecisa gathers precision agriculture tools for QGIS, developed at Fatec Pompeia "Shunji Nishimura" (Brazil). This first release provides "IDW vector grid": soil or plant sample points are interpolated by IDW (power, search radius and pixel size set by the user) over the bounding box of the field boundary, accepting samples slightly outside the boundary through a tolerance. A vector grid (cell size chosen by the user, or an existing grid) receives, by zonal statistics on whole cells, the mean of every interpolated field and is then clipped by the boundary, ready for management zones and variable rate maps. Results are styled as graduated maps (5 classes, Jenks natural breaks, RdYlGn). Available as a step-by-step wizard (Vector > AgriPrecisa) and as a Processing algorithm for batch runs and the Graphical Modeler. Interface in Portuguese, English and Spanish. Unlike general interpolation tools, it delivers the result directly as a pixel-sized vector grid clipped to the field, with one styled layer per attribute.
-version=1.6.0
+version=1.7.0
 author=Gustavo Di Chiacchio Faulin
 email=gustavo.faulin@cps.sp.gov.br
 changelog=
+    1.7.0 Steps 1 and 2 split in two: a fixed panel on the right explains every option (like the Processing dialogs); the Help button now explains the concept behind each step. Step 3: the neighbours box with the influence bars was removed (the maximum of neighbours stays in the summary table; the explanation moved to the Advanced box).
     1.6.0 Minimum (4) and maximum (default 16) of neighbours per pixel, as in GIS interpolators: the minimum is always met, even beyond the radius; the maximum limits the radius. Auto-fit now chooses P and the maximum of neighbours by cross-validation and sets the radius so it does not cut the maximum. Step 3: weight curve removed, map preview fills the right column, search radius moved to a collapsed Advanced box. Processing: new minimum and maximum of neighbours parameters.
     1.5.2 Fix: pixels the search radius did not reach (e.g. a wider gap between sensor passes) were left empty and grid cells came out blank; they now use the 4 nearest samples. Warning in step 3 and in the final message with the % of the field affected.
     1.5.1 Help updated for the vector grid and the pixel size; Processing help shows the standard grid file name correctly.
