@@ -18,9 +18,9 @@ from qgis.core import (
 )
 
 from .compat import UNIT_METERS
-from .idw_math import NODATA, idw_grid, safe_name, snap_extent, unique_prefixes
+from .idw_math import NODATA, idw_grid, safe_name, snap_extent, unique_prefixes, FALLBACK_NEIGHBOURS
 from .paths import shapefile_field_names
-from ..i18n import tr
+from ..i18n import tr, fmt
 
 N_CLASSES = 5
 COLOR_RAMP = "RdYlGn"
@@ -294,6 +294,31 @@ class IdwJob:
         return snap_extent(e.xMinimum(), e.yMinimum(), e.xMaximum(), e.yMaximum(), self.cell_size)
 
 
+def fallback_share_in_field(used_fallback, xmin, ymax, res, field_geom, field_engine):
+    """
+    Percentage of the field area whose pixels had no sample within the search radius and
+    therefore used the nearest samples (fallback). Pixels of the 100 m margin do not count.
+    """
+    import numpy as np
+    rows, cols = np.nonzero(used_fallback)
+    if rows.size == 0 or field_geom is None or field_engine is None:
+        return 0.0
+    area = field_geom.area()
+    if area <= 0:
+        return 0.0
+    bb = field_geom.boundingBox()
+    inside = 0
+    for r, c in zip(rows, cols):
+        x = xmin + (c + 0.5) * res
+        y = ymax - (r + 0.5) * res
+        if not (bb.xMinimum() <= x <= bb.xMaximum() and bb.yMinimum() <= y <= bb.yMaximum()):
+            continue
+        pt = QgsGeometry.fromPointXY(QgsPointXY(x, y))   # keep a reference while GEOS uses it
+        if field_engine.intersects(pt.constGet()):
+            inside += 1
+    return min(100.0, inside * res * res / area * 100.0)
+
+
 def _run(alg, params, context, feedback):
     return processing.run(alg, params, context=context, feedback=feedback,
                           is_child_algorithm=True)["OUTPUT"]
@@ -327,6 +352,19 @@ def run_idw_job(job, context, feedback):
     prefixes = unique_prefixes([(name_of(s), f) for s, f in job.items])
     layers, warnings = [], []
 
+    # boundary with fixed geometries (also used to tell which pixels are inside the field)
+    steps.setCurrentStep(step)
+    step += 1
+    feedback.pushInfo(tr("log_fixing"))
+    fixed = _run("native:fixgeometries", {"INPUT": job.boundary_input, "OUTPUT": "TEMPORARY_OUTPUT"},
+                 context, steps)
+    fixed_layer = QgsProcessingUtils.mapLayerFromString(fixed, context)
+    field_geom = boundary_geometry(fixed_layer.getFeatures()) if fixed_layer is not None else None
+    field_engine = None
+    if field_geom is not None:
+        field_engine = QgsGeometry.createGeometryEngine(field_geom.constGet())
+        field_engine.prepareGeometry()
+
     # 1) IDW for each field, over the boundary extent plus a safety margin
     for (source, field), prefix, (power, radius) in zip(job.items, prefixes, job.params):
         steps.setCurrentStep(step)
@@ -345,26 +383,28 @@ def run_idw_job(job, context, feedback):
 
         feedback.pushInfo(tr("log_params", label=label, p=f"{power:g}",
                              r=tr("no_limit") if radius == 0 else f"{radius:.1f} m"))
-        grid = idw_grid(xs, ys, zs, xmin, ymax, ncol, nrow, res, power, radius, cb)
-        if grid is None or feedback.isCanceled():
+        result = idw_grid(xs, ys, zs, xmin, ymax, ncol, nrow, res, power, radius, cb,
+                          return_fallback=True)
+        if result is None or feedback.isCanceled():
             raise QgsProcessingException(tr("canceled"))
+        grid, used_fallback = result
+        fallback_pct = fallback_share_in_field(used_fallback, xmin, ymax, res, field_geom, field_engine)
+        if fallback_pct > 0:
+            warnings.append(tr("warn_fallback", label=label, pct=fmt(fallback_pct, 1),
+                               k=FALLBACK_NEIGHBOURS))
+            feedback.pushInfo(warnings[-1])
         raster = os.path.join(
             job.raster_folder,
             f"IDW_{safe_name(name_of(source), 25)}_{safe_name(field, 25)}{job.stamp}.tif")
         write_geotiff(raster, grid, xmin, ymax, res, crs)
         layers.append({"prefix": prefix, "field": field, "label": label,
-                       "raster": raster, "n": len(zs), "power": power, "radius": radius})
+                       "raster": raster, "n": len(zs), "power": power, "radius": radius,
+                       "fallback_pct": fallback_pct})
 
     if not layers:
         raise QgsProcessingException(tr("err_nothing_interpolated") + "\n" + "\n".join(warnings))
 
-    # 2) Boundary (fixed) and the vector grid: whole cells touching the boundary
-    steps.setCurrentStep(step)
-    step += 1
-    feedback.pushInfo(tr("log_fixing"))
-    fixed = _run("native:fixgeometries", {"INPUT": job.boundary_input, "OUTPUT": "TEMPORARY_OUTPUT"},
-                 context, steps)
-
+    # 2) The vector grid: whole cells touching the boundary
     steps.setCurrentStep(step)
     step += 1
     grid_path = None

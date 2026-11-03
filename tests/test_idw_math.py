@@ -24,12 +24,27 @@ def test_known_weights_power_2():
     assert g[0, 0] == pytest.approx(expected)
 
 
+def test_radius_gap_uses_nearest_samples_instead_of_nodata():
+    # Regression: pixels in a gap between sensor passes wider than the search radius were
+    # left without value (NODATA) and the grid cells over them came out blank.
+    xs = np.array([0.0, 0.0, 30.0, 30.0])
+    ys = np.array([0.0, 10.0, 0.0, 10.0])
+    zs = np.array([1.0, 1.0, 3.0, 3.0])
+    # pixel at x = 15 is 15 m from every sample; radius 5 m reaches none of them
+    g, used = idw_grid(xs, ys, zs, 12.5, 7.5, 1, 1, 5.0, 2, 5.0, return_fallback=True)
+    assert g[0, 0] != NODATA and used[0, 0]
+    assert g[0, 0] == pytest.approx(2.0)          # 4 nearest, symmetric -> mean of 1 and 3
+    # pixels the radius reaches are not flagged
+    g2, used2 = idw_grid(xs, ys, zs, -2.5, 2.5, 1, 1, 5.0, 2, 5.0, return_fallback=True)
+    assert not used2[0, 0]
+
+
 def test_radius_leaves_far_pixels_nodata():
     # sample at the corner (0, 0): only the centre (5, 5), 7.07 m away, is within 8 m
-    g = idw_grid([0.0], [0.0], [5.0], 0.0, 30.0, 3, 3, 10.0, 2, 8)
+    g = idw_grid([0.0], [0.0], [5.0], 0.0, 30.0, 3, 3, 10.0, 2, 8, fallback_neighbours=0)
     assert (g == NODATA).sum() == 8
     assert g[2, 0] == pytest.approx(5.0)
-    g = idw_grid([5.0], [25.0], [5.0], 0.0, 30.0, 3, 3, 10.0, 2, 8)
+    g = idw_grid([5.0], [25.0], [5.0], 0.0, 30.0, 3, 3, 10.0, 2, 8, fallback_neighbours=0)
     assert g[0, 0] == pytest.approx(5.0)
     assert g[2, 2] == NODATA
 

@@ -13,7 +13,7 @@ _LANG = None
 
 # Last plugin version for which every Help text (help_page*, *_more, alg_help) was reviewed.
 # Must be updated together with "version=" in metadata.txt (checked by tests/test_package.py).
-HELP_REVIEWED_VERSION = "1.5.1"
+HELP_REVIEWED_VERSION = "1.5.2"
 
 
 def current_language():
@@ -420,7 +420,8 @@ STRINGS = {
               "<b>Potência P:</b> quanto maior, mais rápido o peso cai com a distância.<br>"
               "<b>Raio de busca:</b> é definido em múltiplos da distância de "
               "cobertura (distância que cobre 95% do talhão); o valor em metros aparece acima da "
-              "barra.<br>"
+              "barra. Se o raio não alcançar amostras em parte do talhão, um aviso em laranja mostra "
+              "o percentual; nesses pontos são usadas as 4 amostras mais próximas.<br>"
               "<b>Ajuste automático / para todos:</b> a validação cruzada testa combinações e indica, "
               "para cada atributo, a de menor erro.<br>"
               "<b>Mostrar amostras:</b> liga ou desliga os pontos na prévia.<br>"
@@ -442,7 +443,8 @@ STRINGS = {
               "<b>Power P:</b> the higher it is, the faster the weight falls with distance.<br>"
               "<b>Search radius:</b> it is set in multiples of the coverage "
               "distance (distance covering 95% of the field); the value in metres is shown above "
-              "the slider.<br>"
+              "the slider. If the radius reaches no sample in part of the field, an orange warning "
+              "shows the percentage; there the 4 nearest samples are used.<br>"
               "<b>Auto-fit / Auto-fit all:</b> cross-validation tests combinations and points "
               "out, for each attribute, the one with the lowest error.<br>"
               "<b>Show samples:</b> turns the points on or off in the preview.<br>"
@@ -464,7 +466,8 @@ STRINGS = {
               "<b>Potencia P:</b> cuanto mayor, más rápido cae el peso con la distancia.<br>"
               "<b>Radio de búsqueda:</b> se define en múltiplos de la distancia de "
               "cobertura (distancia que cubre el 95% del lote); el valor en metros aparece sobre la "
-              "barra.<br>"
+              "barra. Si el radio no alcanza muestras en parte del lote, un aviso en naranja muestra "
+              "el porcentaje; allí se usan las 4 muestras más cercanas.<br>"
               "<b>Ajuste automático / para todos:</b> la validación cruzada prueba combinaciones e "
               "indica, para cada atributo, la de menor error.<br>"
               "<b>Mostrar muestras:</b> enciende o apaga los puntos en la vista previa.<br>"
@@ -564,13 +567,21 @@ STRINGS = {
     "p3_radius_value": {"pt": "Raio = {mult} × {spacing} m = {radius} m",
                         "en": "Radius = {mult} × {spacing} m = {radius} m",
                         "es": "Radio = {mult} × {spacing} m = {radius} m"},
+    "p3_radius_gap": {
+        "pt": "Em {pct}% do talhão este raio não alcança nenhuma amostra (vãos entre passadas ou "
+              "amostras). Nesses pontos serão usadas as {k} amostras mais próximas, para o mapa não "
+              "ficar com falhas.",
+        "en": "In {pct}% of the field this radius reaches no sample (gaps between passes or samples). "
+              "There the {k} nearest samples will be used, so the map has no gaps.",
+        "es": "En el {pct}% del lote este radio no alcanza ninguna muestra (huecos entre pasadas o "
+              "muestras). Allí se usarán las {k} muestras más cercanas, para que el mapa no tenga huecos."},
     "p3_radius_short": {
-        "pt": "Raio curto: cada pixel enxerga poucas amostras. O mapa fica mais local e podem surgir "
-              "falhas (pixels sem valor, em cinza na prévia).",
-        "en": "Short radius: each pixel sees few samples. The map is more local and gaps may appear "
-              "(pixels without value, grey in the preview).",
-        "es": "Radio corto: cada píxel ve pocas muestras. El mapa es más local y pueden aparecer "
-              "huecos (píxeles sin valor, en gris en la vista previa)."},
+        "pt": "Raio curto: cada pixel enxerga poucas amostras e o mapa fica mais local. Onde o raio não "
+              "alcançar nenhuma amostra, serão usadas as mais próximas.",
+        "en": "Short radius: each pixel sees few samples and the map is more local. Where the radius "
+              "reaches no sample, the nearest ones will be used.",
+        "es": "Radio corto: cada píxel ve pocas muestras y el mapa es más local. Donde el radio no "
+              "alcance ninguna muestra, se usarán las más cercanas."},
     "p3_radius_ok": {
         "pt": "Raio recomendado: cada pixel considera várias amostras vizinhas, cerca de 2 vezes a "
               "distância de cobertura.",
@@ -594,7 +605,9 @@ STRINGS = {
               "um espaçamento calculado só pela densidade seria pequeno demais e deixaria faixas sem "
               "valor entre as passadas.<br><br>"
               "Um raio de 1,5 a 2,5 vezes a distância de cobertura garante várias vizinhas em cada pixel. "
-              "Raios menores deixam falhas; raios maiores suavizam e deixam o cálculo mais lento. Em "
+              "Onde o raio não alcança nenhuma amostra (por exemplo, um vão maior entre passadas), o "
+              "AgriPrecisa usa as 4 amostras mais próximas, para o mapa não ficar com falhas, e avisa "
+              "em quantos % do talhão isso acontece. Raios maiores suavizam e deixam o cálculo mais lento. Em "
               "pesquisa, o alcance do semivariograma é uma boa referência.<br><br>"
               "Com mais de um atributo marcado, vale o de menor cobertura (amostragem mais esparsa).",
         "en": "<b>Search radius</b><br><br>Only samples within the radius are used for each pixel. The "
@@ -604,7 +617,9 @@ STRINGS = {
               "close along the line and far apart between lines. In that case, a spacing computed from "
               "density alone would be too small and leave strips without value between passes.<br><br>"
               "A radius of 1.5 to 2.5 times the coverage distance ensures several neighbours per pixel. "
-              "Smaller radii leave gaps; larger radii smooth and slow processing. In research, the "
+              "Where the radius reaches no sample (e.g. a wider gap between passes), AgriPrecisa uses the "
+              "4 nearest samples so the map has no gaps, and reports in what % of the field this happens. "
+              "Larger radii smooth and slow processing. In research, the "
               "semivariogram range is a good reference.<br><br>"
               "With several attributes ticked, the one with the sparsest sampling is used.",
         "es": "<b>Radio de búsqueda</b><br><br>Solo las muestras dentro del radio entran en el cálculo de "
@@ -615,7 +630,9 @@ STRINGS = {
               "los puntos están muy cerca en la línea y lejos entre líneas. En ese caso, un espaciamiento "
               "calculado solo por la densidad sería demasiado pequeño y dejaría franjas sin valor.<br><br>"
               "Un radio de 1,5 a 2,5 veces la distancia de cobertura garantiza varias vecinas por píxel. "
-              "Radios menores dejan huecos; radios mayores suavizan y hacen el cálculo más lento. En "
+              "Donde el radio no alcanza ninguna muestra (por ejemplo, un hueco mayor entre pasadas), "
+              "AgriPrecisa usa las 4 muestras más cercanas para que el mapa no tenga huecos, e informa en "
+              "qué % del lote ocurre. Radios mayores suavizan y hacen el cálculo más lento. En "
               "investigación, el alcance del semivariograma es una buena referencia.<br><br>"
               "Con varios atributos marcados, vale el de muestreo más disperso."},
     "p3_curve_ref_point": {"pt": "1 = distância típica ({d} m)", "en": "1 = typical distance ({d} m)",
@@ -785,9 +802,9 @@ STRINGS = {
     "cv_cell_tip": {"pt": "{cov}% das amostras de validação foram estimadas (em cinza quando abaixo de 95%).",
                     "en": "{cov}% of the validation samples were estimated (grey when below 95%).",
                     "es": "{cov}% de las muestras de validación fueron estimadas (en gris por debajo de 95%)."},
-    "cv_gap_tip": {"pt": "Este raio deixaria {gap}% do talhão sem valor (falhas no mapa), por isso não pode ser sugerido.",
-                   "en": "This radius would leave {gap}% of the field without value (gaps in the map), so it cannot be suggested.",
-                   "es": "Este radio dejaría el {gap}% del lote sin valor (huecos en el mapa), por eso no puede sugerirse."},
+    "cv_gap_tip": {"pt": "Este raio não alcança amostras em {gap}% do talhão, por isso não pode ser sugerido.",
+                   "en": "This radius reaches no sample in {gap}% of the field, so it cannot be suggested.",
+                   "es": "Este radio no alcanza muestras en el {gap}% del lote, por eso no puede sugerirse."},
     "cv_best": {
         "pt": "<b>Melhor combinação: P = {p} e raio {mult}× ({radius} m).</b> Erro médio (RMSE) = {rmse}, "
               "cerca de {pct}% da média. O P foi refinado em passos de 0,1 para o raio escolhido.",
@@ -798,16 +815,16 @@ STRINGS = {
     "cv_explain": {
         "pt": "Cada número da tabela é o erro médio ao estimar as amostras de validação como se elas "
               "não existissem. Quanto menor, melhor o mapa representa os dados. Compare as linhas (P) e "
-              "as colunas (raio) para ver como cada parâmetro muda o erro. Valores em cinza deixariam "
-              "falhas no mapa e não são sugeridos.",
+              "as colunas (raio) para ver como cada parâmetro muda o erro. Valores em cinza vêm de raios "
+              "que não alcançam amostras em parte do talhão e não são sugeridos.",
         "en": "Each number in the table is the average error when estimating the validation samples as "
               "if they did not exist. The lower, the better the map represents the data. Compare rows (P) "
-              "and columns (radius) to see how each parameter changes the error. Grey values would leave "
-              "gaps in the map and are not suggested.",
+              "and columns (radius) to see how each parameter changes the error. Grey values come from radii "
+              "that reach no sample in part of the field and are not suggested.",
         "es": "Cada número de la tabla es el error medio al estimar las muestras de validación como si no "
               "existieran. Cuanto menor, mejor representa el mapa los datos. Compare filas (P) y columnas "
-              "(radio) para ver cómo cada parámetro cambia el error. Los valores en gris dejarían huecos "
-              "en el mapa y no se sugieren."},
+              "(radio) para ver cómo cada parámetro cambia el error. Los valores en gris vienen de radios "
+              "que no alcanzan muestras en parte del lote y no se sugieren."},
     "cv_apply": {"pt": "Aplicar", "en": "Apply", "es": "Aplicar"},
     "cv_close": {"pt": "Fechar", "en": "Close", "es": "Cerrar"},
     "cv_more": {
@@ -862,11 +879,11 @@ STRINGS = {
     "p3_preview_n": {"pt": "{n} amostras", "en": "{n} samples", "es": "{n} muestras"},
     "p3_preview_note": {
         "pt": "Prévia em baixa resolução, só para comparar parâmetros. Vermelho = valores baixos, "
-              "verde = valores altos, cinza = pixels sem amostras no raio. Pontos pretos = amostras.",
+              "verde = valores altos. Pontos pretos = amostras.",
         "en": "Low-resolution preview, only to compare parameters. Red = low values, green = high "
-              "values, grey = pixels without samples in the radius. Black dots = samples.",
+              "values. Black dots = samples.",
         "es": "Vista previa de baja resolución, solo para comparar parámetros. Rojo = valores bajos, "
-              "verde = valores altos, gris = píxeles sin muestras en el radio. Puntos negros = muestras."},
+              "verde = valores altos. Puntos negros = muestras."},
     "p3_preview_empty": {"pt": "Sem amostras para a prévia.", "en": "No samples for the preview.",
                          "es": "Sin muestras para la vista previa."},
 
@@ -924,6 +941,13 @@ STRINGS = {
     "warn_no_values": {"pt": "{label}: nenhum valor válido na área, atributo ignorado.",
                        "en": "{label}: no valid value in the area, field skipped.",
                        "es": "{label}: ningún valor válido en el área, atributo omitido."},
+    "warn_fallback": {
+        "pt": "{label}: em {pct}% do talhão o raio de busca não alcançou nenhuma amostra; nesses pontos "
+              "foram usadas as {k} amostras mais próximas. Para evitar, aumente o raio.",
+        "en": "{label}: in {pct}% of the field the search radius reached no sample; there the {k} "
+              "nearest samples were used. To avoid it, increase the radius.",
+        "es": "{label}: en el {pct}% del lote el radio de búsqueda no alcanzó ninguna muestra; allí se "
+              "usaron las {k} muestras más cercanas. Para evitarlo, aumente el radio."},
     "warn_load": {"pt": "Não foi possível carregar a camada de {label}.",
                   "en": "Could not load the layer for {label}.",
                   "es": "No se pudo cargar la capa de {label}."},

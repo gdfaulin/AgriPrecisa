@@ -27,7 +27,7 @@ from qgis.core import QgsProject
 from ..core.idw_math import (
     snap_extent, sample_density, power_band, radius_band, coverage_distances,
     suggest_parameters, typical_pixel_neighbours, STUDENT_POWER_MIN, STUDENT_POWER_MAX, STUDENT_RADIUS_MIN,
-    STUDENT_RADIUS_MAX, DEFAULT_RADIUS_MULTIPLE, CV_MIN_VALIDATION,
+    STUDENT_RADIUS_MAX, DEFAULT_RADIUS_MULTIPLE, CV_MIN_VALIDATION, FALLBACK_NEIGHBOURS,
 )
 from ..core.pipeline import buffered, extract_points, edge_distances
 from ..i18n import tr, fmt
@@ -200,10 +200,15 @@ class ParametersPage(QWizardPage):
         row.addWidget(QLabel(fmt(STUDENT_RADIUS_MIN, 0) + "×"))
         row.addWidget(self.slider_r, 1)
         row.addWidget(QLabel(fmt(STUDENT_RADIUS_MAX, 0) + "×"))
+        self.label_r_gap = QLabel()
+        self.label_r_gap.setWordWrap(True)
+        self.label_r_gap.setStyleSheet("color: #b35900;")     # orange warning, like QGIS
+        self.label_r_gap.setVisible(False)
         lr = QVBoxLayout(box_r)
         lr.addWidget(self.label_spacing)
         lr.addLayout(row)
         lr.addWidget(self.label_r_text)
+        lr.addWidget(self.label_r_gap)
 
         lay.addWidget(box_p)
         lay.addWidget(box_r)
@@ -394,7 +399,19 @@ class ParametersPage(QWizardPage):
         else:
             self.label_r_value.setText("")
             self.label_r_text.setText(_link("p3_radius_more"))
+        gap = self.gap_percent()
+        self.label_r_gap.setVisible(gap > 0)
+        if gap > 0:
+            self.label_r_gap.setText("⚠ " + tr("p3_radius_gap", pct=fmt(gap, 1), k=FALLBACK_NEIGHBOURS))
         self.update_visuals()
+
+    def gap_percent(self):
+        """% of the field (preview pixels) farther than the radius from every sample."""
+        nearest = self.cur().get("nearest")
+        r = self.radius()
+        if nearest is None or not len(nearest) or r <= 0:
+            return 0.0
+        return float(np.mean(nearest > r) * 100.0)
 
     def update_visuals(self):
         # weight relative to the typical pixel-to-sample distance (Shepard, 1968): it is 1 there,

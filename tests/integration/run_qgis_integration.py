@@ -162,6 +162,31 @@ lyr_e = check_result(r_e["output"], "existing grid")
 if lyr_e.featureCount() >= big.featureCount():
     errors.append("only cells touching the field should be used from an existing grid")
 
+# Regression (1.5.2): sensor passes with one wider gap and a short radius left empty pixels,
+# and the 5 m cells over them came out blank in the final grid.
+gap = QgsVectorLayer("Point?crs=EPSG:31982&field=CE:double", "ce_gap", "memory")
+gfeats = []
+for yy in [5, 20, 35, 50, 95, 110, 125, 140]:          # 45 m gap between y = 50 and y = 95
+    for xx in range(-5, 206, 2):
+        g2 = QgsFeature(gap.fields())
+        g2.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(X0 + xx, Y0 + yy)))
+        g2.setAttributes([2.0 + xx / 100.0 + yy / 200.0])
+        gfeats.append(g2)
+gap.dataProvider().addFeatures(gfeats)
+i18n.set_language("pt")
+job_g = IdwJob(boundary, boundary.extent(), boundary.crs(), [(gap, "CE")], 50, 2, 10, 5, tmp,
+               os.path.join(tmp, "gap.shp"), "_g", cell_size=5)
+r_g = run_idw_job(job_g, ctx, QgsProcessingFeedback())
+lyr_g = QgsVectorLayer(r_g["output"], "g", "ogr")
+blank = sum(1 for f in lyr_g.getFeatures() if f["CE"] is None or f["CE"] != f["CE"])
+pct = r_g["layers"][0]["fallback_pct"]
+print(f"Gap between passes: {blank} blank cells, fallback in {pct:.1f}% of the field,",
+      "warning:", r_g["warnings"][:1])
+if blank:
+    errors.append(f"{blank} blank cells where the radius reached no sample")
+if not (pct > 0 and r_g["warnings"] and "amostras mais próximas" in r_g["warnings"][0]):
+    errors.append("the final message should warn about the area that used the nearest samples")
+
 # 3) GUI pieces: wizard construction in 3 languages, styling and results loading
 from unittest import mock
 from qgis.PyQt.QtWidgets import QMainWindow, QToolBar
@@ -440,6 +465,15 @@ if (st_ce["power"], st_ce["radius"]) == (st_ce2["power"], st_ce2["radius"]):
     errors.append("CE (smooth) and CE2 (short-range) should get different parameters")
 if not infos or "CE2" not in infos[-1]:
     errors.append("summary message of 'Ajuste automático para todos' missing")
+# step 3 warns when the radius does not reach samples in part of the field
+q3.select_attribute(0)
+q3.slider_r.setValue(10)                               # 1x coverage: ~5 % of the field is farther
+print("Gap warning:", q3.label_r_gap.isVisibleTo(q3), q3.label_r_gap.text()[:70])
+if not q3.label_r_gap.isVisibleTo(q3) or "amostras mais próximas" not in q3.label_r_gap.text():
+    errors.append("step 3 should warn when the radius leaves part of the field without samples")
+q3.slider_r.setValue(30)
+if q3.label_r_gap.isVisibleTo(q3):
+    errors.append("warning should disappear when the radius covers the whole field")
 # names of the buttons
 if (q3.button_cv_this.text(), q3.button_cv_all.text()) != ("Ajuste automático", "Ajuste automático para todos"):
     errors.append("button texts should be 'Ajuste automático' / 'Ajuste automático para todos'")

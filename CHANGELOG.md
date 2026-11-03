@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.2 (2026)
+- Fix: pixels that the search radius did not reach (for example, a wider gap between sensor passes near the border) were left without value, and the grid cells over them came out blank. These pixels now use the 4 nearest samples (regression tests).
+- Step 3 shows an orange warning with the % of the field the radius does not reach; the final message reports it per attribute.
+- Help texts reviewed.
+
 ## 1.5.1 (2026)
 - Help updated: step 1 (vector grid, 100 m margin) and step 3 (pixel size starts equal to the cell and cannot exceed it).
 - Fix: the Processing help showed "_Grade Padrão_ x .shp" because the file name used angle brackets (regression test).
