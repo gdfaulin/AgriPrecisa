@@ -21,7 +21,7 @@ Developed by Gustavo Di Chiacchio Faulin at Fatec Pompeia "Shunji Nishimura" (Ce
 1. **Boundary and output folder.** The bounding box of the field boundary defines the interpolation area. A tolerance (default 50 m) keeps samples slightly outside the boundary (e.g. machine turns). Selected features only can be used.
 2. **Points and fields.** Only point layers with samples near the field are listed; expand each layer and tick the numeric fields to interpolate.
 3. **IDW parameters, per attribute** (each attribute has its own spatial dependence, so each gets its own *P* and radius; a summary table shows all of them). Sliders for the power *P* (0.5 to 5) and the search radius (multiples of the coverage distance, which works for grids and sensor passes), with explanations, the IDW weight curve (1/d^P, Shepard 1968), bars with the share of each neighbouring sample in a typical pixel, a live map preview and **"Auto-fit" / "Auto-fit all"** buttons that run a spatial cross-validation per attribute and show the error (RMSE) for each combination. The Processing algorithm has the same option for batch runs. Pixel size default 5 m.
-4. **Outputs.** One GeoTIFF per field, one GeoPackage polygon grid with `<field>_mean` columns, and one styled copy per field in the *Interpolated* group.
+4. **Outputs.** One GeoTIFF per field (boundary rectangle + 100 m, never clipped), the reusable standard grid `<boundary>_Grade Padrão_<cell>x<cell>.shp`, and the final Shapefile grid with one column per attribute (zonal mean on whole cells, clipped by the boundary afterwards), loaded once per field in the *Interpolated* group.
 
 IDW estimate at each pixel centre:
 

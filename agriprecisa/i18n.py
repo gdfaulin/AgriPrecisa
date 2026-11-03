@@ -96,12 +96,12 @@ STRINGS = {
                      "es": "AgriPrecisa | IDW en cuadrícula vectorial"},
 
     # ---------------------------------------------------------------- page 1
-    "p1_title": {"pt": "Etapa 1 de 4: Contorno da área e pasta de saída",
-                 "en": "Step 1 of 4: Field boundary and output folder",
-                 "es": "Paso 1 de 4: Contorno del área y carpeta de salida"},
-    "p1_subtitle": {"pt": "Escolha o polígono do talhão e onde os resultados serão salvos.",
-                    "en": "Choose the field polygon and where results will be saved.",
-                    "es": "Elija el polígono del lote y dónde se guardarán los resultados."},
+    "p1_title": {"pt": "Etapa 1 de 4: Contorno da área, grade vetorial e pasta de saída",
+                 "en": "Step 1 of 4: Field boundary, vector grid and output folder",
+                 "es": "Paso 1 de 4: Contorno del área, cuadrícula vectorial y carpeta de salida"},
+    "p1_subtitle": {"pt": "Escolha o polígono do talhão, a grade vetorial e onde os resultados serão salvos.",
+                    "en": "Choose the field polygon, the vector grid and where results will be saved.",
+                    "es": "Elija el polígono del lote, la cuadrícula vectorial y dónde se guardarán los resultados."},
     "p1_boundary": {"pt": "Camada de contorno (polígono):", "en": "Boundary layer (polygon):",
                     "es": "Capa de contorno (polígono):"},
     "p1_selected_only": {"pt": "Usar apenas as feições selecionadas",
@@ -110,6 +110,50 @@ STRINGS = {
     "p1_tolerance": {"pt": "Tolerância além do contorno:", "en": "Tolerance beyond boundary:",
                      "es": "Tolerancia más allá del contorno:"},
     "p1_folder": {"pt": "Pasta de saída:", "en": "Output folder:", "es": "Carpeta de salida:"},
+    "p1_grid_group": {"pt": "Grade vetorial", "en": "Vector grid", "es": "Cuadrícula vectorial"},
+    "p1_grid_new": {"pt": "Gerar grade nova", "en": "Create a new grid", "es": "Crear cuadrícula nueva"},
+    "p1_cell_size": {"pt": "Tamanho da célula:", "en": "Cell size:", "es": "Tamaño de la celda:"},
+    "p1_grid_existing": {"pt": "Usar grade existente:", "en": "Use an existing grid:",
+                         "es": "Usar cuadrícula existente:"},
+    "p1_grid_new_hint": {"pt": "Será salva na pasta de saída como \"{name}\", com células inteiras, para reutilizar depois.",
+                         "en": "It will be saved in the output folder as \"{name}\", with whole cells, to reuse later.",
+                         "es": "Se guardará en la carpeta de salida como \"{name}\", con celdas enteras, para reutilizar después."},
+    "p1_grid_existing_hint": {"pt": "Serão usadas apenas as células que tocam o talhão.",
+                              "en": "Only the cells touching the field will be used.",
+                              "es": "Solo se usarán las celdas que tocan el lote."},
+    "p1_grid_err_choose": {"pt": "Escolha a camada da grade existente.", "en": "Choose the existing grid layer.",
+                           "es": "Elija la capa de la cuadrícula existente."},
+    "p1_grid_err_outside": {"pt": "Nenhuma célula da grade escolhida toca o talhão.",
+                            "en": "No cell of the chosen grid touches the field.",
+                            "es": "Ninguna celda de la cuadrícula elegida toca el lote."},
+    "p3_pixel_tip": {"pt": "O pixel da interpolação não pode ser maior que a célula da grade ({cell} m): cada célula precisa conter pixels para calcular a média.",
+                     "en": "The interpolation pixel cannot be larger than the grid cell ({cell} m): each cell must contain pixels to compute the mean.",
+                     "es": "El píxel de la interpolación no puede ser mayor que la celda de la cuadrícula ({cell} m): cada celda debe contener píxeles para calcular la media."},
+    "p4_grid_new": {"pt": "nova, salva como {name}", "en": "new, saved as {name}", "es": "nueva, guardada como {name}"},
+    "p4_grid_existing": {"pt": "existente: {name} (células de cerca de {cell} m)",
+                         "en": "existing: {name} (cells of about {cell} m)",
+                         "es": "existente: {name} (celdas de unos {cell} m)"},
+    "grid_exists_title": {"pt": "Grade já existe", "en": "Grid already exists", "es": "La cuadrícula ya existe"},
+    "grid_exists_text": {"pt": "A pasta de saída já tem a grade \"{name}\".\n\nDeseja reutilizá-la ou gerar de novo e sobrescrever o arquivo?",
+                         "en": "The output folder already has the grid \"{name}\".\n\nReuse it, or create it again and overwrite the file?",
+                         "es": "La carpeta de salida ya tiene la cuadrícula \"{name}\".\n\n¿Desea reutilizarla o crearla de nuevo y sobrescribir el archivo?"},
+    "grid_reuse": {"pt": "Reutilizar", "en": "Reuse", "es": "Reutilizar"},
+    "grid_overwrite": {"pt": "Sobrescrever", "en": "Overwrite", "es": "Sobrescribir"},
+    "done_grid": {"pt": "Grade padrão: {grid}", "en": "Standard grid: {grid}", "es": "Cuadrícula estándar: {grid}"},
+    "log_grid_existing": {"pt": "Usando a grade existente (células que tocam o talhão)...",
+                          "en": "Using the existing grid (cells touching the field)...",
+                          "es": "Usando la cuadrícula existente (celdas que tocan el lote)..."},
+    "log_grid_reuse": {"pt": "Reutilizando a grade {path}", "en": "Reusing the grid {path}",
+                       "es": "Reutilizando la cuadrícula {path}"},
+    "log_grid_saved": {"pt": "Grade salva: {path}", "en": "Grid saved: {path}", "es": "Cuadrícula guardada: {path}"},
+    "alg_p_cell": {"pt": "Tamanho da célula da grade (m)", "en": "Grid cell size (m)",
+                   "es": "Tamaño de la celda de la cuadrícula (m)"},
+    "alg_p_grid": {"pt": "Grade existente (opcional; substitui o tamanho da célula)",
+                   "en": "Existing grid (optional; replaces the cell size)",
+                   "es": "Cuadrícula existente (opcional; reemplaza el tamaño de la celda)"},
+    "alg_err_pixel_cell": {"pt": "O pixel ({pixel} m) não pode ser maior que a célula da grade ({cell} m).",
+                           "en": "The pixel ({pixel} m) cannot be larger than the grid cell ({cell} m).",
+                           "es": "El píxel ({pixel} m) no puede ser mayor que la celda ({cell} m)."},
     "p1_folder_from_last": {"pt": "Última pasta usada.", "en": "Last folder used.",
                             "es": "Última carpeta usada."},
     "p1_folder_from_project": {
@@ -167,8 +211,14 @@ STRINGS = {
               "<b>Tolerância:</b> distância, em metros, além do contorno em que os pontos ainda são "
               "aceitos. Inclui amostras que ficaram um pouco fora do limite, por exemplo em manobras. "
               "Também define quais camadas de pontos aparecem na próxima etapa.<br><br>"
-              "<b>Pasta de saída:</b> onde ficam os rasters interpolados (GeoTIFF) e a grade "
-              "vetorial final (GeoPackage). Vem preenchida com a última pasta usada ou, na primeira "
+              "<b>Grade vetorial:</b> gere uma grade nova escolhendo o tamanho da célula (por exemplo, "
+              "10 × 10 m) ou use uma grade criada antes. A grade nova é salva como "
+              "<i>&lt;contorno&gt;_Grade Padrão_10x10.shp</i>, com células inteiras, e pode ser reutilizada. "
+              "A interpolação cobre o retângulo do talhão com 100 m de margem; a média é calculada em cada "
+              "célula inteira e só depois a grade é recortada pelo contorno, para nenhuma célula da borda "
+              "ficar sem valor.<br><br>"
+              "<b>Pasta de saída:</b> onde ficam os rasters interpolados (GeoTIFF), a grade padrão e a grade "
+              "final com as médias (Shapefile). Vem preenchida com a última pasta usada ou, na primeira "
               "vez, com a subpasta AgriPrecisa dentro da pasta do projeto, criada automaticamente.<br><br>"
               "<b>Sistema de coordenadas:</b> o contorno e os pontos precisam estar em um sistema "
               "projetado em metros, como SIRGAS 2000 / UTM 22S (EPSG:31982).",
@@ -179,8 +229,13 @@ STRINGS = {
               "<b>Tolerance:</b> distance, in metres, beyond the boundary within which points are "
               "still accepted. It keeps samples slightly outside the limit, e.g. from machine "
               "turns. It also defines which point layers are listed in the next step.<br><br>"
-              "<b>Output folder:</b> where the interpolated rasters (GeoTIFF) and the final "
-              "vector grid (GeoPackage) are saved. It is filled with the last folder used or, the "
+              "<b>Vector grid:</b> create a new grid choosing the cell size (e.g. 10 × 10 m) or use a grid "
+              "created before. The new grid is saved as <i>&lt;boundary&gt;_Grade Padrão_10x10.shp</i>, with "
+              "whole cells, and can be reused. Interpolation covers the field rectangle plus a 100 m margin; "
+              "the mean is computed in each whole cell and only then the grid is clipped by the boundary, so "
+              "no border cell is left without value.<br><br>"
+              "<b>Output folder:</b> where the interpolated rasters (GeoTIFF), the standard grid and the final "
+              "grid with the means (Shapefile) are saved. It is filled with the last folder used or, the "
               "first time, with the AgriPrecisa subfolder inside the project folder, created "
               "automatically.<br><br>"
               "<b>Coordinate system:</b> boundary and points must be in a projected CRS in "
@@ -193,8 +248,14 @@ STRINGS = {
               "<b>Tolerancia:</b> distancia, en metros, más allá del contorno dentro de la cual los "
               "puntos aún se aceptan. Incluye muestras algo fuera del límite, por ejemplo en "
               "maniobras. También define qué capas de puntos aparecen en el siguiente paso.<br><br>"
-              "<b>Carpeta de salida:</b> donde se guardan los ráster interpolados (GeoTIFF) y la "
-              "cuadrícula vectorial final (GeoPackage). Viene con la última carpeta usada o, la "
+              "<b>Cuadrícula vectorial:</b> cree una cuadrícula nueva eligiendo el tamaño de la celda (por "
+              "ejemplo, 10 × 10 m) o use una creada antes. La nueva se guarda como "
+              "<i>&lt;contorno&gt;_Grade Padrão_10x10.shp</i>, con celdas enteras, y puede reutilizarse. La "
+              "interpolación cubre el rectángulo del lote con 100 m de margen; la media se calcula en cada "
+              "celda entera y solo después la cuadrícula se recorta por el contorno, para que ninguna celda del "
+              "borde quede sin valor.<br><br>"
+              "<b>Carpeta de salida:</b> donde se guardan los ráster interpolados (GeoTIFF), la cuadrícula "
+              "estándar y la cuadrícula final con las medias (Shapefile). Viene con la última carpeta usada o, la "
               "primera vez, con la subcarpeta AgriPrecisa dentro de la carpeta del proyecto, creada "
               "automáticamente.<br><br>"
               "<b>Sistema de coordenadas:</b> el contorno y los puntos deben estar en un SRC "
@@ -803,34 +864,34 @@ STRINGS = {
     "p4_summary": {
         "pt": "<b>Contorno:</b> {boundary} ({crs}), {area} ha<br><b>Tolerância:</b> {tol} m<br>"
               "<b>Pasta de saída:</b> {folder}<br><br><b>Atributos e parâmetros do IDW ({n}):</b><ul>{items}</ul>"
-              "<b>Pixel:</b> {pixel} m<br>"
+              "<b>Pixel:</b> {pixel} m<br><b>Grade vetorial:</b> {grid}<br>"
               "<b>Estilo:</b> graduado, {classes} classes, quebras naturais (Jenks), {ramp}",
         "en": "<b>Boundary:</b> {boundary} ({crs}), {area} ha<br><b>Tolerance:</b> {tol} m<br>"
               "<b>Output folder:</b> {folder}<br><br><b>Attributes and IDW parameters ({n}):</b><ul>{items}</ul>"
-              "<b>Pixel:</b> {pixel} m<br>"
+              "<b>Pixel:</b> {pixel} m<br><b>Vector grid:</b> {grid}<br>"
               "<b>Style:</b> graduated, {classes} classes, natural breaks (Jenks), {ramp}",
         "es": "<b>Contorno:</b> {boundary} ({crs}), {area} ha<br><b>Tolerancia:</b> {tol} m<br>"
               "<b>Carpeta de salida:</b> {folder}<br><br><b>Atributos y parámetros del IDW ({n}):</b><ul>{items}</ul>"
-              "<b>Píxel:</b> {pixel} m<br>"
+              "<b>Píxel:</b> {pixel} m<br><b>Cuadrícula vectorial:</b> {grid}<br>"
               "<b>Estilo:</b> graduado, {classes} clases, cortes naturales (Jenks), {ramp}"},
     "help_page4": {
         "pt": "<b>Etapa 4: Resumo</b><br><br>Ao clicar em <b>Executar</b>:<br>"
               "1. cada atributo é interpolado por IDW e salvo como GeoTIFF;<br>"
-              "2. é criada a grade de polígonos com o tamanho do pixel, recortada pelo contorno;<br>"
-              "3. calcula-se a média dos pixels de cada atributo em cada célula (estatística zonal);<br>"
-              "4. a grade é salva em GeoPackage e carregada uma vez por atributo no grupo "
+              "2. é criada (ou reutilizada) a grade com as células inteiras que tocam o talhão;<br>"
+              "3. calcula-se a média dos pixels de cada atributo em cada célula inteira (estatística zonal);<br>"
+              "4. a grade é recortada pelo contorno, salva em Shapefile e carregada uma vez por atributo no grupo "
               "'Interpolados', com estilo graduado.<br><br>Use <b>Voltar</b> para corrigir.",
         "en": "<b>Step 4: Summary</b><br><br>When you click <b>Run</b>:<br>"
               "1. each field is interpolated by IDW and saved as GeoTIFF;<br>"
-              "2. a polygon grid with the pixel size is created and clipped by the boundary;<br>"
-              "3. the mean of each field's pixels is computed per cell (zonal statistics);<br>"
-              "4. the grid is saved as GeoPackage and loaded once per field in the "
+              "2. the grid with the whole cells touching the field is created (or reused);<br>"
+              "3. the mean of each field's pixels is computed per whole cell (zonal statistics);<br>"
+              "4. the grid is clipped by the boundary, saved as Shapefile and loaded once per field in the "
               "'Interpolated' group, with a graduated style.<br><br>Use <b>Back</b> to make changes.",
         "es": "<b>Paso 4: Resumen</b><br><br>Al hacer clic en <b>Ejecutar</b>:<br>"
               "1. cada atributo se interpola por IDW y se guarda como GeoTIFF;<br>"
-              "2. se crea la cuadrícula de polígonos con el tamaño del píxel, recortada por el contorno;<br>"
-              "3. se calcula el promedio de los píxeles de cada atributo en cada celda (estadística zonal);<br>"
-              "4. la cuadrícula se guarda en GeoPackage y se carga una vez por atributo en el grupo "
+              "2. se crea (o reutiliza) la cuadrícula con las celdas enteras que tocan el lote;<br>"
+              "3. se calcula el promedio de los píxeles de cada atributo en cada celda entera (estadística zonal);<br>"
+              "4. la cuadrícula se recorta por el contorno, se guarda en Shapefile y se carga una vez por atributo en el grupo "
               "'Interpolados', con estilo graduado.<br><br>Use <b>Atrás</b> para corregir."},
 
     # ---------------------------------------------------------------- pipeline
@@ -893,28 +954,37 @@ STRINGS = {
                     "en": "Layer '{name}' is in {crs}. Reproject it to a projected CRS in metres.",
                     "es": "La capa '{name}' está en {crs}. Reproyéctela a un SRC proyectado en metros."},
     "alg_help": {
-        "pt": "Interpola por IDW os atributos escolhidos de uma camada de pontos, cria uma grade de "
-              "polígonos com o tamanho do pixel recortada pelo contorno e calcula, por estatística "
-              "zonal, a média de cada atributo em cada célula.\n\n"
-              "O retângulo envolvente do contorno define a área da interpolação. A tolerância aceita "
+        "pt": "Interpola por IDW os atributos escolhidos de uma camada de pontos e calcula, por estatística "
+              "zonal, a média de cada atributo em cada célula de uma grade vetorial (gerada com o tamanho "
+              "de célula informado ou uma grade existente).\n\n"
+              "A interpolação cobre o retângulo do contorno com 100 m de margem, sem recorte. A média é "
+              "calculada nas células inteiras que tocam o talhão e só depois a grade é recortada pelo "
+              "contorno. A grade gerada é salva na pasta dos rasters como <contorno>_Grade Padrão_<célula>x<célula>.shp "
+              "e reutilizada se já existir. As colunas recebem o nome do atributo (até 10 caracteres).\n\nA tolerância aceita "
               "pontos um pouco fora do contorno. Raio 0 usa todas as amostras.\n\n"
               "Opção: escolher P e raio de cada atributo por validação cruzada.\n\n"
               "As camadas devem estar em um sistema projetado em metros. A saída é carregada com estilo "
               "graduado (5 classes, Jenks, RdYlGn) do primeiro atributo. Para uma camada estilizada por "
               "atributo, use o assistente em Vetor > AgriPrecisa.",
-        "en": "Interpolates the chosen fields of a point layer by IDW, creates a polygon grid with the "
-              "pixel size clipped by the boundary and computes, by zonal statistics, the mean of each "
-              "field in each cell.\n\n"
-              "The boundary bounding box defines the interpolation area. The tolerance accepts points "
+        "en": "Interpolates the chosen fields of a point layer by IDW and computes, by zonal statistics, the "
+              "mean of each field in each cell of a vector grid (created with the given cell size or an "
+              "existing grid).\n\n"
+              "Interpolation covers the boundary rectangle plus a 100 m margin, without clipping. The mean is "
+              "computed in the whole cells touching the field and only then the grid is clipped by the "
+              "boundary. The created grid is saved in the raster folder as <boundary>_Grade Padrão_<cell>x<cell>.shp "
+              "and reused if it already exists. Columns are named after the attributes (up to 10 characters).\n\nThe tolerance accepts points "
               "slightly outside the boundary. Radius 0 uses all samples.\n\n"
               "Option: choose P and radius of each attribute by cross-validation.\n\n"
               "Layers must be in a projected CRS in metres. The output is loaded with a graduated style "
               "(5 classes, Jenks, RdYlGn) on the first field. For one styled layer per field, use the "
               "wizard in Vector > AgriPrecisa.",
-        "es": "Interpola por IDW los atributos elegidos de una capa de puntos, crea una cuadrícula de "
-              "polígonos con el tamaño del píxel recortada por el contorno y calcula, por estadística "
-              "zonal, el promedio de cada atributo en cada celda.\n\n"
-              "El rectángulo envolvente del contorno define el área de interpolación. La tolerancia "
+        "es": "Interpola por IDW los atributos elegidos de una capa de puntos y calcula, por estadística "
+              "zonal, el promedio de cada atributo en cada celda de una cuadrícula vectorial (creada con el "
+              "tamaño de celda indicado o una existente).\n\n"
+              "La interpolación cubre el rectángulo del contorno con 100 m de margen, sin recorte. La media "
+              "se calcula en las celdas enteras que tocan el lote y solo después se recorta por el contorno. "
+              "La cuadrícula creada se guarda en la carpeta de los ráster como <contorno>_Grade Padrão_<celda>x<celda>.shp "
+              "y se reutiliza si ya existe. Las columnas llevan el nombre del atributo (hasta 10 caracteres).\n\nLa tolerancia "
               "acepta puntos algo fuera del contorno. Radio 0 usa todas las muestras.\n\n"
               "Opción: elegir P y radio de cada atributo por validación cruzada.\n\n"
               "Las capas deben estar en un SRC proyectado en metros. La salida se carga con estilo "

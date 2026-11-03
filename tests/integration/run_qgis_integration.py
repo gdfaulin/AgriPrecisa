@@ -57,21 +57,30 @@ errors = []
 out = os.path.join(tmp, "grid.gpkg")
 res = processing.run("agriprecisa:idw_vector_grid", {
     "BOUNDARY": boundary, "POINTS": points, "FIELDS": ["argila", "pH"],
-    "TOLERANCE": 50, "POWER": 2, "RADIUS": 0, "PIXEL": 5,
+    "TOLERANCE": 50, "POWER": 2, "RADIUS": 0, "PIXEL": 5, "CELL_SIZE": 5,
     "RASTER_FOLDER": os.path.join(tmp, "rasters"), "OUTPUT": out})
 grid = QgsVectorLayer(res["OUTPUT"], "g", "ogr")
 names = [fl.name() for fl in grid.fields()]
 print("Processing output fields:", names, "features:", grid.featureCount())
 print("raster folder:", sorted(os.listdir(os.path.join(tmp, "rasters"))))
-if not {"argila_mean", "pH_mean"} <= set(names):
-    errors.append("missing mean fields")
+if not {"argila", "pH"} <= set(names):
+    errors.append("mean columns should be named after the attributes (argila, pH)")
+std_grid = os.path.join(tmp, "rasters", "talhao_Grade Padrão_5x5.shp")
+if not os.path.exists(std_grid):
+    errors.append("standard grid '<boundary>_Grade Padrão_5x5.shp' not saved")
 if grid.featureCount() == 0:
     errors.append("empty grid")
-vals = [ft["argila_mean"] for ft in grid.getFeatures()]
+vals = [ft["argila"] for ft in grid.getFeatures()]
 lo, hi = min(v for v in vals if v is not None), max(v for v in vals if v is not None)
 print(f"argila_mean range: {lo:.1f} .. {hi:.1f}")
 if not (200 <= lo and hi <= 400):
     errors.append("argila_mean outside sample range")
+# Regression: cells clipped by the boundary before the zonal statistics could hold no pixel
+# centre and ended with empty (NULL) means along the border
+nulls = sum(1 for ft in grid.getFeatures() if ft["argila"] is None or ft["argila"] != ft["argila"])
+print("Cells without value:", nulls)
+if nulls:
+    errors.append(f"{nulls} grid cells without value (NULL mean)")
 area = sum(ft.geometry().area() for ft in grid.getFeatures())
 print(f"grid area {area:.1f} m2 (boundary 25000 m2)")
 if abs(area - 25000) > 1:
@@ -83,14 +92,75 @@ if len([n for n in os.listdir(os.path.join(tmp, "rasters")) if n.endswith(".tif"
 from qgis.core import QgsProcessingFeatureSourceDefinition
 boundary.selectAll()
 ctx = QgsProcessingContext(); ctx.setProject(QgsProject.instance())
+from agriprecisa.core.paths import grid_file_name, result_file_name
+grid_path2 = os.path.join(tmp, grid_file_name("talhao", 10))
 job = IdwJob(QgsProcessingFeatureSourceDefinition(boundary.id(), True),
              features_extent(boundary.getSelectedFeatures()), boundary.crs(),
-             [(points, "argila"), (points, "pH")], 50, 2, 100, 10, tmp,
-             os.path.join(tmp, "wizard.gpkg"), "_t")
+             [(points, "argila"), (points, "pH")], 50, 2, 100, 3, tmp,
+             os.path.join(tmp, result_file_name("talhao", 10, "_t")), "_t",
+             cell_size=10, grid_path=grid_path2)
 r = run_idw_job(job, ctx, QgsProcessingFeedback())
 print("Wizard pipeline layers:", [l["mean_field"] for l in r["layers"]], "n:", [l["n"] for l in r["layers"]])
 if [l["n"] for l in r["layers"]] != [20, 19]:
     errors.append("unexpected sample counts (NULL pH must be skipped)")
+
+
+def check_result(path, label):
+    lyr = QgsVectorLayer(path, "r", "ogr")
+    feats = list(lyr.getFeatures())
+    empty = sum(1 for f in feats if f["argila"] is None or f["argila"] != f["argila"]
+                or f["pH"] is None or f["pH"] != f["pH"])
+    area = sum(f.geometry().area() for f in feats)
+    print(f"{label}: {len(feats)} cells, {empty} without value, area {area:.1f} m2,",
+          "shp" if path.endswith(".shp") else "other")
+    if empty:
+        errors.append(f"{label}: {empty} cells without value")
+    if abs(area - 25000) > 1:
+        errors.append(f"{label}: clipped area should equal the field (25000 m2)")
+    return lyr
+
+
+# cell 10 m, pixel 3 m (not aligned): whole cells, clipped only at the end
+check_result(r["output"], "10x10 cells / 3 m pixel")
+if not r["output"].endswith("talhao_IDW_10x10_t.shp"):
+    errors.append("result should be '<boundary>_IDW_10x10<stamp>.shp'")
+saved = QgsVectorLayer(grid_path2, "g", "ogr")
+whole = [f.geometry().area() for f in saved.getFeatures()]
+print("Standard grid:", os.path.basename(grid_path2), len(whole), "whole cells")
+if not whole or any(abs(a - 100.0) > 1e-6 for a in whole):
+    errors.append("standard grid should keep whole 10 x 10 m cells")
+# raster covers the boundary plus the 100 m margin, never clipped
+from osgeo import gdal as _gdal
+ds = _gdal.Open(r["layers"][0]["raster"])
+gt = ds.GetGeoTransform()
+r_xmin, r_ymax = gt[0], gt[3]
+r_xmax, r_ymin = r_xmin + gt[1] * ds.RasterXSize, r_ymax + gt[5] * ds.RasterYSize
+ext = boundary.extent()
+print("Raster extent margin (m):", round(ext.xMinimum() - r_xmin, 1), round(r_xmax - ext.xMaximum(), 1),
+      round(ext.yMinimum() - r_ymin, 1), round(r_ymax - ext.yMaximum(), 1))
+if min(ext.xMinimum() - r_xmin, r_xmax - ext.xMaximum(), ext.yMinimum() - r_ymin, r_ymax - ext.yMaximum()) < 100:
+    errors.append("raster should extend at least 100 m beyond the boundary")
+ds = None
+
+# reuse the saved grid
+job_r = IdwJob(boundary, boundary.extent(), boundary.crs(), [(points, "argila"), (points, "pH")],
+               50, 2, 100, 3, tmp, os.path.join(tmp, "reuse.shp"), "_r",
+               cell_size=10, grid_path=grid_path2, reuse_grid=True)
+r_r = run_idw_job(job_r, ctx, QgsProcessingFeedback())
+check_result(r_r["output"], "reused grid")
+if r_r["grid_path"] != grid_path2:
+    errors.append("reused grid path not reported")
+
+# existing grid chosen by the user (here: a 10 m grid covering a larger area)
+big = processing.run("native:creategrid", {"TYPE": 2,
+    "EXTENT": f"{X0-200},{X0+400},{Y0-200},{Y0+350} [EPSG:31982]", "HSPACING": 10, "VSPACING": 10,
+    "HOVERLAY": 0, "VOVERLAY": 0, "CRS": boundary.crs(), "OUTPUT": "memory:"})["OUTPUT"]
+job_e = IdwJob(boundary, boundary.extent(), boundary.crs(), [(points, "argila"), (points, "pH")],
+               50, 2, 100, 3, tmp, os.path.join(tmp, "existing.shp"), "_e", grid_input=big)
+r_e = run_idw_job(job_e, ctx, QgsProcessingFeedback())
+lyr_e = check_result(r_e["output"], "existing grid")
+if lyr_e.featureCount() >= big.featureCount():
+    errors.append("only cells touching the field should be used from an existing grid")
 
 # 3) GUI pieces: wizard construction in 3 languages, styling and results loading
 from unittest import mock
@@ -406,7 +476,7 @@ i18n.set_language("pt")
 log = _Log()
 res_auto = processing.run("agriprecisa:idw_vector_grid", {
     "BOUNDARY": boundary, "POINTS": ce, "FIELDS": ["CE", "CE2"], "TOLERANCE": 50,
-    "POWER": 2, "RADIUS": 0, "PIXEL": 5, "AUTO_PARAMS": True,
+    "POWER": 2, "RADIUS": 0, "PIXEL": 5, "CELL_SIZE": 5, "AUTO_PARAMS": True,
     "RASTER_FOLDER": os.path.join(tmp, "auto"), "OUTPUT": os.path.join(tmp, "auto.gpkg")},
     feedback=log)
 auto_lines = [l for l in log.lines if "validação cruzada" in l]
@@ -414,7 +484,7 @@ print("Processing auto:", auto_lines)
 if len(auto_lines) != 2 or any(l.startswith("ERROR") for l in auto_lines):
     errors.append("Processing AUTO_PARAMS should cross-validate each field")
 auto_grid = QgsVectorLayer(res_auto["OUTPUT"], "a", "ogr")
-if not {"CE_mean", "CE2_mean"} <= {f.name() for f in auto_grid.fields()}:
+if not {"CE", "CE2"} <= {f.name() for f in auto_grid.fields()}:
     errors.append("Processing AUTO_PARAMS output missing mean fields")
 
 QgsProject.instance().removeMapLayer(ce.id())
@@ -434,10 +504,44 @@ print("Default folder:", f1.edit_folder.text(), "|", f1.label_folder.text())
 if os.path.normpath(f1.edit_folder.text()) != os.path.normpath(expected):
     errors.append("default output folder should be <project>/AgriPrecisa")
 f1.combo.setCurrentIndex(f1.combo.findData(boundary.id()))
+f1.spin_cell.setValue(10)
+print("Grid hint:", f1.label_grid.text())
+if "talhao_Grade Padrão_10x10.shp" not in f1.label_grid.text():
+    errors.append("step 1 should show the standard grid file name")
+shot1 = os.environ.get("AGRIPRECISA_SHOT1")
+if shot1:
+    app.processEvents(); w3.grab().save(shot1)
 w3.next()
 if not os.path.isdir(expected):
     errors.append("AgriPrecisa subfolder was not created")
+if w3.cell_size != 10 or w3.grid_layer is not None:
+    errors.append("new grid with 10 m cells should be stored in the wizard")
 w3.hide()
+
+# existing grid in step 1: cell size estimated, pixel limited to the cell in step 3
+QgsProject.instance().addMapLayer(big)
+big.setName("grade_10m")
+w7 = idw_wizard.IdwWizard()
+w7.show()
+e1 = w7.currentPage()
+e1.combo.setCurrentIndex(e1.combo.findData(boundary.id()))
+e1.edit_folder.setText(tmp)
+e1.radio_grid_old.setChecked(True)
+e1.combo_grid.setCurrentIndex(e1.combo_grid.findData(big.id()))
+w7.next()
+print("Existing grid:", w7.grid_layer.name() if w7.grid_layer else None, "cell", w7.cell_size)
+if w7.grid_layer is None or abs(w7.cell_size - 10) > 1e-6:
+    errors.append("existing grid: cell size should be estimated as 10 m")
+e2 = w7.currentPage()
+amo = e2.tree.findItems("amostras [EPSG:31982]", Qt.MatchFlag.MatchExactly, 0)[0]
+amo.child(0).setCheckState(0, Qt.CheckState.Checked)
+w7.next()
+e3 = w7.currentPage()
+print("Step 3 pixel:", e3.spin_px.value(), "max", e3.spin_px.maximum())
+if e3.spin_px.value() != 10 or e3.spin_px.maximum() != 10:
+    errors.append("pixel should start equal to the cell and never exceed it")
+w7.hide()
+QgsProject.instance().removeMapLayer(big.id())
 chosen = os.path.join(tmp, "outra_pasta")
 os.makedirs(chosen, exist_ok=True)
 w4 = idw_wizard.IdwWizard()

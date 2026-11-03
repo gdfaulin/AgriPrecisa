@@ -17,6 +17,7 @@ from ..core.pipeline import (
     field_cell_centres, edge_distances, extract_points, buffered,
 )
 from ..core.idw_math import coverage_distances, suggest_parameters, CV_MIN_VALIDATION
+from ..core.paths import grid_file_name
 from ..i18n import tr
 
 ICON = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icon.png")
@@ -51,6 +52,8 @@ class IdwGridAlgorithm(QgsProcessingAlgorithm):
     RADIUS = "RADIUS"
     PIXEL = "PIXEL"
     AUTO_PARAMS = "AUTO_PARAMS"
+    CELL_SIZE = "CELL_SIZE"
+    GRID = "GRID"
     RASTER_FOLDER = "RASTER_FOLDER"
     OUTPUT = "OUTPUT"
 
@@ -96,6 +99,10 @@ class IdwGridAlgorithm(QgsProcessingAlgorithm):
             self.PIXEL, tr("alg_p_pixel"), NUMBER_DOUBLE, 5.0, minValue=0.1))
         self.addParameter(QgsProcessingParameterBoolean(
             self.AUTO_PARAMS, tr("alg_p_auto"), defaultValue=False))
+        self.addParameter(QgsProcessingParameterNumber(
+            self.CELL_SIZE, tr("alg_p_cell"), NUMBER_DOUBLE, 5.0, minValue=0.5))
+        self.addParameter(QgsProcessingParameterFeatureSource(
+            self.GRID, tr("alg_p_grid"), [SRC_POLYGON], optional=True))
         self.addParameter(QgsProcessingParameterFolderDestination(
             self.RASTER_FOLDER, tr("alg_p_folder")))
         self.addParameter(QgsProcessingParameterVectorDestination(
@@ -137,8 +144,24 @@ class IdwGridAlgorithm(QgsProcessingAlgorithm):
             params = self.cross_validated_params(boundary, points, fields, extent, tolerance,
                                                  power, radius, context, feedback)
 
+        cell = self.parameterAsDouble(parameters, self.CELL_SIZE, context)
+        pixel = self.parameterAsDouble(parameters, self.PIXEL, context)
+        grid_input, grid_path, reuse = None, None, False
+        grid_src = self.parameterAsSource(parameters, self.GRID, context)
+        if grid_src is not None:
+            grid_input = parameters[self.GRID]
+        else:
+            if pixel > cell:
+                raise QgsProcessingException(tr("alg_err_pixel_cell", pixel=f"{pixel:g}", cell=f"{cell:g}"))
+            grid_path = os.path.join(folder, grid_file_name(boundary.sourceName(), cell))
+            reuse = os.path.exists(grid_path)      # same boundary and cell size: same grid
+
         job = IdwJob(
             params=params,
+            cell_size=cell,
+            grid_input=grid_input,
+            grid_path=grid_path,
+            reuse_grid=reuse,
             boundary_input=parameters[self.BOUNDARY],
             boundary_extent=extent,
             boundary_crs=boundary.sourceCrs(),
@@ -146,7 +169,7 @@ class IdwGridAlgorithm(QgsProcessingAlgorithm):
             tolerance=tolerance,
             power=power,
             radius=radius,
-            pixel=self.parameterAsDouble(parameters, self.PIXEL, context),
+            pixel=pixel,
             raster_folder=folder,
             output_path=output,
         )
