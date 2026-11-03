@@ -13,12 +13,13 @@ from osgeo import gdal
 from qgis import processing
 from qgis.core import (
     QgsCoordinateTransform, QgsFeatureRequest, QgsGeometry, QgsRectangle, QgsPointXY,
-    QgsProcessingException, QgsProcessingMultiStepFeedback, QgsProcessingUtils,
+    QgsProcessingException, QgsProcessingMultiStepFeedback, QgsProcessingUtils, QgsVectorLayer,
     QgsGraduatedSymbolRenderer, QgsClassificationJenks, QgsStyle, QgsFillSymbol,
 )
 
 from .compat import UNIT_METERS
 from .idw_math import NODATA, idw_grid, safe_name, snap_extent, unique_prefixes
+from .paths import shapefile_field_names
 from ..i18n import tr
 
 N_CLASSES = 5
@@ -232,6 +233,9 @@ def style_graduated(layer, field, classes=N_CLASSES, ramp_name=COLOR_RAMP):
 # ---------------------------------------------------------------------------
 # Job description and execution
 # ---------------------------------------------------------------------------
+RASTER_MARGIN = 100.0   # metres added around the boundary for the interpolated rasters
+
+
 class IdwJob:
     """
     Everything the workflow needs.
@@ -241,17 +245,23 @@ class IdwJob:
     boundary_extent: QgsRectangle of the boundary features (boundary CRS)
     boundary_crs   : QgsCoordinateReferenceSystem (projected, metres)
     items          : list of (point_source, field_name)
-    output_path    : .gpkg path for the final polygon grid
+    output_path    : path of the final polygon grid (.shp in the wizard)
     raster_folder  : folder for the interpolated GeoTIFFs
     stamp          : text added to raster file names (avoids overwriting)
     params         : optional list of (power, radius), one per item; each attribute has
                      its own spatial dependence, so each may have its own IDW parameters.
                      When omitted, ``power`` and ``radius`` are used for every item.
+    cell_size      : side of the vector grid cells (default: pixel size)
+    grid_input     : existing polygon grid to use instead of generating one (only the
+                     cells touching the boundary are used)
+    grid_path      : where the generated grid is saved (whole cells, reusable)
+    reuse_grid     : True to use the grid already saved at ``grid_path``
     """
 
     def __init__(self, boundary_input, boundary_extent, boundary_crs, items,
                  tolerance, power, radius, pixel, raster_folder, output_path, stamp="",
-                 params=None):
+                 params=None, cell_size=None, grid_input=None, grid_path=None,
+                 reuse_grid=False):
         self.boundary_input = boundary_input
         self.boundary_extent = boundary_extent
         self.boundary_crs = boundary_crs
@@ -268,19 +278,41 @@ class IdwJob:
         if len(params) != len(items):
             raise ValueError("params must have one (power, radius) per item")
         self.params = [(float(p), float(r)) for p, r in params]
+        self.cell_size = float(cell_size) if cell_size else self.pixel
+        self.grid_input = grid_input
+        self.grid_path = grid_path
+        self.reuse_grid = bool(reuse_grid)
 
     def grid(self):
-        e = self.boundary_extent
+        """Raster grid: boundary extent plus RASTER_MARGIN, snapped to the pixel size."""
+        e = buffered(self.boundary_extent, RASTER_MARGIN)
         return snap_extent(e.xMinimum(), e.yMinimum(), e.xMaximum(), e.yMaximum(), self.pixel)
+
+    def cell_grid(self):
+        """Vector grid extent: boundary extent snapped outward to the cell size."""
+        e = self.boundary_extent
+        return snap_extent(e.xMinimum(), e.yMinimum(), e.xMaximum(), e.yMaximum(), self.cell_size)
+
+
+def _run(alg, params, context, feedback):
+    return processing.run(alg, params, context=context, feedback=feedback,
+                          is_child_algorithm=True)["OUTPUT"]
 
 
 def run_idw_job(job, context, feedback):
     """
     Run the workflow. Returns a dict:
-      output   -> path of the final GeoPackage
-      layers   -> list of dicts {prefix, field, label, mean_field, raster, n}
-      warnings -> list of messages
+      output    -> path of the final grid
+      grid_path -> path of the reusable grid (generated or reused), or None
+      layers    -> list of dicts {prefix, field, label, mean_field, raster, n, power, radius}
+      warnings  -> list of messages
     Raises QgsProcessingException on error or cancellation.
+
+    Order (avoids cells without value along the border):
+      1. IDW rasters over the boundary extent + 100 m, never masked or clipped;
+      2. grid cells touching the boundary, kept WHOLE;
+      3. zonal mean of every raster in the whole cells;
+      4. only then the cells are clipped by the boundary.
     """
     crs = job.boundary_crs
     res = job.pixel
@@ -289,13 +321,13 @@ def run_idw_job(job, context, feedback):
     tctx = context.transformContext()
 
     n_items = len(job.items)
-    steps = QgsProcessingMultiStepFeedback(2 * n_items + 3, feedback)
+    steps = QgsProcessingMultiStepFeedback(2 * n_items + 5, feedback)
     step = 0
 
     prefixes = unique_prefixes([(name_of(s), f) for s, f in job.items])
     layers, warnings = [], []
 
-    # 1) IDW for each field
+    # 1) IDW for each field, over the boundary extent plus a safety margin
     for (source, field), prefix, (power, radius) in zip(job.items, prefixes, job.params):
         steps.setCurrentStep(step)
         step += 1
@@ -321,54 +353,92 @@ def run_idw_job(job, context, feedback):
             f"IDW_{safe_name(name_of(source), 25)}_{safe_name(field, 25)}{job.stamp}.tif")
         write_geotiff(raster, grid, xmin, ymax, res, crs)
         layers.append({"prefix": prefix, "field": field, "label": label,
-                       "mean_field": prefix + "_mean", "raster": raster, "n": len(zs),
-                       "power": power, "radius": radius})
+                       "raster": raster, "n": len(zs), "power": power, "radius": radius})
 
     if not layers:
         raise QgsProcessingException(tr("err_nothing_interpolated") + "\n" + "\n".join(warnings))
 
-    # 2) Polygon grid with the pixel size, clipped by the boundary
+    # 2) Boundary (fixed) and the vector grid: whole cells touching the boundary
     steps.setCurrentStep(step)
     step += 1
     feedback.pushInfo(tr("log_fixing"))
-    fixed = processing.run("native:fixgeometries", {
-        "INPUT": job.boundary_input, "OUTPUT": "TEMPORARY_OUTPUT"},
-        context=context, feedback=steps, is_child_algorithm=True)["OUTPUT"]
+    fixed = _run("native:fixgeometries", {"INPUT": job.boundary_input, "OUTPUT": "TEMPORARY_OUTPUT"},
+                 context, steps)
 
     steps.setCurrentStep(step)
     step += 1
-    feedback.pushInfo(tr("log_grid"))
-    grid_layer = processing.run("native:creategrid", {
-        "TYPE": 2,
-        "EXTENT": f"{xmin},{xmax},{ymin},{ymax} [{crs.authid()}]",
-        "HSPACING": res, "VSPACING": res, "HOVERLAY": 0, "VOVERLAY": 0,
-        "CRS": crs, "OUTPUT": "TEMPORARY_OUTPUT"},
-        context=context, feedback=steps, is_child_algorithm=True)["OUTPUT"]
+    grid_path = None
+    if job.grid_input is not None:
+        feedback.pushInfo(tr("log_grid_existing"))
+        grid_src = job.grid_input
+        src_layer = QgsProcessingUtils.mapLayerFromString(grid_src, context) if isinstance(grid_src, str) else grid_src
+        if src_layer is not None and hasattr(src_layer, "crs") and src_layer.crs() != crs:
+            grid_src = _run("native:reprojectlayer", {"INPUT": grid_src, "TARGET_CRS": crs,
+                                                     "OUTPUT": "TEMPORARY_OUTPUT"}, context, steps)
+    elif job.reuse_grid and job.grid_path and os.path.exists(job.grid_path):
+        feedback.pushInfo(tr("log_grid_reuse", path=os.path.basename(job.grid_path)))
+        grid_src = job.grid_path
+        grid_path = job.grid_path
+    else:
+        feedback.pushInfo(tr("log_grid"))
+        gx0, gy0, gx1, gy1, _, _ = job.cell_grid()
+        grid_src = _run("native:creategrid", {
+            "TYPE": 2, "EXTENT": f"{gx0},{gx1},{gy0},{gy1} [{crs.authid()}]",
+            "HSPACING": job.cell_size, "VSPACING": job.cell_size, "HOVERLAY": 0, "VOVERLAY": 0,
+            "CRS": crs, "OUTPUT": "TEMPORARY_OUTPUT"}, context, steps)
 
     steps.setCurrentStep(step)
     step += 1
-    feedback.pushInfo(tr("log_clip"))
-    clipped = processing.run("native:clip", {
-        "INPUT": grid_layer, "OVERLAY": fixed, "OUTPUT": "TEMPORARY_OUTPUT"},
-        context=context, feedback=steps, is_child_algorithm=True)["OUTPUT"]
-    clipped_layer = QgsProcessingUtils.mapLayerFromString(clipped, context)
-    if clipped_layer is None or clipped_layer.featureCount() == 0:
+    save_grid = job.grid_input is None and not (job.reuse_grid and grid_path) and job.grid_path
+    cells = _run("native:extractbylocation", {
+        "INPUT": grid_src, "PREDICATE": [0], "INTERSECT": fixed,   # 0 = intersects
+        "OUTPUT": job.grid_path if save_grid else "TEMPORARY_OUTPUT"}, context, steps)
+    if save_grid:
+        grid_path = job.grid_path
+        feedback.pushInfo(tr("log_grid_saved", path=os.path.basename(job.grid_path)))
+    cells_layer = QgsProcessingUtils.mapLayerFromString(cells, context)
+    if cells_layer is None:
+        cells_layer = QgsVectorLayer(cells, "cells", "ogr")
+    if cells_layer is None or not cells_layer.isValid() or cells_layer.featureCount() == 0:
         raise QgsProcessingException(tr("err_empty_grid"))
 
-    # 3) Zonal statistics (mean), chained so every column ends up in one layer
-    current = clipped
+    # final column names: the attribute names (Shapefile: at most 10 characters)
+    existing = [f.name() for f in cells_layer.fields()]
+    names = shapefile_field_names([info["field"] for info in layers], existing)
+    for info, name in zip(layers, names):
+        info["mean_field"] = name
+
+    # 3) Zonal statistics (mean) in the WHOLE cells, chained in one layer
+    current = cells
     for i, info in enumerate(layers):
         if feedback.isCanceled():
             raise QgsProcessingException(tr("canceled"))
         steps.setCurrentStep(step)
         step += 1
         feedback.pushInfo(tr("log_zonal", label=info["label"]))
-        last = i == len(layers) - 1
-        current = processing.run("native:zonalstatisticsfb", {
+        current = _run("native:zonalstatisticsfb", {
             "INPUT": current, "INPUT_RASTER": info["raster"], "RASTER_BAND": 1,
-            "COLUMN_PREFIX": info["prefix"] + "_", "STATISTICS": [2],  # 2 = mean
-            "OUTPUT": job.output_path if last else "TEMPORARY_OUTPUT"},
-            context=context, feedback=steps, is_child_algorithm=True)["OUTPUT"]
+            "COLUMN_PREFIX": f"z{i}_", "STATISTICS": [2],  # 2 = mean
+            "OUTPUT": "TEMPORARY_OUTPUT"}, context, steps)
 
-    steps.setCurrentStep(2 * n_items + 3)
-    return {"output": job.output_path, "layers": layers, "warnings": warnings}
+    # rename z<i>_mean to the attribute names
+    steps.setCurrentStep(step)
+    step += 1
+    stats_layer = QgsProcessingUtils.mapLayerFromString(current, context)
+    rename = {f"z{i}_mean": info["mean_field"] for i, info in enumerate(layers)}
+    mapping = []
+    for f in stats_layer.fields():
+        mapping.append({"expression": f'"{f.name()}"', "name": rename.get(f.name(), f.name()),
+                        "type": f.type(), "length": f.length(), "precision": f.precision()})
+    current = _run("native:refactorfields", {"INPUT": current, "FIELDS_MAPPING": mapping,
+                                             "OUTPUT": "TEMPORARY_OUTPUT"}, context, steps)
+
+    # 4) Only now clip the cells by the boundary (values already computed on whole cells)
+    steps.setCurrentStep(step)
+    feedback.pushInfo(tr("log_clip"))
+    _run("native:clip", {"INPUT": current, "OVERLAY": fixed, "OUTPUT": job.output_path},
+         context, steps)
+
+    steps.setCurrentStep(2 * n_items + 5)
+    return {"output": job.output_path, "grid_path": grid_path, "layers": layers,
+            "warnings": warnings}

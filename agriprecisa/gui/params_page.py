@@ -249,6 +249,13 @@ class ParametersPage(QWizardPage):
     # ------------------------------------------------------------- lifecycle
     def initializePage(self):
         w = self.wizard()
+        # pixel: at most the grid cell, starting equal to it (each cell must hold pixel centres)
+        cell = getattr(w, "cell_size", None) or self.spin_px.value()
+        self.spin_px.setMaximum(cell)
+        if getattr(self, "_last_cell", None) != cell:
+            self.spin_px.setValue(cell)
+            self._last_cell = cell
+        self.spin_px.setToolTip(tr("p3_pixel_tip", cell=fmt(cell, 2)))
         self.preview.set_boundary(w.boundary_geom)
         px, py = self.preview.cell_centres()
         old_state = self.state

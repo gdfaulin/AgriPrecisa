@@ -15,10 +15,11 @@ from qgis.PyQt.QtCore import Qt, QCoreApplication
 from qgis.PyQt.QtWidgets import (
     QDialog, QWizard, QWizardPage, QVBoxLayout, QHBoxLayout, QFormLayout, QLabel,
     QComboBox, QLineEdit, QPushButton, QFileDialog, QDoubleSpinBox, QCheckBox,
-    QTreeWidget, QTreeWidgetItem, QMessageBox, QProgressDialog, QTextBrowser,
+    QTreeWidget, QTreeWidgetItem, QMessageBox, QProgressDialog, QTextBrowser, QGroupBox,
+    QRadioButton, QGridLayout,
 )
 from qgis.core import (
-    QgsSettings,
+    QgsSettings, QgsGeometry, QgsVectorFileWriter,
     QgsApplication, QgsProject, QgsVectorLayer, QgsProcessingContext, QgsProcessingFeedback,
     QgsProcessingException, QgsProcessingFeatureSourceDefinition,
 )
@@ -31,12 +32,36 @@ from ..core.pipeline import (
 )
 from ..core.idw_math import snap_extent, sample_density
 from ..i18n import tr, fmt
-from ..core.paths import default_output_folder, prepare_output_folder
+from ..core.paths import (
+    default_output_folder, prepare_output_folder, grid_file_name, result_file_name,
+)
 from .params_page import ParametersPage, ORIGIN_TEXT
 
 LAST_FOLDER_KEY = "AgriPrecisa/last_output_folder"
 FOLDER_HINT = {"last": "p1_folder_from_last", "project": "p1_folder_from_project",
                "none": "p1_folder_none"}
+
+
+def existing_cell_size(grid_layer, boundary_geom, boundary_crs):
+    """Typical cell side (sqrt of the median area) of the cells touching the boundary; None if none."""
+    import math as _math
+    from qgis.core import QgsCoordinateTransform, QgsFeatureRequest
+    geom = QgsGeometry(boundary_geom)
+    if grid_layer.crs() != boundary_crs:
+        geom.transform(QgsCoordinateTransform(boundary_crs, grid_layer.crs(), QgsProject.instance()))
+    engine = QgsGeometry.createGeometryEngine(geom.constGet())
+    engine.prepareGeometry()
+    areas = []
+    for f in grid_layer.getFeatures(QgsFeatureRequest().setFilterRect(geom.boundingBox()).setNoAttributes()):
+        g = f.geometry()
+        if g is not None and not g.isEmpty() and engine.intersects(g.constGet()):
+            areas.append(g.area())
+            if len(areas) >= 2000:
+                break
+    if not areas:
+        return None
+    areas.sort()
+    return round(_math.sqrt(areas[len(areas) // 2]), 2)
 
 
 # ---------------------------------------------------------------------------
@@ -73,6 +98,34 @@ class BoundaryPage(QWizardPage):
         self.label_crs.setWordWrap(True)
         self.combo.currentIndexChanged.connect(self.update_info)
 
+        # vector grid: generate (cell size) or use an existing grid
+        box_grid = QGroupBox(tr("p1_grid_group"))
+        self.radio_grid_new = QRadioButton(tr("p1_grid_new"))
+        self.radio_grid_old = QRadioButton(tr("p1_grid_existing"))
+        self.radio_grid_new.setChecked(True)
+        self.spin_cell = QDoubleSpinBox()
+        self.spin_cell.setRange(0.5, 1000)
+        self.spin_cell.setDecimals(2)
+        self.spin_cell.setValue(5.0)
+        self.spin_cell.setSuffix(" m")
+        self.spin_cell.setMaximumWidth(120)
+        self.combo_grid = QComboBox()
+        self.label_grid = QLabel()
+        self.label_grid.setWordWrap(True)
+        self.label_grid.setEnabled(False)
+        g = QGridLayout(box_grid)
+        g.addWidget(self.radio_grid_new, 0, 0)
+        g.addWidget(QLabel(tr("p1_cell_size")), 0, 1)
+        g.addWidget(self.spin_cell, 0, 2)
+        g.addWidget(self.radio_grid_old, 1, 0)
+        g.addWidget(self.combo_grid, 1, 1, 1, 2)
+        g.addWidget(self.label_grid, 2, 0, 1, 3)
+        g.setColumnStretch(1, 1)
+        for wdg in (self.radio_grid_new, self.radio_grid_old):
+            wdg.toggled.connect(self.update_grid_state)
+        self.spin_cell.valueChanged.connect(self.update_grid_state)
+        self.combo.currentIndexChanged.connect(self.update_grid_state)
+
         form = QFormLayout()
         form.addRow(tr("p1_boundary"), self.combo)
         form.addRow("", self.check_selected)
@@ -81,6 +134,7 @@ class BoundaryPage(QWizardPage):
         form.addRow("", self.label_folder)
         layout = QVBoxLayout(self)
         layout.addLayout(form)
+        layout.addWidget(box_grid)
         layout.addWidget(self.label_crs)
         layout.addStretch()
 
@@ -98,8 +152,29 @@ class BoundaryPage(QWizardPage):
                                        tr(tip_key, crs=crs_code(layer.crs())),
                                        Qt.ItemDataRole.ToolTipRole)
         self.update_info()
+        self.combo_grid.clear()
+        for layer in QgsProject.instance().mapLayers().values():
+            if isinstance(layer, QgsVectorLayer) and layer.geometryType() == GEOM_POLYGON:
+                self.combo_grid.addItem(layer_label(layer), layer.id())
+        self.radio_grid_old.setEnabled(self.combo_grid.count() > 0)
         if not self.edit_folder.text().strip():
             self.fill_default_folder()
+        self.update_grid_state()
+
+    def update_grid_state(self, *args):
+        new = self.radio_grid_new.isChecked()
+        self.spin_cell.setEnabled(new)
+        self.combo_grid.setEnabled(not new)
+        layer = self.layer()
+        if new:
+            name = grid_file_name(layer.name() if layer else "talhao", self.spin_cell.value())
+            self.label_grid.setText(tr("p1_grid_new_hint", name=name))
+        else:
+            self.label_grid.setText(tr("p1_grid_existing_hint"))
+
+    def grid_layer(self):
+        lid = self.combo_grid.currentData()
+        return QgsProject.instance().mapLayer(lid) if lid else None
 
     def fill_default_folder(self):
         """Last folder used; otherwise <project folder>/AgriPrecisa; otherwise empty."""
@@ -164,7 +239,24 @@ class BoundaryPage(QWizardPage):
             return False
         QgsSettings().setValue(LAST_FOLDER_KEY, folder)
 
+        grid_layer, cell = None, self.spin_cell.value()
+        if self.radio_grid_old.isChecked():
+            grid_layer = self.grid_layer()
+            if grid_layer is None:
+                QMessageBox.warning(self, tr("p1_grid_group"), tr("p1_grid_err_choose"))
+                return False
+            if not crs_in_meters(grid_layer.crs()):
+                QMessageBox.warning(self, tr("project_layer_title"),
+                                    tr("p1_err_crs", name=grid_layer.name(), crs=crs_code(grid_layer.crs())))
+                return False
+            cell = existing_cell_size(grid_layer, geom, layer.crs())
+            if cell is None:
+                QMessageBox.warning(self, tr("p1_grid_group"), tr("p1_grid_err_outside"))
+                return False
+
         w = self.wizard()
+        w.grid_layer = grid_layer
+        w.cell_size = cell
         w.boundary = layer
         w.selected_only = selected
         w.boundary_extent = extent
@@ -349,7 +441,10 @@ class SummaryPage(QWizardPage):
             "p4_summary", boundary=w.boundary.name() + sel, crs=crs_code(w.boundary.crs()),
             area=fmt(w.area_ha, 2),
             tol=f"{w.tolerance:g}", folder=w.folder, n=len(w.items), items=items,
-            pixel=f"{w.pixel:g}", classes=N_CLASSES, ramp=COLOR_RAMP))
+            pixel=f"{w.pixel:g}", classes=N_CLASSES, ramp=COLOR_RAMP,
+            grid=(tr("p4_grid_existing", name=w.grid_layer.name(), cell=fmt(w.cell_size, 1))
+                  if w.grid_layer is not None else
+                  tr("p4_grid_new", name=grid_file_name(w.boundary.name(), w.cell_size)))))
 
 
 # ---------------------------------------------------------------------------
@@ -379,6 +474,8 @@ class IdwWizard(QWizard):
         self.folder = ""
         self.items = []
         self.params = []          # (power, radius) per item, set in step 3
+        self.grid_layer = None    # existing grid chosen in step 1 (None = generate)
+        self.cell_size = 5.0
         self.param_origins = []
         self.pixel = 5.0
 
@@ -437,6 +534,21 @@ def load_results(result, wizard):
     return first
 
 
+def ask_existing_grid(parent, file_name):
+    """'reuse', 'overwrite' or None (cancel) when the standard grid already exists."""
+    box = QMessageBox(parent)
+    box.setWindowTitle(tr("grid_exists_title"))
+    box.setIcon(QMessageBox.Icon.Question)
+    box.setText(tr("grid_exists_text", name=file_name))
+    b_reuse = box.addButton(tr("grid_reuse"), QMessageBox.ButtonRole.AcceptRole)
+    b_over = box.addButton(tr("grid_overwrite"), QMessageBox.ButtonRole.DestructiveRole)
+    box.addButton(tr("cancel"), QMessageBox.ButtonRole.RejectRole)
+    box.setDefaultButton(b_reuse)
+    box.exec()
+    clicked = box.clickedButton()
+    return "reuse" if clicked == b_reuse else "overwrite" if clicked == b_over else None
+
+
 def run_wizard(iface):
     wizard = IdwWizard(iface.mainWindow())
     if wizard.exec() != QDialog.DialogCode.Accepted:
@@ -446,10 +558,22 @@ def run_wizard(iface):
     boundary_input = wizard.boundary
     if wizard.selected_only:
         boundary_input = QgsProcessingFeatureSourceDefinition(wizard.boundary.id(), True)
+    name = wizard.boundary.name()
+    grid_path, reuse = None, False
+    if wizard.grid_layer is None:
+        grid_path = os.path.join(wizard.folder, grid_file_name(name, wizard.cell_size))
+        if os.path.exists(grid_path):
+            choice = ask_existing_grid(iface.mainWindow(), os.path.basename(grid_path))
+            if choice is None:
+                return
+            reuse = choice == "reuse"
+            if not reuse:
+                QgsVectorFileWriter.deleteShapeFile(grid_path)
+    output = os.path.join(wizard.folder, result_file_name(name, wizard.cell_size, stamp))
     job = IdwJob(boundary_input, wizard.boundary_extent, wizard.boundary.crs(), wizard.items,
-                 wizard.tolerance, 2.0, 0.0, wizard.pixel,
-                 wizard.folder, os.path.join(wizard.folder, f"Grid_IDW{stamp}.gpkg"), stamp,
-                 params=wizard.params)
+                 wizard.tolerance, 2.0, 0.0, wizard.pixel, wizard.folder, output, stamp,
+                 params=wizard.params, cell_size=wizard.cell_size, grid_input=wizard.grid_layer,
+                 grid_path=grid_path, reuse_grid=reuse)
 
     progress = QProgressDialog(tr("starting"), tr("cancel"), 0, 100, iface.mainWindow())
     progress.setWindowTitle(tr("wizard_title"))
@@ -483,6 +607,8 @@ def run_wizard(iface):
     summary = "\n".join(tr("done_line", label=i["label"], n=i["n"]) for i in result["layers"])
     msg = tr("done_msg", summary=summary, folder=wizard.folder,
              output=os.path.basename(result["output"]))
+    if result.get("grid_path"):
+        msg += "\n" + tr("done_grid", grid=os.path.basename(result["grid_path"]))
     if result["warnings"]:
         msg += "\n\n" + tr("warnings") + "\n" + "\n".join(result["warnings"])
     QMessageBox.information(iface.mainWindow(), tr("wizard_title"), msg)

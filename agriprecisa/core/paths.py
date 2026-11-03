@@ -38,3 +38,59 @@ def prepare_output_folder(folder):
     except OSError:
         return False
     return os.path.isdir(folder) and os.access(folder, os.W_OK)
+
+
+# ---------------------------------------------------------------------------
+# File and field names (Shapefile)
+# ---------------------------------------------------------------------------
+GRID_SUFFIX = "Grade Padrão"
+SHP_FIELD_MAX = 10
+_INVALID = '<>:"/\\|?*'
+
+
+def sanitize_file_name(name):
+    """Keep the layer name as typed, removing only characters not allowed in file names."""
+    clean = "".join("_" if (c in _INVALID or ord(c) < 32) else c for c in str(name)).strip(" .")
+    return clean or "talhao"
+
+
+def format_size(value):
+    """5 -> '5', 2.5 -> '2,5' (no trailing zeros)."""
+    text = f"{float(value):.2f}".rstrip("0").rstrip(".")
+    return text.replace(".", ",")
+
+
+def grid_file_name(boundary_name, cell):
+    """'<boundary layer>_Grade Padrão_<cell>x<cell>.shp'."""
+    size = format_size(cell)
+    return f"{sanitize_file_name(boundary_name)}_{GRID_SUFFIX}_{size}x{size}.shp"
+
+
+def result_file_name(boundary_name, cell, stamp=""):
+    """'<boundary layer>_IDW_<cell>x<cell><stamp>.shp' (grid with the interpolated means)."""
+    size = format_size(cell)
+    return f"{sanitize_file_name(boundary_name)}_IDW_{size}x{size}{stamp}.shp"
+
+
+def shapefile_field_names(attributes, existing=()):
+    """
+    Column names for the interpolated means: the attribute name itself, ASCII, at most
+    10 characters (Shapefile limit). Names repeated (or already used by ``existing`` fields)
+    get _2, _3... keeping the 10-character limit.
+    """
+    import re
+    import unicodedata
+    used = {e.lower() for e in existing}
+    out = []
+    for name in attributes:
+        base = unicodedata.normalize("NFKD", str(name)).encode("ascii", "ignore").decode()
+        base = re.sub(r"[^0-9A-Za-z_]+", "_", base).strip("_") or "campo"
+        base = base[:SHP_FIELD_MAX]
+        cand, k = base, 2
+        while cand.lower() in used:
+            suffix = f"_{k}"
+            cand = base[:SHP_FIELD_MAX - len(suffix)] + suffix
+            k += 1
+        used.add(cand.lower())
+        out.append(cand)
+    return out

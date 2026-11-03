@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.5.0 (2026)
+- Step 1: choose the vector grid: create a new one with the cell size chosen by the user (independent of the interpolation pixel), or use an existing grid (only the cells touching the field are used).
+- The created grid is saved in the output folder as "<boundary layer>_Grade Padrão_<cell>x<cell>.shp", with whole cells, and can be reused; when it already exists the wizard asks whether to reuse or overwrite it.
+- Outputs in Shapefile; mean columns named after the attributes (up to 10 characters).
+- Interpolated rasters cover the boundary rectangle plus a 100 m margin and are never masked or clipped.
+- Fix: the zonal mean is computed on whole cells and the grid is clipped by the boundary only afterwards, so border cells are never left without value (regression test).
+- Step 3: the pixel starts equal to the cell size and cannot exceed it.
+- Processing algorithm: new "Grid cell size" and optional "Existing grid" parameters.
+
 ## 1.4.0 (2026)
 - Step 3 has a single layout (the standard layout was removed); sliders now cover P from 0.5 to 5.0 and the radius from 1x to 6x the coverage distance.
 - Weight chart corrected after Shepard (1968): the IDW weight 1/d^P is shown relative to the weight at the typical pixel-to-sample distance (equal to 1 there), grows without limit near the sample (axis cut at 4) and has distance ticks. The artificial plateau at distance 0 and the grey reference curves were removed (regression test).
