@@ -70,3 +70,24 @@ def test_cv_table_decimals_show_three_significant_digits():
     assert f(np.array([0.0391, 0.045])) == 4
     assert f(np.array([12.3, 40.1])) == 2
     assert f(np.array([float("nan")])) == 2
+
+
+def test_help_reviewed_for_this_version():
+    # Rule: every new version must review the Help texts (wizard pages, "Saiba mais" and the
+    # Processing help) and then set i18n.HELP_REVIEWED_VERSION to the new version.
+    from agriprecisa import i18n
+    version = read_metadata()["version"]
+    assert i18n.HELP_REVIEWED_VERSION == version, (
+        f"Help texts not reviewed for version {version}: review help_page*, *_more and "
+        f"alg_help in i18n.py and set HELP_REVIEWED_VERSION = '{version}'")
+
+
+def test_help_texts_use_only_known_html_tags():
+    # Regression: "<contorno>_Grade Padrão_<célula>x<célula>.shp" in the Processing help was
+    # read as HTML and shown as "_Grade Padrão_ x .shp".
+    from agriprecisa import i18n
+    allowed = {"b", "i", "br", "ul", "li", "sub", "sup", "a"}
+    for key, entry in i18n.STRINGS.items():
+        for lang, text in entry.items():
+            for tag in re.findall(r"</?([A-Za-z][^\s>/]*)", text):
+                assert tag.lower() in allowed, f"{key} [{lang}]: unexpected tag <{tag}>"

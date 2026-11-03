@@ -11,6 +11,10 @@ the three languages (checked by tests/test_i18n.py).
 
 _LANG = None
 
+# Last plugin version for which every Help text (help_page*, *_more, alg_help) was reviewed.
+# Must be updated together with "version=" in metadata.txt (checked by tests/test_package.py).
+HELP_REVIEWED_VERSION = "1.5.1"
+
 
 def current_language():
     global _LANG
@@ -203,9 +207,10 @@ STRINGS = {
                       "en": "Choose an output folder. The folder could not be created or written to.",
                       "es": "Elija una carpeta de salida. No se pudo crear ni escribir en la carpeta indicada."},
     "help_page1": {
-        "pt": "<b>Etapa 1: Contorno e pasta de saída</b><br><br>"
+        "pt": "<b>Etapa 1: Contorno, grade vetorial e pasta de saída</b><br><br>"
               "<b>Camada de contorno:</b> polígono que delimita o talhão. O retângulo envolvente "
-              "dele define a área da interpolação, e ele também recorta a grade final. Se houver "
+              "dele, acrescido de 100 m de margem, define a área da interpolação, e o contorno "
+              "recorta a grade final depois do cálculo das médias. Se houver "
               "feições selecionadas, é possível usar apenas elas (por exemplo, um talhão de uma "
               "camada com vários).<br><br>"
               "<b>Tolerância:</b> distância, em metros, além do contorno em que os pontos ainda são "
@@ -222,9 +227,10 @@ STRINGS = {
               "vez, com a subpasta AgriPrecisa dentro da pasta do projeto, criada automaticamente.<br><br>"
               "<b>Sistema de coordenadas:</b> o contorno e os pontos precisam estar em um sistema "
               "projetado em metros, como SIRGAS 2000 / UTM 22S (EPSG:31982).",
-        "en": "<b>Step 1: Boundary and output folder</b><br><br>"
-              "<b>Boundary layer:</b> polygon delimiting the field. Its bounding box defines the "
-              "interpolation area and it also clips the final grid. If features are selected, you "
+        "en": "<b>Step 1: Boundary, vector grid and output folder</b><br><br>"
+              "<b>Boundary layer:</b> polygon delimiting the field. Its bounding box, plus a 100 m "
+              "margin, defines the interpolation area, and the boundary clips the final grid after "
+              "the means are computed. If features are selected, you "
               "can use only them (e.g. one field from a layer with many).<br><br>"
               "<b>Tolerance:</b> distance, in metres, beyond the boundary within which points are "
               "still accepted. It keeps samples slightly outside the limit, e.g. from machine "
@@ -240,9 +246,10 @@ STRINGS = {
               "automatically.<br><br>"
               "<b>Coordinate system:</b> boundary and points must be in a projected CRS in "
               "metres, such as a UTM zone.",
-        "es": "<b>Paso 1: Contorno y carpeta de salida</b><br><br>"
-              "<b>Capa de contorno:</b> polígono que delimita el lote. Su rectángulo envolvente "
-              "define el área de interpolación y también recorta la cuadrícula final. Si hay "
+        "es": "<b>Paso 1: Contorno, cuadrícula vectorial y carpeta de salida</b><br><br>"
+              "<b>Capa de contorno:</b> polígono que delimita el lote. Su rectángulo envolvente, más "
+              "100 m de margen, define el área de interpolación, y el contorno recorta la cuadrícula "
+              "final después del cálculo de las medias. Si hay "
               "entidades seleccionadas, se pueden usar solo ellas (por ejemplo, un lote de una "
               "capa con varios).<br><br>"
               "<b>Tolerancia:</b> distancia, en metros, más allá del contorno dentro de la cual los "
@@ -417,8 +424,10 @@ STRINGS = {
               "<b>Ajuste automático / para todos:</b> a validação cruzada testa combinações e indica, "
               "para cada atributo, a de menor erro.<br>"
               "<b>Mostrar amostras:</b> liga ou desliga os pontos na prévia.<br>"
-              "<b>Tamanho do pixel:</b> lado de cada pixel e de cada célula da grade final. "
-              "Padrão de 5 m.",
+              "<b>Tamanho do pixel:</b> lado de cada pixel da interpolação. Começa igual ao tamanho "
+              "da célula da grade escolhido na Etapa 1 e não pode ser maior que ele, porque cada "
+              "célula precisa conter pixels para o cálculo da média. Pixels menores deixam a média "
+              "de cada célula mais representativa, mas o cálculo fica mais lento.",
         "en": "<b>Step 3: IDW parameters</b><br><br>"
               "IDW (Inverse Distance Weighting) estimates each pixel as the average of nearby "
               "samples, giving more weight to the closest ones.<br><br>"
@@ -437,7 +446,10 @@ STRINGS = {
               "<b>Auto-fit / Auto-fit all:</b> cross-validation tests combinations and points "
               "out, for each attribute, the one with the lowest error.<br>"
               "<b>Show samples:</b> turns the points on or off in the preview.<br>"
-              "<b>Pixel size:</b> side of each pixel and of each final grid cell. Default 5 m.",
+              "<b>Pixel size:</b> side of each interpolation pixel. It starts equal to the grid cell "
+              "size chosen in step 1 and cannot be larger, because each cell must contain pixels to "
+              "compute the mean. Smaller pixels make each cell's mean more representative, but "
+              "processing is slower.",
         "es": "<b>Paso 3: Parámetros del IDW</b><br><br>"
               "El IDW (inverso de la distancia ponderada) estima cada píxel como el promedio de las "
               "muestras vecinas, dando más peso a las más cercanas.<br><br>"
@@ -456,8 +468,10 @@ STRINGS = {
               "<b>Ajuste automático / para todos:</b> la validación cruzada prueba combinaciones e "
               "indica, para cada atributo, la de menor error.<br>"
               "<b>Mostrar muestras:</b> enciende o apaga los puntos en la vista previa.<br>"
-              "<b>Tamaño del píxel:</b> lado de cada píxel y de cada celda de la cuadrícula final. "
-              "Por defecto 5 m."},
+              "<b>Tamaño del píxel:</b> lado de cada píxel de la interpolación. Empieza igual al "
+              "tamaño de la celda elegido en el paso 1 y no puede ser mayor, porque cada celda debe "
+              "contener píxeles para calcular la media. Píxeles menores hacen la media de cada celda "
+              "más representativa, pero el cálculo es más lento."},
     "learn_more": {"pt": "Saiba mais", "en": "Learn more", "es": "Saber más"},
     "p3_power_group": {"pt": "Potência (P)", "en": "Power (P)", "es": "Potencia (P)"},
     "p3_power_value": {"pt": "P = {p}", "en": "P = {p}", "es": "P = {p}"},
@@ -959,7 +973,7 @@ STRINGS = {
               "de célula informado ou uma grade existente).\n\n"
               "A interpolação cobre o retângulo do contorno com 100 m de margem, sem recorte. A média é "
               "calculada nas células inteiras que tocam o talhão e só depois a grade é recortada pelo "
-              "contorno. A grade gerada é salva na pasta dos rasters como <contorno>_Grade Padrão_<célula>x<célula>.shp "
+              "contorno. A grade gerada é salva na pasta dos rasters como [contorno]_Grade Padrão_[célula]x[célula].shp "
               "e reutilizada se já existir. As colunas recebem o nome do atributo (até 10 caracteres).\n\nA tolerância aceita "
               "pontos um pouco fora do contorno. Raio 0 usa todas as amostras.\n\n"
               "Opção: escolher P e raio de cada atributo por validação cruzada.\n\n"
@@ -971,7 +985,7 @@ STRINGS = {
               "existing grid).\n\n"
               "Interpolation covers the boundary rectangle plus a 100 m margin, without clipping. The mean is "
               "computed in the whole cells touching the field and only then the grid is clipped by the "
-              "boundary. The created grid is saved in the raster folder as <boundary>_Grade Padrão_<cell>x<cell>.shp "
+              "boundary. The created grid is saved in the raster folder as [boundary]_Grade Padrão_[cell]x[cell].shp "
               "and reused if it already exists. Columns are named after the attributes (up to 10 characters).\n\nThe tolerance accepts points "
               "slightly outside the boundary. Radius 0 uses all samples.\n\n"
               "Option: choose P and radius of each attribute by cross-validation.\n\n"
@@ -983,7 +997,7 @@ STRINGS = {
               "tamaño de celda indicado o una existente).\n\n"
               "La interpolación cubre el rectángulo del contorno con 100 m de margen, sin recorte. La media "
               "se calcula en las celdas enteras que tocan el lote y solo después se recorta por el contorno. "
-              "La cuadrícula creada se guarda en la carpeta de los ráster como <contorno>_Grade Padrão_<celda>x<celda>.shp "
+              "La cuadrícula creada se guarda en la carpeta de los ráster como [contorno]_Grade Padrão_[celda]x[celda].shp "
               "y se reutiliza si ya existe. Las columnas llevan el nombre del atributo (hasta 10 caracteres).\n\nLa tolerancia "
               "acepta puntos algo fuera del contorno. Radio 0 usa todas las muestras.\n\n"
               "Opción: elegir P y radio de cada atributo por validación cruzada.\n\n"

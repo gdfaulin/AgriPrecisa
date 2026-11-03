@@ -57,6 +57,12 @@ docs/GUIA_PUBLICACAO.md     guia para o autor
 - Aumentar `version=` em `agriprecisa/metadata.txt` (maior.menor.correção). O plugins.qgis.org recusa versão repetida.
 - Acrescentar linha no topo de `changelog=` (metadata.txt, em inglês) e em `CHANGELOG.md`.
 
+### 3b. Atualizar a Ajuda (obrigatório em toda versão)
+- Revisar **todos** os textos de Ajuda em `i18n.py`, nos três idiomas: `help_page1` a `help_page4` (botão Ajuda de cada etapa), os textos `*_more` (links "Saiba mais") e `alg_help` (Ajuda da Caixa de Ferramentas).
+- Atualizar o que a nova versão mudou: novos campos, valores padrão, limites, nomes de botões e de arquivos.
+- Não usar `<` e `>` em nomes de exemplo (o QGIS interpreta como marcação); usar colchetes, por exemplo `[contorno]`.
+- Depois da revisão, definir `HELP_REVIEWED_VERSION` em `i18n.py` igual à nova versão. O teste `test_help_reviewed_for_this_version` falha enquanto isso não for feito.
+
 ### 4. Testar (obrigatório antes de publicar)
 - `python3 -m pytest -q tests`
 - Teste com QGIS real. Se o QGIS não estiver instalado na sessão:

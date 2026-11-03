@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.1 (2026)
+- Help updated: step 1 (vector grid, 100 m margin) and step 3 (pixel size starts equal to the cell and cannot exceed it).
+- Fix: the Processing help showed "_Grade Padrão_ x .shp" because the file name used angle brackets (regression test).
+- New rule and test: the Help texts are reviewed for every version (i18n.HELP_REVIEWED_VERSION must match the plugin version).
+
 ## 1.5.0 (2026)
 - Step 1: choose the vector grid: create a new one with the cell size chosen by the user (independent of the interpolation pixel), or use an existing grid (only the cells touching the field are used).
 - The created grid is saved in the output folder as "<boundary layer>_Grade Padrão_<cell>x<cell>.shp", with whole cells, and can be reused; when it already exists the wizard asks whether to reuse or overwrite it.
