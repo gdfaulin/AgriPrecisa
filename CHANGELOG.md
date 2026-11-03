@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.0 (2026)
+- Steps 1 and 2 are split in two: the options on the left and, on the right, a fixed panel explaining every option (like the help panel of the Processing dialogs). The two sides can be resized.
+- The Help button of steps 1 and 2 now explains the concept behind the step (area of interest, edge effect, management cell, sampling density, spatial dependence).
+- Step 3: the "Neighbours per pixel" box with the influence bars was removed; the maximum of neighbours of each attribute stays in the summary table and the explanation of the neighbour rule is a link inside the "Advanced" box.
+- Help texts reviewed in the three languages.
+
 ## 1.6.0 (2026)
 - Minimum and maximum of neighbours per pixel, as in GIS interpolators (Surfer, ArcGIS, SAGA): every pixel uses at least 4 samples, even beyond the search radius, and at most the maximum (default 16), the nearest ones. The search radius now only saves computation in very dense sampling.
 - Auto-fit: the cross-validation table now crosses P with the maximum of neighbours (4 to 32); the search radius is computed so it reaches the chosen maximum in 95% of the field.

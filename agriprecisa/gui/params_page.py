@@ -9,11 +9,11 @@ the controls and the map preview; a summary table lists P, neighbours, radius an
 
 Neighbours follow the usual rule of GIS interpolators: at least MIN_NEIGHBOURS samples per
 pixel (beyond the radius if needed) and at most the attribute's maximum (the nearest ones).
-The maximum is shown as text and chosen by the auto-fit together with P; the radius only
+The maximum is shown in the summary table and chosen by the auto-fit together with P; the radius only
 saves computation and sits in a collapsed "Advanced" box.
 
-Left column: P slider, neighbours (with the share of each neighbour in a typical pixel,
-Shepard 1968), advanced radius and summary table. Right column: live map preview.
+Left column: P slider, advanced radius and summary table (with the neighbours of each
+attribute). Right column: live map preview.
 """
 
 import numpy as np
@@ -30,15 +30,15 @@ from qgis.core import QgsProject
 from qgis.gui import QgsCollapsibleGroupBox
 
 from ..core.idw_math import (
-    snap_extent, sample_density, power_band, suggest_parameters, typical_pixel_neighbours,
-    nearest_k_distances, share_beyond_radius, select_neighbour_distances, radius_from_knn,
+    snap_extent, sample_density, power_band, suggest_parameters, 
+    nearest_k_distances, share_beyond_radius, radius_from_knn,
     STUDENT_POWER_MIN, STUDENT_POWER_MAX, STUDENT_RADIUS_MIN, STUDENT_RADIUS_MAX,
     DEFAULT_RADIUS_MULTIPLE, CV_MIN_VALIDATION, CV_MAX_NEIGHBOURS, MIN_NEIGHBOURS,
     DEFAULT_MAX_NEIGHBOURS,
 )
 from ..core.pipeline import buffered, extract_points, edge_distances
 from ..i18n import tr, fmt
-from .widgets import PreviewMap, InfluenceBars
+from .widgets import PreviewMap
 from .cv_dialog import CrossValidationDialog, significant_decimals
 
 POWER_TEXT = {"low": "p3_power_low", "mid": "p3_power_mid", "high": "p3_power_high"}
@@ -173,25 +173,6 @@ class ParametersPage(QWizardPage):
         lp.addLayout(row)
         lp.addWidget(self.label_p_text)
 
-        # neighbours: chosen by the auto-fit, shown as text, with the influence bars
-        box_n = QGroupBox(tr("p3_neigh_group"))
-        self.label_n = QLabel()
-        self.label_n.setWordWrap(True)
-        self.label_n.setMinimumHeight(3 * self.fontMetrics().lineSpacing() + 4)
-        self.label_n.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        self.label_n.linkActivated.connect(self.show_more)
-        self.bars = InfluenceBars()
-        self.bars.setMinimumSize(210, 150)
-        self.label_bars = QLabel("<b>" + tr("p3_bars_title") + "</b>")
-        self.label_bars.setWordWrap(True)
-        more_w = QLabel(_link("p3_weight_more"))
-        more_w.linkActivated.connect(self.show_more)
-        ln = QVBoxLayout(box_n)
-        ln.addWidget(self.label_n)
-        ln.addWidget(self.label_bars)
-        ln.addWidget(self.bars, 1)
-        ln.addWidget(more_w, 0, Qt.AlignmentFlag.AlignRight)
-
         # advanced: search radius (only saves computation), collapsed like in QGIS tools
         box_r = QgsCollapsibleGroupBox(tr("p3_advanced_group"))
         self.label_spacing = QLabel()
@@ -223,11 +204,13 @@ class ParametersPage(QWizardPage):
         lr.addWidget(self.label_spacing)
         lr.addLayout(row)
         lr.addWidget(self.label_r_text)
+        more_n = QLabel(f'<a href="p3_neigh_more">{tr("p3_neigh_link")}</a>')
+        more_n.linkActivated.connect(self.show_more)
+        lr.addWidget(more_n, 0, Qt.AlignmentFlag.AlignRight)
         box_r.setCollapsed(True)
         self.box_advanced = box_r
 
         lay.addWidget(box_p)
-        lay.addWidget(box_n, 1)
         lay.addWidget(box_r)
         lay.addWidget(self.label_r_gap)      # outside the box: visible even when collapsed
         self.slider_p.valueChanged.connect(self.on_student_changed)
@@ -285,7 +268,6 @@ class ParametersPage(QWizardPage):
         old_state = self.state
         self.keys, self.labels, self.state = [], {}, {}
         self.points_cache, self.edge_cache, self.cv_cache = {}, {}, {}
-        self.neigh_cache = {}
         self.px, self.py = px, py
         for layer, field in w.items:
             key = (layer.id(), field)
@@ -423,10 +405,6 @@ class ParametersPage(QWizardPage):
         p = self.power()
         self.label_p_value.setText("<b>" + tr("p3_power_value", p=fmt(p, 1)) + "</b>")
         self.label_p_text.setText(tr(POWER_TEXT[power_band(p)]) + "  " + _link("p3_power_more"))
-        origin = self.cur().get("origin", "default")
-        note = tr("p3_neigh_cv") if origin == "cv" else tr("p3_neigh_default")
-        self.label_n.setText(tr("p3_neigh_text", kmin=MIN_NEIGHBOURS, kmax=self.max_neighbours())
-                             + " " + note + "  " + _link("p3_neigh_more"))
         if self.spacing and self.radius() > 0:
             mult = round(self.radius() / self.spacing, 1)
             self.label_r_value.setText("<b>" + tr(
@@ -469,17 +447,6 @@ class ParametersPage(QWizardPage):
     def update_visuals(self):
         self.timer.start()
 
-    def neighbour_distances(self):
-        """Sorted distances from a typical pixel to the samples it really uses."""
-        key = self.current
-        if key is None:
-            return np.array([])
-        if key not in self.neigh_cache:
-            xs, ys, _ = self.points_for(key)
-            self.neigh_cache[key] = typical_pixel_neighbours(self.px, self.py, xs, ys, radius=0)
-        return select_neighbour_distances(self.neigh_cache[key], self.radius(), MIN_NEIGHBOURS,
-                                          self.max_neighbours())
-
     def refresh_table(self):
         for row, key in enumerate(self.keys):
             st = self.state[key]
@@ -503,7 +470,6 @@ class ParametersPage(QWizardPage):
     # ------------------------------------------------------------- preview
     def refresh_preview(self):
         self.preview.compute(self.power(), self.radius(), self.max_neighbours())
-        self.bars.set_data(self.neighbour_distances(), self.power())
 
     def show_more(self, key):
         box = QMessageBox(self)

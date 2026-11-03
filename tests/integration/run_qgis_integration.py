@@ -240,6 +240,32 @@ wz.show()
 p1 = wz.currentPage()
 p1.combo.setCurrentIndex(p1.combo.findData(boundary.id()))
 p1.edit_folder.setText(tmp)
+# 1.7.0: steps 1 and 2 show a fixed panel on the right explaining every option, and the
+# Help button explains the concept of the step
+def _check_panel(page, words, label):
+    panel = getattr(page, "side_panel", None)
+    if panel is None:
+        errors.append(f"{label}: explanation panel on the right missing")
+        return
+    app.processEvents()
+    text = panel.toPlainText()
+    sizes = page.splitter.sizes()
+    print(f"{label} panel:", text[:60].replace("\n", " "), "| sizes:", sizes)
+    if any(w not in text for w in words):
+        errors.append(f"{label}: panel should explain {words}")
+    if page.splitter.indexOf(panel) != 1 or min(sizes) <= 0:
+        errors.append(f"{label}: panel should be visible on the right side")
+    # Regression: the wizard gave the page only its size hint and the panel stopped halfway
+    print(f"{label} page height:", page.height(), "of", wz.height())
+    if page.height() < 0.75 * wz.height():
+        errors.append(f"{label}: the two sides should fill the page height")
+_check_panel(p1, ["Camada de contorno", "Tolerância", "Grade vetorial", "Pasta de saída"], "Step 1")
+from agriprecisa.i18n import tr as _tr
+if "Efeito de borda" not in _tr("help_page1") or "Tolerância:" in _tr("help_page1"):
+    errors.append("help of step 1 should explain the concept, not repeat the options")
+shot_p1 = os.environ.get("AGRIPRECISA_SHOT_P1")
+if shot_p1:
+    app.processEvents(); wz.grab().save(shot_p1)
 wz.next()
 if popups:
     print("popups:", popups)
@@ -254,6 +280,12 @@ for i in range(page.tree.topLevelItemCount()):
     rows[it.text(0)] = (not it.icon(1).isNull(), it.toolTip(1), it.text(2))
 print("Step 2 rows:", {k: ("WARNING ICON" if v[0] else "no icon", v[2]) for k, v in rows.items()})
 print("Step 2 subtitle:", page.subTitle())
+_check_panel(page, ["densidade", "EPSG", "seta"], "Step 2")
+if "Densidade amostral" not in _tr("help_page2") or "seta" in _tr("help_page2"):
+    errors.append("help of step 2 should explain the concept, not repeat the options")
+shot_p2 = os.environ.get("AGRIPRECISA_SHOT_P2")
+if shot_p2:
+    app.processEvents(); wz.grab().save(shot_p2)
 if "2,50 ha" not in page.subTitle():
     errors.append("field area (2,50 ha) missing from step 2 header")
 amostras = page.tree.findItems("amostras [EPSG:31982]", Qt.MatchFlag.MatchExactly, 0)[0]
@@ -341,9 +373,9 @@ if _pos[1] != 1 or _pos[2] != 2:
     errors.append("the map preview should fill the whole right column")
 if not p3.box_advanced.isCollapsed():
     errors.append("the search radius should start inside a collapsed 'Avançado' box")
-print("Neighbours text:", p3.label_n.text()[:90])
-if "<b>4</b>" not in p3.label_n.text() or "<b>16</b>" not in p3.label_n.text():
-    errors.append("step 3 should show the default 4 to 16 neighbours")
+# 1.7.0: the neighbours box (text and influence bars) was removed from step 3
+if hasattr(p3, "bars") or hasattr(p3, "label_n"):
+    errors.append("the 'Vizinhas por pixel' box should no longer exist in step 3")
 # preview attribute selector
 p3.combo_attr.setCurrentIndex(1)
 p3.refresh_preview()
@@ -387,21 +419,6 @@ if shot3:
 # slider ranges: P 0.5 to 5.0, radius 1x to 10x (the radius only limits computation now)
 if (p3.slider_p.minimum(), p3.slider_p.maximum(), p3.slider_r.minimum(), p3.slider_r.maximum()) != (5, 50, 10, 100):
     errors.append("sliders should cover P 0.5-5.0 and radius 1x-10x")
-# influence bars: shares of a typical pixel sum to 100 %, nearest gets more with higher P
-p3.slider_p.setValue(10); p3.refresh_preview()
-low_rows, low_rest = p3.bars.shares()
-p3.slider_p.setValue(40); p3.refresh_preview()
-high_rows, high_rest = p3.bars.shares()
-print("Bars P=1:", [round(v, 3) for _, v in low_rows], "| P=4:", [round(v, 3) for _, v in high_rows])
-# bars show only the neighbours really used: between the minimum (4) and the maximum (16)
-_nb = p3.bars.distances.size
-print("Neighbours used by the typical pixel:", _nb)
-if not (4 <= _nb <= 16):
-    errors.append(f"influence bars should show 4 to 16 neighbours, got {_nb}")
-if abs(sum(v for _, v in high_rows) + high_rest - 1.0) > 1e-9 or not high_rows:
-    errors.append("influence shares should add up to 100 %")
-elif not high_rows[0][1] > low_rows[0][1]:
-    errors.append("higher P should give more influence to the nearest sample")
 p3.slider_p.setValue(45)                              # argila: P = 4,5 (beyond the old limit of 3)
 p3.validatePage()
 print("Wizard params:", wz.params, wz.param_origins, wz.pixel)
@@ -466,9 +483,8 @@ else:
     cols = [dlg.table.horizontalHeaderItem(c).text() for c in range(dlg.table.columnCount())]
     if cols[0] != "até 4\nvizinhas" or cols[-1] != "até 32\nvizinhas":
         errors.append(f"cross-validation columns should be the maximum of neighbours, got {cols}")
-    if f"até {q3.max_neighbours()}" not in q3.label_n.text().replace("<b>", "").replace("</b>", "") \
-            and str(q3.max_neighbours()) not in q3.label_n.text():
-        errors.append("step 3 should show the maximum chosen by the auto-fit")
+    if q3.table.item(0, 2).text() != f"4 a {q3.max_neighbours()}":
+        errors.append("summary table should show the maximum chosen by the auto-fit")
     if q3.table.item(0, 4).text() != "automático" or q3.table.item(1, 4).text() != "padrão":
         errors.append("'Ajuste automático' must change only the selected attribute")
     # Regression: the suggested P (e.g. 0,6) was outside the rows of the table (P 1 to 3)
@@ -525,7 +541,7 @@ if content.minimumSizeHint().width() > q3.scroll.viewport().width() + 1 if (cont
 content = q3.scroll.widget()
 print("Step 3 content min height:", content.minimumSizeHint().height(), "| visible:", q3.scroll.viewport().height(),
       "| scrollbar:", q3.scroll.verticalScrollBar().isVisible())
-for lbl in (q3.label_p_text, q3.label_r_text, q3.label_spacing, q3.label_n):
+for lbl in (q3.label_p_text, q3.label_r_text, q3.label_spacing):
     if lbl.height() < lbl.minimumHeight():
         errors.append("step 3 text squeezed below its minimum height")
 shot4 = os.environ.get("AGRIPRECISA_SHOT4")

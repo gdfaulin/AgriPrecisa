@@ -2,9 +2,7 @@
 """
 AgriPrecisa: small didactic widgets used by the wizard.
 
-InfluenceBars : share of each neighbouring sample actually used (lambda = w_i / sum w_j, 100 % in total)
-                in the estimate of a typical pixel of the field.
-PreviewMap    : low-resolution live IDW map of the field with the real samples.
+PreviewMap : low-resolution live IDW map of the field with the real samples.
 """
 
 import numpy as np
@@ -14,87 +12,9 @@ from qgis.PyQt.QtGui import QColor, QImage, QPainter, QPen, QBrush
 from qgis.PyQt.QtWidgets import QSizePolicy, QWidget
 from qgis.core import QgsStyle
 
-from ..core.idw_math import NODATA, idw_grid, normalized_weights, MIN_NEIGHBOURS
+from ..core.idw_math import NODATA, idw_grid, MIN_NEIGHBOURS
 from ..core.pipeline import field_cell_centres
 from ..i18n import tr, fmt
-
-CURVE_COLOR = QColor(26, 150, 65)        # green of the RdYlGn ramp
-REF_COLOR = QColor(120, 120, 120)
-MAX_BARS = 6
-
-
-def _small_font(painter):
-    font = painter.font()
-    font.setPointSizeF(max(font.pointSizeF() - 1, 7))
-    painter.setFont(font)
-    return painter.fontMetrics().height()
-
-
-class InfluenceBars(QWidget):
-    """Horizontal bars: share (%) of each neighbour in the estimate of a typical pixel."""
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setMinimumSize(210, 180)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.setToolTip(tr("p3_bars_tip"))
-        self.distances = np.array([])
-        self.power = 2.0
-
-    def set_data(self, distances, power):
-        self.distances = np.asarray(distances, float)
-        self.power = power
-        self.update()
-
-    def shares(self):
-        """(rows, rest): up to MAX_BARS (distance, share) and the share of the others."""
-        lam = normalized_weights(self.distances, self.power)
-        rows = list(zip(self.distances[:MAX_BARS], lam[:MAX_BARS]))
-        rest = float(lam[MAX_BARS:].sum()) if lam.size > MAX_BARS else 0.0
-        return rows, rest
-
-    def paintEvent(self, event):
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        fh = _small_font(p)
-        pal = self.palette()
-        text_color = pal.color(pal.ColorRole.WindowText)
-        if self.distances.size == 0:
-            p.setPen(text_color)
-            p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap,
-                       tr("p3_bars_empty"))
-            p.end()
-            return
-        rows, rest = self.shares()
-        labels = [tr("p3_bars_row", k=k + 1, d=fmt(d, 1)) for k, (d, _) in enumerate(rows)]
-        values = [s for _, s in rows]
-        if rest > 0:
-            labels.append(tr("p3_bars_rest", n=fmt(self.distances.size - MAX_BARS)))
-            values.append(rest)
-        label_w = max(p.fontMetrics().horizontalAdvance(t) for t in labels) + 8
-        pct_w = p.fontMetrics().horizontalAdvance("100%") + 6
-        top = 2
-        bottom = fh + 6
-        bar_area = self.width() - label_w - pct_w - 6
-        row_h = min(2 * fh, (self.height() - top - bottom) / max(len(labels), 1))
-        for i, (text, v) in enumerate(zip(labels, values)):
-            y = top + i * row_h
-            p.setPen(text_color)
-            p.drawText(QRectF(0, y, label_w - 4, row_h), Qt.AlignmentFlag.AlignRight |
-                       Qt.AlignmentFlag.AlignVCenter, text)
-            bw = max(bar_area * v, 1.0)
-            p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QBrush(CURVE_COLOR if i < len(rows) else REF_COLOR))
-            p.drawRect(QRectF(label_w, y + row_h * 0.2, bw, row_h * 0.6))
-            p.setPen(text_color)
-            p.drawText(QRectF(label_w + bw + 4, y, pct_w + 20, row_h),
-                       Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-                       fmt(v * 100) + "%")
-        p.setPen(text_color)
-        p.drawText(QRectF(0, self.height() - fh - 2, self.width(), fh), Qt.AlignmentFlag.AlignHCenter,
-                   tr("p3_bars_total", n=fmt(self.distances.size)))
-        p.end()
-
 
 class PreviewMap(QWidget):
     """Low-resolution IDW of one attribute, masked by the field boundary."""
