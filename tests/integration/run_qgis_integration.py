@@ -184,7 +184,7 @@ print(f"Gap between passes: {blank} blank cells, fallback in {pct:.1f}% of the f
       "warning:", r_g["warnings"][:1])
 if blank:
     errors.append(f"{blank} blank cells where the radius reached no sample")
-if not (pct > 0 and r_g["warnings"] and "amostras mais próximas" in r_g["warnings"][0]):
+if not (pct > 0 and r_g["warnings"] and "mais próximas" in r_g["warnings"][0]):
     errors.append("the final message should warn about the area that used the nearest samples")
 
 # 3) GUI pieces: wizard construction in 3 languages, styling and results loading
@@ -280,7 +280,7 @@ shot = os.environ.get("AGRIPRECISA_SHOT")
 if shot:
     wz.grab().save(shot)
 
-# 3c) Step 3: sliders, texts, spacing, weight chart, influence bars and live preview
+# 3c) Step 3: sliders, texts, spacing, neighbours, influence bars and live preview
 from qgis.core import QgsSettings
 for k in range(amostras.childCount()):
     amostras.child(k).setCheckState(0, Qt.CheckState.Checked)
@@ -299,8 +299,12 @@ p3.check_points.setChecked(False)
 if p3.preview.show_points:
     errors.append("'Mostrar amostras' did not hide the samples")
 p3.check_points.setChecked(True)
-if abs(p3.radius() - round(2 * p3.spacing, 1)) > 0.05:
-    errors.append("default radius should be 2x the spacing")
+# 1.6.0: the default radius reaches the 16 neighbours in 95 % of the field and the 4 everywhere,
+# so step 3 opens without the orange warning
+if p3.label_r_gap.isVisibleTo(p3) or p3.gap_percent() > 0:
+    errors.append("default radius should reach the minimum of neighbours in the whole field")
+if p3.radius_status()[0] != "ok":
+    errors.append("default radius should not limit the maximum of neighbours")
 p3.slider_p.setValue(30)
 p3.slider_r.setValue(12)
 app.processEvents()
@@ -327,8 +331,19 @@ if not (0.9 * 25000 < inside_cells * cell_area < 1.1 * 25000):
     errors.append("preview mask should cover about the field area (25000 m2)")
 if p3.preview.image is None or p3.preview.value_range is None:
     errors.append("live preview not rendered")
-if p3.curve.power != 2.0:
-    errors.append("weight curve not following P")
+# 1.6.0: weight curve removed; the preview fills the whole right column
+if hasattr(p3, "curve"):
+    errors.append("the weight curve should no longer exist in step 3")
+_g = next(l for l in p3.scroll.widget().layout().children() if hasattr(l, "getItemPosition"))
+_pos = _g.getItemPosition(_g.indexOf(p3.box_preview))
+print("Preview position (row, col, rowspan, colspan):", _pos)
+if _pos[1] != 1 or _pos[2] != 2:
+    errors.append("the map preview should fill the whole right column")
+if not p3.box_advanced.isCollapsed():
+    errors.append("the search radius should start inside a collapsed 'Avançado' box")
+print("Neighbours text:", p3.label_n.text()[:90])
+if "<b>4</b>" not in p3.label_n.text() or "<b>16</b>" not in p3.label_n.text():
+    errors.append("step 3 should show the default 4 to 16 neighbours")
 # preview attribute selector
 p3.combo_attr.setCurrentIndex(1)
 p3.refresh_preview()
@@ -344,8 +359,10 @@ if p3.slider_p.value() != 20 or p3.power() != 2.0:
 p3.combo_attr.setCurrentIndex(0)                     # back to argila
 if p3.slider_p.value() != 30:
     errors.append("argila lost its own P after switching attributes")
-origins = [p3.table.item(r, 3).text() for r in range(p3.table.rowCount())]
-print("Summary table:", [[p3.table.item(r, c).text() for c in range(4)] for r in range(p3.table.rowCount())])
+origins = [p3.table.item(r, 4).text() for r in range(p3.table.rowCount())]
+print("Summary table:", [[p3.table.item(r, c).text() for c in range(5)] for r in range(p3.table.rowCount())])
+if p3.table.item(0, 2).text() != "4 a 16":
+    errors.append("summary table should show the neighbours (4 a 16)")
 if origins != ["manual", "padrão"]:
     errors.append(f"origins should be manual / padrão, got {origins}")
 p3.table.selectRow(1)
@@ -367,19 +384,20 @@ if cmp_dir:
 shot3 = os.environ.get("AGRIPRECISA_SHOT3")
 if shot3:
     wz.grab().save(shot3)
-# wider slider ranges replace the old standard layout: P 0.5 to 5.0, radius 1x to 6x
-if (p3.slider_p.minimum(), p3.slider_p.maximum(), p3.slider_r.minimum(), p3.slider_r.maximum()) != (5, 50, 10, 60):
-    errors.append("sliders should cover P 0.5-5.0 and radius 1x-6x")
-# weight chart follows Shepard (1968): weight 1 at the typical distance, no plateau at d = 0
-print("Curve d_ref:", round(p3.curve.d_ref, 2), "typical:", round(p3.typical, 2))
-if abs(p3.curve.d_ref - p3.typical) > 1e-6:
-    errors.append("weight curve should be relative to the typical pixel-to-sample distance")
+# slider ranges: P 0.5 to 5.0, radius 1x to 10x (the radius only limits computation now)
+if (p3.slider_p.minimum(), p3.slider_p.maximum(), p3.slider_r.minimum(), p3.slider_r.maximum()) != (5, 50, 10, 100):
+    errors.append("sliders should cover P 0.5-5.0 and radius 1x-10x")
 # influence bars: shares of a typical pixel sum to 100 %, nearest gets more with higher P
 p3.slider_p.setValue(10); p3.refresh_preview()
 low_rows, low_rest = p3.bars.shares()
 p3.slider_p.setValue(40); p3.refresh_preview()
 high_rows, high_rest = p3.bars.shares()
 print("Bars P=1:", [round(v, 3) for _, v in low_rows], "| P=4:", [round(v, 3) for _, v in high_rows])
+# bars show only the neighbours really used: between the minimum (4) and the maximum (16)
+_nb = p3.bars.distances.size
+print("Neighbours used by the typical pixel:", _nb)
+if not (4 <= _nb <= 16):
+    errors.append(f"influence bars should show 4 to 16 neighbours, got {_nb}")
 if abs(sum(v for _, v in high_rows) + high_rest - 1.0) > 1e-9 or not high_rows:
     errors.append("influence shares should add up to 100 %")
 elif not high_rows[0][1] > low_rows[0][1]:
@@ -387,8 +405,8 @@ elif not high_rows[0][1] > low_rows[0][1]:
 p3.slider_p.setValue(45)                              # argila: P = 4,5 (beyond the old limit of 3)
 p3.validatePage()
 print("Wizard params:", wz.params, wz.param_origins, wz.pixel)
-if len(wz.params) != 2 or wz.params[0][0] != 4.5 or wz.params[1][0] != 2.0:
-    errors.append("wizard should hand one (P, radius) per attribute to the job")
+if len(wz.params) != 2 or wz.params[0][0] != 4.5 or wz.params[1][0] != 2.0 or wz.params[0][2] != 16:
+    errors.append("wizard should hand one (P, radius, max neighbours) per attribute to the job")
 wz.hide()
 
 # 3d) Sensor passes (like EC): coverage distance and cross-validation
@@ -441,9 +459,17 @@ else:
     best_p = dlg.result_summary["power"]
     if abs(q3.slider_p.value() / 10.0 - best_p) > 1e-6:
         errors.append("'Aplicar' did not move the P slider to the suggested value")
-    if abs(q3.slider_r.value() / 10.0 - dlg.result_summary["multiple"]) > 1e-6:
-        errors.append("'Aplicar' did not move the radius slider")
-    if q3.table.item(0, 3).text() != "automático" or q3.table.item(1, 3).text() != "padrão":
+    if q3.max_neighbours() != dlg.result_summary["max_neighbours"]:
+        errors.append("'Aplicar' did not set the maximum of neighbours")
+    if abs(q3.radius() - round(dlg.result_summary["radius"], 1)) > 1e-6:
+        errors.append("'Aplicar' did not set the radius computed for the maximum")
+    cols = [dlg.table.horizontalHeaderItem(c).text() for c in range(dlg.table.columnCount())]
+    if cols[0] != "até 4\nvizinhas" or cols[-1] != "até 32\nvizinhas":
+        errors.append(f"cross-validation columns should be the maximum of neighbours, got {cols}")
+    if f"até {q3.max_neighbours()}" not in q3.label_n.text().replace("<b>", "").replace("</b>", "") \
+            and str(q3.max_neighbours()) not in q3.label_n.text():
+        errors.append("step 3 should show the maximum chosen by the auto-fit")
+    if q3.table.item(0, 4).text() != "automático" or q3.table.item(1, 4).text() != "padrão":
         errors.append("'Ajuste automático' must change only the selected attribute")
     # Regression: the suggested P (e.g. 0,6) was outside the rows of the table (P 1 to 3)
     rows_p = [dlg.table.verticalHeaderItem(r).text() for r in range(dlg.table.rowCount())]
@@ -458,20 +484,29 @@ else:
 q3.run_cv_all()
 print("CV all:", q3.last_cv_all)
 st_ce, st_ce2 = (q3.state[k] for k in q3.keys)
-print("Per attribute:", {q3.labels[k]: (q3.state[k]["power"], q3.state[k]["radius"]) for k in q3.keys})
-if [q3.table.item(r, 3).text() for r in range(2)] != ["automático", "automático"]:
+print("Per attribute:", {q3.labels[k]: (q3.state[k]["power"], q3.state[k]["max_n"], q3.state[k]["radius"])
+                         for k in q3.keys})
+if [q3.table.item(r, 4).text() for r in range(2)] != ["automático", "automático"]:
     errors.append("'Ajuste automático para todos' should apply to every attribute")
-if (st_ce["power"], st_ce["radius"]) == (st_ce2["power"], st_ce2["radius"]):
+if (st_ce["power"], st_ce["max_n"]) == (st_ce2["power"], st_ce2["max_n"]):
     errors.append("CE (smooth) and CE2 (short-range) should get different parameters")
 if not infos or "CE2" not in infos[-1]:
     errors.append("summary message of 'Ajuste automático para todos' missing")
 # step 3 warns when the radius does not reach samples in part of the field
 q3.select_attribute(0)
-q3.slider_r.setValue(10)                               # 1x coverage: ~5 % of the field is farther
+q3.box_advanced.setCollapsed(False)
+q3.slider_r.setValue(10)                               # 1x coverage: many pixels reach fewer than 4
 print("Gap warning:", q3.label_r_gap.isVisibleTo(q3), q3.label_r_gap.text()[:70])
-if not q3.label_r_gap.isVisibleTo(q3) or "amostras mais próximas" not in q3.label_r_gap.text():
+# Regression: the warning was drawn over the title of the collapsed 'Avançado' box
+if q3.label_r_gap.parentWidget() is q3.box_advanced or q3.box_advanced.isAncestorOf(q3.label_r_gap):
+    errors.append("the orange warning should stay outside the collapsible box")
+q3.box_advanced.setCollapsed(True); app.processEvents()
+if not q3.label_r_gap.isVisibleTo(q3):
+    errors.append("the orange warning should stay visible with 'Avançado' collapsed")
+q3.box_advanced.setCollapsed(False)
+if not q3.label_r_gap.isVisibleTo(q3) or "mais próximas" not in q3.label_r_gap.text():
     errors.append("step 3 should warn when the radius leaves part of the field without samples")
-q3.slider_r.setValue(30)
+q3.slider_r.setValue(40)
 if q3.label_r_gap.isVisibleTo(q3):
     errors.append("warning should disappear when the radius covers the whole field")
 # names of the buttons
@@ -479,9 +514,10 @@ if (q3.button_cv_this.text(), q3.button_cv_all.text()) != ("Ajuste automático",
     errors.append("button texts should be 'Ajuste automático' / 'Ajuste automático para todos'")
 q3.select_attribute(1)
 q3.refresh_preview(); app.processEvents()
-# Regression: a suggested radius of 1,5x read "Raio curto" (10,8 / 7,23 = 1,49 before rounding)
-if "Raio recomendado" not in q3.label_r_text.text():
-    errors.append("1,5x radius should be described as recommended")
+# the radius set by the auto-fit does not cut the maximum: the text must say so
+print("Radius text after auto-fit:", q3.label_r_text.text()[:60])
+if "O raio não limita" not in q3.label_r_text.text():
+    errors.append("after the auto-fit the radius should be described as not limiting")
 # Regression: right column (weight chart and bars) was cut when the content was wider than the window
 if content.minimumSizeHint().width() > q3.scroll.viewport().width() + 1 if (content := q3.scroll.widget()) else False:
     errors.append("step 3 content wider than the default window")
@@ -489,7 +525,7 @@ if content.minimumSizeHint().width() > q3.scroll.viewport().width() + 1 if (cont
 content = q3.scroll.widget()
 print("Step 3 content min height:", content.minimumSizeHint().height(), "| visible:", q3.scroll.viewport().height(),
       "| scrollbar:", q3.scroll.verticalScrollBar().isVisible())
-for lbl in (q3.label_p_text, q3.label_r_text, q3.label_spacing):
+for lbl in (q3.label_p_text, q3.label_r_text, q3.label_spacing, q3.label_n):
     if lbl.height() < lbl.minimumHeight():
         errors.append("step 3 text squeezed below its minimum height")
 shot4 = os.environ.get("AGRIPRECISA_SHOT4")

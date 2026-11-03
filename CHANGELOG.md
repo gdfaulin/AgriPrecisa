@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.0 (2026)
+- Minimum and maximum of neighbours per pixel, as in GIS interpolators (Surfer, ArcGIS, SAGA): every pixel uses at least 4 samples, even beyond the search radius, and at most the maximum (default 16), the nearest ones. The search radius now only saves computation in very dense sampling.
+- Auto-fit: the cross-validation table now crosses P with the maximum of neighbours (4 to 32); the search radius is computed so it reaches the chosen maximum in 95% of the field.
+- Step 3: the weight curve was removed and the map preview fills the whole right column; the neighbours (with the influence bars of the neighbours actually used) are shown below the power; the search radius moved to a collapsed "Advanced" box with a new explanation; the summary table shows the neighbours of each attribute.
+- Processing toolbox: new "Minimum of neighbours" and "Maximum of neighbours" parameters; auto-fit chooses P and the maximum.
+- Help texts reviewed in the three languages.
+
 ## 1.5.2 (2026)
 - Fix: pixels that the search radius did not reach (for example, a wider gap between sensor passes near the border) were left without value, and the grid cells over them came out blank. These pixels now use the 4 nearest samples (regression tests).
 - Step 3 shows an orange warning with the % of the field the radius does not reach; the final message reports it per attribute.

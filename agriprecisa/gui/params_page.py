@@ -3,13 +3,17 @@
 AgriPrecisa: wizard step 3, IDW parameters PER ATTRIBUTE.
 
 Each attribute has its own spatial dependence and variability, so each one keeps its own
-power P and search radius. The attribute selector at the top drives the sliders, the
-weight x distance curve and the map preview; a summary table lists P, radius and origin
+power P, maximum of neighbours and search radius. The attribute selector at the top drives
+the controls and the map preview; a summary table lists P, neighbours, radius and origin
 (default, cross-validation or manual) of every attribute.
 
-Single teaching layout: sliders P 0.5 to 5.0 (step 0.1) and radius 1x to 6x the attribute's
-coverage distance, with simple explanations and "Learn more" links; weight curve and the
-share of each neighbour in a typical pixel (Shepard, 1968); live map preview.
+Neighbours follow the usual rule of GIS interpolators: at least MIN_NEIGHBOURS samples per
+pixel (beyond the radius if needed) and at most the attribute's maximum (the nearest ones).
+The maximum is shown as text and chosen by the auto-fit together with P; the radius only
+saves computation and sits in a collapsed "Advanced" box.
+
+Left column: P slider, neighbours (with the share of each neighbour in a typical pixel,
+Shepard 1968), advanced radius and summary table. Right column: live map preview.
 """
 
 import numpy as np
@@ -17,30 +21,34 @@ import numpy as np
 from qgis.PyQt.QtCore import Qt, QTimer, QCoreApplication
 from qgis.PyQt.QtGui import QFont
 from qgis.PyQt.QtWidgets import (
-    QWizardPage, QVBoxLayout, QHBoxLayout, QFormLayout, QGridLayout, QLabel, QSlider,
+    QWizardPage, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QSlider,
     QDoubleSpinBox, QWidget, QGroupBox,
     QComboBox, QMessageBox, QCheckBox, QPushButton, QApplication, QTableWidget,
     QTableWidgetItem, QAbstractItemView, QHeaderView, QProgressDialog, QScrollArea, QFrame,
 )
 from qgis.core import QgsProject
+from qgis.gui import QgsCollapsibleGroupBox
 
 from ..core.idw_math import (
-    snap_extent, sample_density, power_band, radius_band, coverage_distances,
-    suggest_parameters, typical_pixel_neighbours, STUDENT_POWER_MIN, STUDENT_POWER_MAX, STUDENT_RADIUS_MIN,
-    STUDENT_RADIUS_MAX, DEFAULT_RADIUS_MULTIPLE, CV_MIN_VALIDATION, FALLBACK_NEIGHBOURS,
+    snap_extent, sample_density, power_band, suggest_parameters, typical_pixel_neighbours,
+    nearest_k_distances, share_beyond_radius, select_neighbour_distances, radius_from_knn,
+    STUDENT_POWER_MIN, STUDENT_POWER_MAX, STUDENT_RADIUS_MIN, STUDENT_RADIUS_MAX,
+    DEFAULT_RADIUS_MULTIPLE, CV_MIN_VALIDATION, CV_MAX_NEIGHBOURS, MIN_NEIGHBOURS,
+    DEFAULT_MAX_NEIGHBOURS,
 )
 from ..core.pipeline import buffered, extract_points, edge_distances
 from ..i18n import tr, fmt
-from .widgets import WeightCurve, PreviewMap, InfluenceBars
+from .widgets import PreviewMap, InfluenceBars
 from .cv_dialog import CrossValidationDialog, significant_decimals
 
 POWER_TEXT = {"low": "p3_power_low", "mid": "p3_power_mid", "high": "p3_power_high"}
-RADIUS_TEXT = {"short": "p3_radius_short", "ok": "p3_radius_ok", "long": "p3_radius_long"}
+RADIUS_TEXT = {"short": "p3_radius_short", "ok": "p3_radius_ok", "limits": "p3_radius_limits"}
+RADIUS_LIMIT_SHARE = 5.0  # % of the field above which the radius is said to cut the maximum
 ORIGIN_TEXT = {"default": "origin_default", "cv": "origin_cv", "manual": "origin_manual"}
 ORIGIN_TIP = {"default": "origin_default_tip", "cv": "origin_cv_tip", "manual": "origin_manual_tip"}
 SHOW_POINTS_LIMIT = 500   # above this, samples start hidden in the preview
 DEFAULT_POWER = 2.0
-SUM_ATTR, SUM_P, SUM_R, SUM_ORIGIN = 0, 1, 2, 3
+SUM_ATTR, SUM_P, SUM_N, SUM_R, SUM_ORIGIN = 0, 1, 2, 3, 4
 
 
 def _link(key):
@@ -56,7 +64,7 @@ class ParametersPage(QWizardPage):
         self.setSubTitle(tr("p3_subtitle"))
         self.keys = []            # (layer_id, field) in the order of the wizard items
         self.labels = {}          # key -> "field (layer)"
-        self.state = {}           # key -> dict(power, radius, origin, coverage, typical, density)
+        self.state = {}           # key -> dict(power, max_n, radius, origin, coverage, typical, density, knn)
         self.points_cache = {}
         self.edge_cache = {}
         self.cv_cache = {}
@@ -78,41 +86,28 @@ class ParametersPage(QWizardPage):
         top.addWidget(self.combo_attr)
         top.addStretch()
 
-        # ---- left column: power / radius (stack) and summary --------------
+        # ---- left column: power, neighbours, advanced radius and summary ------
         self.controls = self._build_student()
         box_s = self._build_summary()
 
-        # ---- right column: curve and preview -------------------------------
-        box_c = QGroupBox(tr("p3_curve_group"))
-        self.curve = WeightCurve()
-        self.bars = InfluenceBars()
-        self.label_bars = QLabel("<b>" + tr("p3_bars_title") + "</b>")
-        self.label_bars.setWordWrap(True)
-        more_w = QLabel(_link("p3_weight_more"))
-        more_w.linkActivated.connect(self.show_more)
-        bars_col = QVBoxLayout()
-        bars_col.addWidget(self.label_bars)
-        bars_col.addWidget(self.bars, 1)
-        bars_col.addWidget(more_w, 0, Qt.AlignmentFlag.AlignRight)
-        lc = QHBoxLayout(box_c)
-        lc.addWidget(self.curve, 3)
-        lc.addLayout(bars_col, 2)
+        # ---- right column: map preview over the whole height -----------------
         box_m = QGroupBox(tr("p3_preview_group"))
         self.preview = PreviewMap()
+        self.preview.setMinimumSize(380, 420)
         self.preview.setToolTip(tr("p3_preview_note"))
         self.check_points = QCheckBox(tr("p3_show_samples"))
         self.check_points.toggled.connect(self.preview.set_show_points)
         lm = QVBoxLayout(box_m)
         lm.addWidget(self.check_points, 0, Qt.AlignmentFlag.AlignRight)
         lm.addWidget(self.preview, 1)
+        self.box_preview = box_m
 
         grid = QGridLayout()
         grid.addWidget(self.controls, 0, 0)
         grid.addWidget(box_s, 1, 0)
-        grid.addWidget(box_c, 0, 1)
-        grid.addWidget(box_m, 1, 1)
-        grid.setColumnStretch(0, 4)
-        grid.setColumnStretch(1, 5)
+        grid.addWidget(box_m, 0, 1, 2, 1)
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
         grid.setRowStretch(1, 1)
 
         # ---- pixel size (all attributes) ------------------------------------
@@ -178,7 +173,27 @@ class ParametersPage(QWizardPage):
         lp.addLayout(row)
         lp.addWidget(self.label_p_text)
 
-        box_r = QGroupBox(tr("p3_radius_group"))
+        # neighbours: chosen by the auto-fit, shown as text, with the influence bars
+        box_n = QGroupBox(tr("p3_neigh_group"))
+        self.label_n = QLabel()
+        self.label_n.setWordWrap(True)
+        self.label_n.setMinimumHeight(3 * self.fontMetrics().lineSpacing() + 4)
+        self.label_n.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        self.label_n.linkActivated.connect(self.show_more)
+        self.bars = InfluenceBars()
+        self.bars.setMinimumSize(210, 150)
+        self.label_bars = QLabel("<b>" + tr("p3_bars_title") + "</b>")
+        self.label_bars.setWordWrap(True)
+        more_w = QLabel(_link("p3_weight_more"))
+        more_w.linkActivated.connect(self.show_more)
+        ln = QVBoxLayout(box_n)
+        ln.addWidget(self.label_n)
+        ln.addWidget(self.label_bars)
+        ln.addWidget(self.bars, 1)
+        ln.addWidget(more_w, 0, Qt.AlignmentFlag.AlignRight)
+
+        # advanced: search radius (only saves computation), collapsed like in QGIS tools
+        box_r = QgsCollapsibleGroupBox(tr("p3_advanced_group"))
         self.label_spacing = QLabel()
         self.label_spacing.setWordWrap(True)
         self.label_spacing.setMinimumHeight(2 * self.fontMetrics().lineSpacing() + 2)
@@ -208,29 +223,33 @@ class ParametersPage(QWizardPage):
         lr.addWidget(self.label_spacing)
         lr.addLayout(row)
         lr.addWidget(self.label_r_text)
-        lr.addWidget(self.label_r_gap)
+        box_r.setCollapsed(True)
+        self.box_advanced = box_r
 
         lay.addWidget(box_p)
+        lay.addWidget(box_n, 1)
         lay.addWidget(box_r)
+        lay.addWidget(self.label_r_gap)      # outside the box: visible even when collapsed
         self.slider_p.valueChanged.connect(self.on_student_changed)
         self.slider_r.valueChanged.connect(self.on_student_changed)
         return page
 
     def _build_summary(self):
         box = QGroupBox(tr("p3_summary_group"))
-        self.table = QTableWidget(0, 4)
+        self.table = QTableWidget(0, 5)
         self.table.setHorizontalHeaderLabels(
-            [tr("sum_col_attr"), tr("sum_col_p"), tr("sum_col_r"), tr("sum_col_origin")])
+            [tr("sum_col_attr"), tr("sum_col_p"), tr("sum_col_n"), tr("sum_col_r"),
+             tr("sum_col_origin")])
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.table.verticalHeader().setVisible(False)
         hh = self.table.horizontalHeader()
         hh.setSectionResizeMode(SUM_ATTR, QHeaderView.ResizeMode.Stretch)
-        for c in (SUM_P, SUM_R, SUM_ORIGIN):
+        for c in (SUM_P, SUM_N, SUM_R, SUM_ORIGIN):
             hh.setSectionResizeMode(c, QHeaderView.ResizeMode.ResizeToContents)
         self.table.itemSelectionChanged.connect(self.on_table_selection)
-        self.table.setMinimumHeight(3 * self.fontMetrics().lineSpacing() + 30)
+        self.table.setMinimumHeight(4 * self.fontMetrics().lineSpacing() + 30)
 
         self.button_cv_this = QPushButton(tr("cv_this"))
         self.button_cv_this.setToolTip(tr("cv_this_tip"))
@@ -273,14 +292,26 @@ class ParametersPage(QWizardPage):
             self.keys.append(key)
             self.labels[key] = f"{field} ({layer.name()})"
             xs, ys, _ = self.points_for(key)
-            typical, cover, nearest = coverage_distances(px, py, xs, ys, return_nearest=True)
+            # distances from each preview pixel to its 1st..32nd nearest samples: coverage,
+            # minimum and maximum of neighbours are all read from this one matrix
+            knn = nearest_k_distances(px, py, xs, ys, max(CV_MAX_NEIGHBOURS))
+            nearest = knn[:, 0][np.isfinite(knn[:, 0])] if knn.size else np.array([])
+            if nearest.size:
+                typical = float(np.percentile(nearest, 50))
+                cover = float(np.percentile(nearest, 95))
+            else:
+                typical = cover = None
             fs = getattr(w, "layer_stats", {}).get(layer.id(), {}).get("fields", {}).get(field, {})
             density = sample_density(fs.get("inside") or fs.get("used") or 0, w.area_ha)
             st = {"coverage": cover, "typical": typical, "density": density, "nearest": nearest,
-                  "power": DEFAULT_POWER, "origin": "default",
-                  "radius": round(DEFAULT_RADIUS_MULTIPLE * cover, 1) if cover else 100.0}
+                  "knn": knn, "power": DEFAULT_POWER, "max_n": DEFAULT_MAX_NEIGHBOURS,
+                  "origin": "default",
+                  # default radius follows the same rule as the auto-fit: it reaches the
+                  # 16 neighbours in 95 % of the field and the minimum in all of it
+                  "radius": (radius_from_knn(knn, DEFAULT_MAX_NEIGHBOURS, MIN_NEIGHBOURS, cover)
+                             if cover else 100.0)}
             if key in old_state and old_state[key].get("coverage") == cover:
-                for k in ("power", "radius", "origin"):   # coming back from step 4
+                for k in ("power", "max_n", "radius", "origin"):   # coming back from step 4
                     st[k] = old_state[key][k]
             self.state[key] = st
 
@@ -319,6 +350,9 @@ class ParametersPage(QWizardPage):
 
     def radius(self):
         return self.cur().get("radius", 0.0)
+
+    def max_neighbours(self):
+        return self.cur().get("max_n", DEFAULT_MAX_NEIGHBOURS)
 
     @property
     def spacing(self):
@@ -389,53 +423,68 @@ class ParametersPage(QWizardPage):
         p = self.power()
         self.label_p_value.setText("<b>" + tr("p3_power_value", p=fmt(p, 1)) + "</b>")
         self.label_p_text.setText(tr(POWER_TEXT[power_band(p)]) + "  " + _link("p3_power_more"))
+        origin = self.cur().get("origin", "default")
+        note = tr("p3_neigh_cv") if origin == "cv" else tr("p3_neigh_default")
+        self.label_n.setText(tr("p3_neigh_text", kmin=MIN_NEIGHBOURS, kmax=self.max_neighbours())
+                             + " " + note + "  " + _link("p3_neigh_more"))
         if self.spacing and self.radius() > 0:
-            # rounded like the slider, so 10,8 m / 7,23 m reads as 1,5x ("recommended")
             mult = round(self.radius() / self.spacing, 1)
             self.label_r_value.setText("<b>" + tr(
                 "p3_radius_value", mult=fmt(mult, 1), spacing=fmt(self.spacing),
                 radius=fmt(self.radius())) + "</b>")
-            self.label_r_text.setText(tr(RADIUS_TEXT[radius_band(mult)]) + "  " + _link("p3_radius_more"))
+            band, pct = self.radius_status()
+            self.label_r_text.setText(
+                tr(RADIUS_TEXT[band], kmin=MIN_NEIGHBOURS, kmax=self.max_neighbours(),
+                   pct=fmt(pct, 1)) + "  " + _link("p3_radius_more"))
         else:
             self.label_r_value.setText("")
             self.label_r_text.setText(_link("p3_radius_more"))
         gap = self.gap_percent()
         self.label_r_gap.setVisible(gap > 0)
         if gap > 0:
-            self.label_r_gap.setText("⚠ " + tr("p3_radius_gap", pct=fmt(gap, 1), k=FALLBACK_NEIGHBOURS))
+            self.label_r_gap.setText("⚠ " + tr("p3_radius_gap", pct=fmt(gap, 1), k=MIN_NEIGHBOURS))
         self.update_visuals()
 
     def gap_percent(self):
-        """% of the field (preview pixels) farther than the radius from every sample."""
-        nearest = self.cur().get("nearest")
-        r = self.radius()
-        if nearest is None or not len(nearest) or r <= 0:
+        """% of the field (preview pixels) where the radius reaches fewer than the minimum."""
+        knn = self.cur().get("knn")
+        if knn is None:
             return 0.0
-        return float(np.mean(nearest > r) * 100.0)
+        return share_beyond_radius(knn, MIN_NEIGHBOURS, self.radius())
+
+    def radius_status(self):
+        """
+        ('short', %) when the radius reaches fewer than the minimum somewhere; ('limits', %)
+        when it cuts the maximum in more than RADIUS_LIMIT_SHARE % of the field; else ('ok', 0).
+        """
+        gap = self.gap_percent()
+        if gap > 0:
+            return "short", gap
+        knn = self.cur().get("knn")
+        cut = share_beyond_radius(knn, self.max_neighbours(), self.radius()) if knn is not None else 0.0
+        if cut > RADIUS_LIMIT_SHARE:
+            return "limits", cut
+        return "ok", 0.0
 
     def update_visuals(self):
-        # weight relative to the typical pixel-to-sample distance (Shepard, 1968): it is 1 there,
-        # grows without limit towards the sample and decays beyond
-        d_ref = self.typical or (self.spacing or 10.0) / 2.0
-        self.curve.set_params(self.power(), self.radius(), d_ref)
         self.timer.start()
 
     def neighbour_distances(self):
-        """Sorted distances from a typical pixel to every sample of the current attribute."""
+        """Sorted distances from a typical pixel to the samples it really uses."""
         key = self.current
         if key is None:
             return np.array([])
         if key not in self.neigh_cache:
             xs, ys, _ = self.points_for(key)
             self.neigh_cache[key] = typical_pixel_neighbours(self.px, self.py, xs, ys, radius=0)
-        d = self.neigh_cache[key]
-        r = self.radius()
-        return d[d <= r] if r > 0 else d
+        return select_neighbour_distances(self.neigh_cache[key], self.radius(), MIN_NEIGHBOURS,
+                                          self.max_neighbours())
 
     def refresh_table(self):
         for row, key in enumerate(self.keys):
             st = self.state[key]
             values = [self.labels[key], fmt(st["power"], 1),
+                      tr("sum_n_value", kmin=MIN_NEIGHBOURS, kmax=st["max_n"]),
                       tr("no_limit") if st["radius"] == 0 else fmt(st["radius"]) + " m",
                       tr(ORIGIN_TEXT[st["origin"]])]
             for col, text in enumerate(values):
@@ -453,7 +502,7 @@ class ParametersPage(QWizardPage):
 
     # ------------------------------------------------------------- preview
     def refresh_preview(self):
-        self.preview.compute(self.power(), self.radius())
+        self.preview.compute(self.power(), self.radius(), self.max_neighbours())
         self.bars.set_data(self.neighbour_distances(), self.power())
 
     def show_more(self, key):
@@ -487,7 +536,7 @@ class ParametersPage(QWizardPage):
                 self.edge_cache[key] = edge_distances(self.wizard().boundary_geom, xs, ys)
             self.cv_cache[key] = suggest_parameters(xs, ys, zs, self.edge_cache[key],
                                                     st["coverage"], st["typical"],
-                                                    pixel_nearest=st["nearest"])
+                                                    pixels=(self.px, self.py))
         return self.cv_cache[key]
 
     def _cv_problem(self, res):
@@ -516,7 +565,7 @@ class ParametersPage(QWizardPage):
             self, attribute=self.labels[key], rmse=res["rmse"], coverage=res["coverage"],
             spacing=self.state[key]["coverage"], best=res["best"], best_power=res["power"],
             n_val=res["n_val"], exclusion=res["exclusion"], mean=res["mean"],
-            map_coverage=res["map_coverage"])
+            max_neighbours=res["max_neighbours"], radius=res["radius"])
         dlg.linkActivated.connect(self.show_more)
         self.last_dialog = dlg
         if dlg.exec():
@@ -541,7 +590,7 @@ class ParametersPage(QWizardPage):
                 continue
             self.apply_cv(key, res, refresh=False)
             lines.append(tr("cv_all_line", label=self.labels[key], p=fmt(res["power"], 1),
-                            mult=fmt(res["multiple"], 1), radius=fmt(res["radius"]),
+                            kmax=res["max_neighbours"], radius=fmt(res["radius"]),
                             rmse=fmt(res["best_rmse"], significant_decimals(res["rmse"]))))
         progress.setValue(len(self.keys))
         progress.close()
@@ -552,6 +601,7 @@ class ParametersPage(QWizardPage):
     def apply_cv(self, key, res, refresh=True):
         st = self.state[key]
         st["power"] = res["power"]
+        st["max_n"] = int(res["max_neighbours"])
         st["radius"] = round(res["radius"], 1)
         st["origin"] = "cv"
         if refresh:
@@ -560,7 +610,8 @@ class ParametersPage(QWizardPage):
     # --------------------------------------------------------------- finish
     def validatePage(self):
         w = self.wizard()
-        w.params = [(self.state[k]["power"], self.state[k]["radius"]) for k in self.keys]
+        w.params = [(self.state[k]["power"], self.state[k]["radius"], self.state[k]["max_n"])
+                    for k in self.keys]
         w.param_origins = [self.state[k]["origin"] for k in self.keys]
         w.pixel = self.spin_px.value()
         return True

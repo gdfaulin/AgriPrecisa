@@ -13,7 +13,7 @@ _LANG = None
 
 # Last plugin version for which every Help text (help_page*, *_more, alg_help) was reviewed.
 # Must be updated together with "version=" in metadata.txt (checked by tests/test_package.py).
-HELP_REVIEWED_VERSION = "1.5.2"
+HELP_REVIEWED_VERSION = "1.6.0"
 
 
 def current_language():
@@ -393,9 +393,10 @@ STRINGS = {
     "p3_title": {"pt": "Etapa 3 de 4: Parâmetros da interpolação IDW",
                  "en": "Step 3 of 4: IDW interpolation parameters",
                  "es": "Paso 3 de 4: Parámetros de la interpolación IDW"},
-    "p3_subtitle": {"pt": "Ajuste a potência, o raio de busca e o tamanho do pixel.",
-                    "en": "Set the power, the search radius and the pixel size.",
-                    "es": "Ajuste la potencia, el radio de búsqueda y el tamaño del píxel."},
+    "p3_subtitle": {
+        "pt": "Ajuste a potência e o tamanho do pixel; o ajuste automático escolhe também o número de vizinhas.",
+        "en": "Set the power and the pixel size; the auto-fit also chooses the number of neighbours.",
+        "es": "Ajuste la potencia y el tamaño del píxel; el ajuste automático elige también el número de vecinas."},
     "p3_power": {"pt": "Potência (P):", "en": "Power (P):", "es": "Potencia (P):"},
     "p3_radius": {"pt": "Raio de busca:", "en": "Search radius:", "es": "Radio de búsqueda:"},
     "p3_pixel": {"pt": "Tamanho do pixel:", "en": "Pixel size:", "es": "Tamaño del píxel:"},
@@ -406,75 +407,9 @@ STRINGS = {
                "en": "<b>Warning:</b> very large grid; processing may take a long time.",
                "es": "<b>Atención:</b> cuadrícula muy grande; el procesamiento puede tardar bastante."},
     "help_page3": {
-        "pt": "<b>Etapa 3: Parâmetros do IDW</b><br><br>"
-              "O IDW (inverso da distância ponderada) estima cada pixel pela média das amostras "
-              "vizinhas, dando mais peso às mais próximas.<br><br>"
-              "<b>Cada atributo tem seus próprios P e raio</b>, porque a dependência espacial e a "
-              "variabilidade mudam de um atributo para outro. Escolha o atributo no topo; as barras, "
-              "a curva e a prévia passam a valer para ele. A tabela mostra os parâmetros de todos e a "
-              "origem de cada um (padrão, automático ou manual).<br><br>"
-              "<b>Barras deslizantes:</b> P de 0,5 a 5,0 e raio de 1× a 6× a distância de cobertura, "
-              "com explicações que mudam conforme o valor. Mova as barras e observe a curva de peso, "
-              "a influência de cada vizinha e a prévia do mapa. Os links <i>Saiba mais</i> trazem a "
-              "explicação técnica.<br><br>"
-              "<b>Potência P:</b> quanto maior, mais rápido o peso cai com a distância.<br>"
-              "<b>Raio de busca:</b> é definido em múltiplos da distância de "
-              "cobertura (distância que cobre 95% do talhão); o valor em metros aparece acima da "
-              "barra. Se o raio não alcançar amostras em parte do talhão, um aviso em laranja mostra "
-              "o percentual; nesses pontos são usadas as 4 amostras mais próximas.<br>"
-              "<b>Ajuste automático / para todos:</b> a validação cruzada testa combinações e indica, "
-              "para cada atributo, a de menor erro.<br>"
-              "<b>Mostrar amostras:</b> liga ou desliga os pontos na prévia.<br>"
-              "<b>Tamanho do pixel:</b> lado de cada pixel da interpolação. Começa igual ao tamanho "
-              "da célula da grade escolhido na Etapa 1 e não pode ser maior que ele, porque cada "
-              "célula precisa conter pixels para o cálculo da média. Pixels menores deixam a média "
-              "de cada célula mais representativa, mas o cálculo fica mais lento.",
-        "en": "<b>Step 3: IDW parameters</b><br><br>"
-              "IDW (Inverse Distance Weighting) estimates each pixel as the average of nearby "
-              "samples, giving more weight to the closest ones.<br><br>"
-              "<b>Each attribute has its own P and radius</b>, because spatial dependence and "
-              "variability change from one attribute to another. Choose the attribute at the top; "
-              "the sliders, curve and preview then apply to it. The table shows the parameters of all "
-              "attributes and where each came from (default, auto-fit or manual).<br><br>"
-              "<b>Sliders:</b> P from 0.5 to 5.0 and radius from 1× to 6× the coverage distance, with "
-              "explanations that change with the value. Move the sliders and watch the weight curve, "
-              "the influence of each neighbour and the map preview. The <i>Learn more</i> links give the "
-              "technical explanation.<br><br>"
-              "<b>Power P:</b> the higher it is, the faster the weight falls with distance.<br>"
-              "<b>Search radius:</b> it is set in multiples of the coverage "
-              "distance (distance covering 95% of the field); the value in metres is shown above "
-              "the slider. If the radius reaches no sample in part of the field, an orange warning "
-              "shows the percentage; there the 4 nearest samples are used.<br>"
-              "<b>Auto-fit / Auto-fit all:</b> cross-validation tests combinations and points "
-              "out, for each attribute, the one with the lowest error.<br>"
-              "<b>Show samples:</b> turns the points on or off in the preview.<br>"
-              "<b>Pixel size:</b> side of each interpolation pixel. It starts equal to the grid cell "
-              "size chosen in step 1 and cannot be larger, because each cell must contain pixels to "
-              "compute the mean. Smaller pixels make each cell's mean more representative, but "
-              "processing is slower.",
-        "es": "<b>Paso 3: Parámetros del IDW</b><br><br>"
-              "El IDW (inverso de la distancia ponderada) estima cada píxel como el promedio de las "
-              "muestras vecinas, dando más peso a las más cercanas.<br><br>"
-              "<b>Cada atributo tiene su propio P y radio</b>, porque la dependencia espacial y la "
-              "variabilidad cambian de un atributo a otro. Elija el atributo arriba; las barras, la "
-              "curva y la vista previa pasan a valer para él. La tabla muestra los parámetros de todos "
-              "y el origen de cada uno (por defecto, automático o manual).<br><br>"
-              "<b>Barras deslizantes:</b> P de 0,5 a 5,0 y radio de 1× a 6× la distancia de cobertura, "
-              "con explicaciones que cambian con el valor. Mueva las barras y observe la curva de peso, "
-              "la influencia de cada vecina y la vista previa. Los enlaces <i>Saber más</i> traen la "
-              "explicación técnica.<br><br>"
-              "<b>Potencia P:</b> cuanto mayor, más rápido cae el peso con la distancia.<br>"
-              "<b>Radio de búsqueda:</b> se define en múltiplos de la distancia de "
-              "cobertura (distancia que cubre el 95% del lote); el valor en metros aparece sobre la "
-              "barra. Si el radio no alcanza muestras en parte del lote, un aviso en naranja muestra "
-              "el porcentaje; allí se usan las 4 muestras más cercanas.<br>"
-              "<b>Ajuste automático / para todos:</b> la validación cruzada prueba combinaciones e "
-              "indica, para cada atributo, la de menor error.<br>"
-              "<b>Mostrar muestras:</b> enciende o apaga los puntos en la vista previa.<br>"
-              "<b>Tamaño del píxel:</b> lado de cada píxel de la interpolación. Empieza igual al "
-              "tamaño de la celda elegido en el paso 1 y no puede ser mayor, porque cada celda debe "
-              "contener píxeles para calcular la media. Píxeles menores hacen la media de cada celda "
-              "más representativa, pero el cálculo es más lento."},
+        "pt": "<b>Etapa 3: Parâmetros do IDW</b><br><br>O IDW (inverso da distância ponderada) estima cada pixel pela média das amostras vizinhas, dando mais peso às mais próximas.<br><br><b>Cada atributo tem seus próprios parâmetros</b>, porque a dependência espacial e a variabilidade mudam de um atributo para outro. Escolha o atributo no topo; os controles e a prévia passam a valer para ele. A tabela mostra os parâmetros de todos e a origem de cada um (padrão, automático ou manual).<br><br><b>Potência P</b> (barra de 0,5 a 5,0): quanto maior, mais rápido o peso cai com a distância e mais o pixel se parece com a amostra mais próxima.<br><b>Vizinhas por pixel:</b> cada pixel usa no mínimo 4 e no máximo 16 amostras (padrão), sempre as mais próximas. O <b>Ajuste automático</b> escolhe o máximo de cada atributo, entre 4 e 32, junto com o P. As barras mostram a fatia de cada vizinha num pixel típico.<br><b>Avançado: raio de busca</b> (recolhido; clique no título para abrir). O raio só economiza cálculo em amostragens muito densas. Se ele alcançar menos de 4 amostras, as 4 mais próximas são usadas mesmo fora dele, e um aviso em laranja mostra em quantos % do talhão isso acontece; se alcançar mais que o máximo, só as mais próximas entram. É dado em múltiplos da distância de cobertura (1× a 10×), e começa no valor que alcança o máximo de vizinhas em 95% do talhão e o mínimo em todo ele (o ajuste automático recalcula do mesmo modo). Mover a barra não muda o mapa enquanto o raio não limitar a busca.<br><b>Ajuste automático / para todos:</b> a validação cruzada testa combinações de P e máximo de vizinhas e indica, para cada atributo, a de menor erro.<br><b>Prévia do mapa:</b> ocupa a coluna da direita e muda a cada ajuste. <b>Mostrar amostras</b> liga ou desliga os pontos.<br><b>Tamanho do pixel:</b> lado de cada pixel da interpolação. Começa igual ao tamanho da célula da grade escolhido na Etapa 1 e não pode ser maior que ele, porque cada célula precisa conter pixels para o cálculo da média. Pixels menores deixam a média de cada célula mais representativa, mas o cálculo fica mais lento.",
+        "en": "<b>Step 3: IDW parameters</b><br><br>IDW (Inverse Distance Weighting) estimates each pixel as the average of nearby samples, giving more weight to the closest ones.<br><br><b>Each attribute has its own parameters</b>, because spatial dependence and variability change from one attribute to another. Choose the attribute at the top; the controls and the preview then apply to it. The table shows the parameters of all attributes and where each came from (default, auto-fit or manual).<br><br><b>Power P</b> (slider from 0.5 to 5.0): the higher it is, the faster the weight falls with distance and the more the pixel resembles the nearest sample.<br><b>Neighbours per pixel:</b> each pixel uses at least 4 and at most 16 samples (default), always the nearest ones. <b>Auto-fit</b> chooses the maximum of each attribute, between 4 and 32, together with P. The bars show each neighbour's share in a typical pixel.<br><b>Advanced: search radius</b> (collapsed; click the title to open). The radius only saves computation in very dense sampling. If it reaches fewer than 4 samples, the 4 nearest are used even beyond it, and an orange warning shows in what % of the field this happens; if it reaches more than the maximum, only the nearest ones are used. It is given in multiples of the coverage distance (1× to 10×), and it starts at the value that reaches the maximum of neighbours in 95% of the field and the minimum in all of it (the auto-fit recomputes it the same way). Moving the slider does not change the map while the radius does not limit the search.<br><b>Auto-fit / Auto-fit all:</b> cross-validation tests combinations of P and maximum of neighbours and points out, for each attribute, the one with the lowest error.<br><b>Map preview:</b> fills the right column and changes with every adjustment. <b>Show samples</b> turns the points on or off.<br><b>Pixel size:</b> side of each interpolation pixel. It starts equal to the grid cell size chosen in step 1 and cannot be larger, because each cell must contain pixels to compute the mean. Smaller pixels make each cell's mean more representative, but processing is slower.",
+        "es": "<b>Paso 3: Parámetros del IDW</b><br><br>El IDW (inverso de la distancia ponderada) estima cada píxel como el promedio de las muestras vecinas, dando más peso a las más cercanas.<br><br><b>Cada atributo tiene sus propios parámetros</b>, porque la dependencia espacial y la variabilidad cambian de un atributo a otro. Elija el atributo arriba; los controles y la vista previa pasan a valer para él. La tabla muestra los parámetros de todos y el origen de cada uno (por defecto, automático o manual).<br><br><b>Potencia P</b> (barra de 0,5 a 5,0): cuanto mayor, más rápido cae el peso con la distancia y más se parece el píxel a la muestra más cercana.<br><b>Vecinas por píxel:</b> cada píxel usa como mínimo 4 y como máximo 16 muestras (por defecto), siempre las más cercanas. El <b>Ajuste automático</b> elige el máximo de cada atributo, entre 4 y 32, junto con P. Las barras muestran la parte de cada vecina en un píxel típico.<br><b>Avanzado: radio de búsqueda</b> (plegado; haga clic en el título para abrirlo). El radio solo ahorra cálculo en muestreos muy densos. Si alcanza menos de 4 muestras, se usan las 4 más cercanas aunque estén fuera de él, y un aviso en naranja muestra en qué % del lote ocurre; si alcanza más que el máximo, solo entran las más cercanas. Se da en múltiplos de la distancia de cobertura (1× a 10×), y empieza en el valor que alcanza el máximo de vecinas en el 95% del lote y el mínimo en todo él (el ajuste automático lo recalcula igual). Mover la barra no cambia el mapa mientras el radio no limite la búsqueda.<br><b>Ajuste automático / para todos:</b> la validación cruzada prueba combinaciones de P y máximo de vecinas e indica, para cada atributo, la de menor error.<br><b>Vista previa del mapa:</b> ocupa la columna derecha y cambia con cada ajuste. <b>Mostrar muestras</b> enciende o apaga los puntos.<br><b>Tamaño del píxel:</b> lado de cada píxel de la interpolación. Empieza igual al tamaño de la celda elegido en el paso 1 y no puede ser mayor, porque cada celda debe contener píxeles para calcular la media. Píxeles menores hacen la media de cada celda más representativa, pero el cálculo es más lento."},
     "learn_more": {"pt": "Saiba mais", "en": "Learn more", "es": "Saber más"},
     "p3_power_group": {"pt": "Potência (P)", "en": "Power (P)", "es": "Potencia (P)"},
     "p3_power_value": {"pt": "P = {p}", "en": "P = {p}", "es": "P = {p}"},
@@ -550,7 +485,6 @@ STRINGS = {
               "la validación cruzada: retire cada muestra, estímela con las demás y compare el error "
               "entre valores de P. Cuando la dependencia espacial está bien descrita por un "
               "semivariograma, el kriging suele ser preferible al IDW."},
-    "p3_radius_group": {"pt": "Raio de busca", "en": "Search radius", "es": "Radio de búsqueda"},
     "p3_spacing": {
         "pt": "Distância de cobertura: 95% do talhão fica a até {spacing} m de uma amostra "
               "({density} amostras/ha).",
@@ -568,153 +502,94 @@ STRINGS = {
                         "en": "Radius = {mult} × {spacing} m = {radius} m",
                         "es": "Radio = {mult} × {spacing} m = {radius} m"},
     "p3_radius_gap": {
-        "pt": "Em {pct}% do talhão este raio não alcança nenhuma amostra (vãos entre passadas ou "
-              "amostras). Nesses pontos serão usadas as {k} amostras mais próximas, para o mapa não "
-              "ficar com falhas.",
-        "en": "In {pct}% of the field this radius reaches no sample (gaps between passes or samples). "
-              "There the {k} nearest samples will be used, so the map has no gaps.",
-        "es": "En el {pct}% del lote este radio no alcanza ninguna muestra (huecos entre pasadas o "
-              "muestras). Allí se usarán las {k} muestras más cercanas, para que el mapa no tenga huecos."},
+        "pt": "Em {pct}% do talhão este raio alcança menos de {k} amostras (vãos entre passadas ou amostras). Nesses pontos são usadas as {k} mais próximas, mesmo fora do raio, para o mapa não ficar com falhas.",
+        "en": "In {pct}% of the field this radius reaches fewer than {k} samples (gaps between passes or samples). There the {k} nearest are used, even beyond the radius, so the map has no gaps.",
+        "es": "En el {pct}% del lote este radio alcanza menos de {k} muestras (huecos entre pasadas o muestras). Allí se usan las {k} más cercanas, aunque estén fuera del radio, para que el mapa no tenga huecos."},
     "p3_radius_short": {
-        "pt": "Raio curto: cada pixel enxerga poucas amostras e o mapa fica mais local. Onde o raio não "
-              "alcançar nenhuma amostra, serão usadas as mais próximas.",
-        "en": "Short radius: each pixel sees few samples and the map is more local. Where the radius "
-              "reaches no sample, the nearest ones will be used.",
-        "es": "Radio corto: cada píxel ve pocas muestras y el mapa es más local. Donde el radio no "
-              "alcance ninguna muestra, se usarán las más cercanas."},
+        "pt": "Raio curto: em parte do talhão ele não alcança o mínimo de {kmin} amostras, e a busca continua além dele até completar o mínimo.",
+        "en": "Short radius: in part of the field it does not reach the minimum of {kmin} samples, and the search goes beyond it until the minimum is met.",
+        "es": "Radio corto: en parte del lote no alcanza el mínimo de {kmin} muestras, y la búsqueda sigue más allá hasta completar el mínimo."},
     "p3_radius_ok": {
-        "pt": "Raio recomendado: cada pixel considera várias amostras vizinhas, cerca de 2 vezes a "
-              "distância de cobertura.",
-        "en": "Recommended radius: each pixel considers several neighbouring samples, about twice "
-              "the coverage distance.",
-        "es": "Radio recomendado: cada píxel considera varias muestras vecinas, cerca de 2 veces la "
-              "distancia de cobertura."},
-    "p3_radius_long": {
-        "pt": "Raio longo: o mapa fica mais suave e sem falhas, mas detalhes locais se perdem e o "
-              "cálculo fica mais lento.",
-        "en": "Long radius: the map is smoother and without gaps, but local detail is lost and "
-              "processing is slower.",
-        "es": "Radio largo: el mapa queda más suave y sin huecos, pero se pierden detalles locales y "
-              "el cálculo es más lento."},
+        "pt": "O raio não limita: quem decide quantas amostras entram é o máximo de {kmax} vizinhas. O raio só economiza cálculo em amostragens muito densas.",
+        "en": "The radius does not limit: the maximum of {kmax} neighbours decides how many samples are used. The radius only saves computation in very dense sampling.",
+        "es": "El radio no limita: quien decide cuántas muestras entran es el máximo de {kmax} vecinas. El radio solo ahorra cálculo en muestreos muy densos."},
     "p3_radius_more": {
-        "pt": "<b>Raio de busca</b><br><br>Só as amostras dentro do raio entram no cálculo de cada "
-              "pixel. A barra usa a <b>distância de cobertura</b>: mede-se, para os pixels do talhão, a "
-              "distância até a amostra mais próxima, e 95% deles ficam a até essa distância.<br><br>"
-              "Ela funciona tanto para amostragem em grade quanto para sensores em passadas (como a CE), "
-              "em que os pontos ficam muito próximos na linha e distantes entre as linhas. Nesse caso, "
-              "um espaçamento calculado só pela densidade seria pequeno demais e deixaria faixas sem "
-              "valor entre as passadas.<br><br>"
-              "Um raio de 1,5 a 2,5 vezes a distância de cobertura garante várias vizinhas em cada pixel. "
-              "Onde o raio não alcança nenhuma amostra (por exemplo, um vão maior entre passadas), o "
-              "AgriPrecisa usa as 4 amostras mais próximas, para o mapa não ficar com falhas, e avisa "
-              "em quantos % do talhão isso acontece. Raios maiores suavizam e deixam o cálculo mais lento. Em "
-              "pesquisa, o alcance do semivariograma é uma boa referência.<br><br>"
-              "Com mais de um atributo marcado, vale o de menor cobertura (amostragem mais esparsa).",
-        "en": "<b>Search radius</b><br><br>Only samples within the radius are used for each pixel. The "
-              "slider uses the <b>coverage distance</b>: for the field pixels, the distance to the nearest "
-              "sample is measured, and 95% of them are within this distance.<br><br>"
-              "It works both for grid sampling and for sensor passes (such as EC), where points are very "
-              "close along the line and far apart between lines. In that case, a spacing computed from "
-              "density alone would be too small and leave strips without value between passes.<br><br>"
-              "A radius of 1.5 to 2.5 times the coverage distance ensures several neighbours per pixel. "
-              "Where the radius reaches no sample (e.g. a wider gap between passes), AgriPrecisa uses the "
-              "4 nearest samples so the map has no gaps, and reports in what % of the field this happens. "
-              "Larger radii smooth and slow processing. In research, the "
-              "semivariogram range is a good reference.<br><br>"
-              "With several attributes ticked, the one with the sparsest sampling is used.",
-        "es": "<b>Radio de búsqueda</b><br><br>Solo las muestras dentro del radio entran en el cálculo de "
-              "cada píxel. La barra usa la <b>distancia de cobertura</b>: se mide, para los píxeles del "
-              "lote, la distancia a la muestra más cercana, y el 95% de ellos está a menos de esa "
-              "distancia.<br><br>"
-              "Funciona tanto para muestreo en grilla como para sensores en pasadas (como la CE), donde "
-              "los puntos están muy cerca en la línea y lejos entre líneas. En ese caso, un espaciamiento "
-              "calculado solo por la densidad sería demasiado pequeño y dejaría franjas sin valor.<br><br>"
-              "Un radio de 1,5 a 2,5 veces la distancia de cobertura garantiza varias vecinas por píxel. "
-              "Donde el radio no alcanza ninguna muestra (por ejemplo, un hueco mayor entre pasadas), "
-              "AgriPrecisa usa las 4 muestras más cercanas para que el mapa no tenga huecos, e informa en "
-              "qué % del lote ocurre. Radios mayores suavizan y hacen el cálculo más lento. En "
-              "investigación, el alcance del semivariograma es una buena referencia.<br><br>"
-              "Con varios atributos marcados, vale el de muestreo más disperso."},
-    "p3_curve_ref_point": {"pt": "1 = distância típica ({d} m)", "en": "1 = typical distance ({d} m)",
-                           "es": "1 = distancia típica ({d} m)"},
-    "p3_curve_tip": {
-        "pt": "Peso 1/d^P relativo ao de uma amostra na distância típica entre um pixel e a amostra mais "
-              "próxima. Perto da amostra o peso tende ao infinito, por isso o eixo é cortado em 4.",
-        "en": "Weight 1/d^P relative to a sample at the typical distance between a pixel and its nearest "
-              "sample. Near the sample the weight tends to infinity, so the axis is cut at 4.",
-        "es": "Peso 1/d^P relativo al de una muestra a la distancia típica entre un píxel y su muestra más "
-              "cercana. Cerca de la muestra el peso tiende al infinito, por eso el eje se corta en 4."},
+        "pt": "<b>Raio de busca</b><br><br>O raio é um recurso para diminuir o cálculo quando a amostragem é muito densa: o programa só olha as amostras dentro dele. Quem decide quantas amostras entram em cada pixel são o <b>mínimo</b> e o <b>máximo de vizinhas</b>: se o raio alcançar menos que o mínimo, a busca continua além dele; se alcançar mais que o máximo, só as mais próximas entram.<br><br>A barra usa a <b>distância de cobertura</b>: mede-se, para os pixels do talhão, a distância até a amostra mais próxima, e 95% deles ficam a até essa distância. Ela funciona tanto para amostragem em grade quanto para sensores em passadas (como a CE), em que os pontos ficam muito próximos na linha e distantes entre as linhas.<br><br>O <b>Ajuste automático</b> calcula o raio para que ele alcance o máximo de vizinhas em 95% do talhão. Um aviso em laranja mostra em quantos % do talhão o raio não alcança o mínimo. Em pesquisa, o alcance do semivariograma é uma boa referência para o raio.",
+        "en": "<b>Search radius</b><br><br>The radius is a way to reduce computation when sampling is very dense: the program only looks at samples inside it. How many samples each pixel uses is decided by the <b>minimum</b> and <b>maximum of neighbours</b>: if the radius reaches fewer than the minimum, the search goes beyond it; if it reaches more than the maximum, only the nearest ones are used.<br><br>The slider uses the <b>coverage distance</b>: for the field pixels, the distance to the nearest sample is measured, and 95% of them are within this distance. It works both for grid sampling and for sensor passes (such as EC), where points are very close along the line and far apart between lines.<br><br><b>Auto-fit</b> sets the radius so it reaches the maximum of neighbours in 95% of the field. An orange warning shows in what % of the field the radius does not reach the minimum. In research, the semivariogram range is a good reference for the radius.",
+        "es": "<b>Radio de búsqueda</b><br><br>El radio es un recurso para reducir el cálculo cuando el muestreo es muy denso: el programa solo mira las muestras dentro de él. Cuántas muestras usa cada píxel lo deciden el <b>mínimo</b> y el <b>máximo de vecinas</b>: si el radio alcanza menos que el mínimo, la búsqueda sigue más allá; si alcanza más que el máximo, solo entran las más cercanas.<br><br>La barra usa la <b>distancia de cobertura</b>: se mide, para los píxeles del lote, la distancia a la muestra más cercana, y el 95% de ellos está a menos de esa distancia. Funciona tanto para muestreo en grilla como para sensores en pasadas (como la CE), donde los puntos están muy cerca en la línea y lejos entre líneas.<br><br>El <b>Ajuste automático</b> calcula el radio para que alcance el máximo de vecinas en el 95% del lote. Un aviso en naranja muestra en qué % del lote el radio no alcanza el mínimo. En investigación, el alcance del semivariograma es una buena referencia para el radio."},
     "p3_bars_tip": {
-        "pt": "Parte de cada amostra (λ = w / Σw) no valor de um pixel típico do talhão. As partes somam 100%.",
-        "en": "Share of each sample (λ = w / Σw) in the value of a typical pixel of the field. Shares add up to 100%.",
-        "es": "Parte de cada muestra (λ = w / Σw) en el valor de un píxel típico del lote. Las partes suman 100%."},
+        "pt": "Parte de cada vizinha usada (λ = w / Σw) no valor de um pixel típico do talhão. As partes somam 100%.",
+        "en": "Share of each neighbour used (λ = w / Σw) in the value of a typical pixel of the field. Shares add up to 100%.",
+        "es": "Parte de cada vecina usada (λ = w / Σw) en el valor de un píxel típico del lote. Las partes suman 100%."},
     "p3_bars_title": {"pt": "Influência no pixel típico", "en": "Influence on a typical pixel",
                       "es": "Influencia en el píxel típico"},
     "p3_bars_row": {"pt": "{k}ª ({d} m)", "en": "#{k} ({d} m)", "es": "{k}.ª ({d} m)"},
     "p3_bars_rest": {"pt": "outras {n}", "en": "other {n}", "es": "otras {n}"},
-    "p3_bars_total": {"pt": "{n} no raio = 100%", "en": "{n} in radius = 100%",
-                      "es": "{n} en el radio = 100%"},
-    "p3_bars_empty": {"pt": "Nenhuma amostra dentro do raio no pixel típico. Aumente o raio.",
-                      "en": "No sample within the radius at the typical pixel. Increase the radius.",
-                      "es": "Ninguna muestra dentro del radio en el píxel típico. Aumente el radio."},
+    "p3_bars_total": {
+        "pt": "{n} vizinhas usadas = 100%",
+        "en": "{n} neighbours used = 100%",
+        "es": "{n} vecinas usadas = 100%"},
+    "p3_bars_empty": {
+        "pt": "Sem amostras no pixel típico.",
+        "en": "No samples at the typical pixel.",
+        "es": "Sin muestras en el píxel típico."},
     "p3_weight_more": {
-        "pt": "<b>Como o IDW calcula os pesos</b> (Shepard, 1968)<br><br>"
-              "Cada amostra i recebe o peso <b>w<sub>i</sub> = 1 / d<sub>i</sub><sup>P</sup></b>, em que "
-              "d<sub>i</sub> é a distância entre o pixel e a amostra. O valor do pixel é a média "
-              "ponderada <b>ẑ = Σ w<sub>i</sub> z<sub>i</sub> / Σ w<sub>i</sub></b>. Assim, o que "
-              "conta é a fatia de cada amostra, <b>λ<sub>i</sub> = w<sub>i</sub> / Σ w<sub>j</sub></b>, "
-              "e as fatias somam 100%.<ul>"
-              "<li><b>Perto da amostra</b> o peso cresce sem limite: um pixel exatamente sobre uma "
-              "amostra recebe o valor dela (o IDW é um interpolador exato). Por isso o eixo do "
-              "gráfico é cortado.</li>"
-              "<li><b>A curva</b> mostra o peso relativo ao de uma amostra na distância típica entre "
-              "um pixel e a amostra mais próxima do seu talhão: vale 1 nesse ponto. Com P maior, ela "
-              "cai mais rápido, e as amostras distantes perdem importância.</li>"
-              "<li><b>As barras</b> mostram, num pixel típico do talhão, a fatia de cada amostra "
-              "dentro do raio. Mova a barra do P e veja a influência se concentrar na mais próxima "
-              "(P alto) ou se distribuir entre as vizinhas (P baixo).</li></ul>"
-              "Referência: Shepard, D. (1968). A two-dimensional interpolation function for "
-              "irregularly-spaced data. <i>Proceedings of the 23rd ACM National Conference</i>, 517-524.",
-        "en": "<b>How IDW computes the weights</b> (Shepard, 1968)<br><br>"
-              "Each sample i gets the weight <b>w<sub>i</sub> = 1 / d<sub>i</sub><sup>P</sup></b>, where "
-              "d<sub>i</sub> is the distance between the pixel and the sample. The pixel value is the "
-              "weighted mean <b>ẑ = Σ w<sub>i</sub> z<sub>i</sub> / Σ w<sub>i</sub></b>. So what matters "
-              "is each sample's share, <b>λ<sub>i</sub> = w<sub>i</sub> / Σ w<sub>j</sub></b>, and the "
-              "shares add up to 100%.<ul>"
-              "<li><b>Near the sample</b> the weight grows without limit: a pixel exactly on a sample "
-              "takes its value (IDW is an exact interpolator). That is why the chart axis is cut.</li>"
-              "<li><b>The curve</b> shows the weight relative to a sample at the typical distance "
-              "between a pixel and its nearest sample in your field: it equals 1 there. With a higher "
-              "P it falls faster and distant samples lose importance.</li>"
-              "<li><b>The bars</b> show, for a typical pixel of the field, the share of each sample "
-              "within the radius. Move the P slider and watch the influence concentrate on the "
-              "nearest sample (high P) or spread among neighbours (low P).</li></ul>"
-              "Reference: Shepard, D. (1968). A two-dimensional interpolation function for "
-              "irregularly-spaced data. <i>Proceedings of the 23rd ACM National Conference</i>, 517-524.",
-        "es": "<b>Cómo calcula el IDW los pesos</b> (Shepard, 1968)<br><br>"
-              "Cada muestra i recibe el peso <b>w<sub>i</sub> = 1 / d<sub>i</sub><sup>P</sup></b>, donde "
-              "d<sub>i</sub> es la distancia entre el píxel y la muestra. El valor del píxel es el "
-              "promedio ponderado <b>ẑ = Σ w<sub>i</sub> z<sub>i</sub> / Σ w<sub>i</sub></b>. Así, lo que "
-              "cuenta es la parte de cada muestra, <b>λ<sub>i</sub> = w<sub>i</sub> / Σ w<sub>j</sub></b>, "
-              "y las partes suman 100%.<ul>"
-              "<li><b>Cerca de la muestra</b> el peso crece sin límite: un píxel exactamente sobre una "
-              "muestra recibe su valor (el IDW es un interpolador exacto). Por eso el eje del gráfico "
-              "está cortado.</li>"
-              "<li><b>La curva</b> muestra el peso relativo al de una muestra a la distancia típica "
-              "entre un píxel y su muestra más cercana en su lote: vale 1 en ese punto. Con P mayor "
-              "cae más rápido y las muestras lejanas pierden importancia.</li>"
-              "<li><b>Las barras</b> muestran, en un píxel típico del lote, la parte de cada muestra "
-              "dentro del radio. Mueva la barra de P y vea la influencia concentrarse en la más "
-              "cercana (P alto) o repartirse entre las vecinas (P bajo).</li></ul>"
-              "Referencia: Shepard, D. (1968). A two-dimensional interpolation function for "
-              "irregularly-spaced data. <i>Proceedings of the 23rd ACM National Conference</i>, 517-524."},
-    "p3_curve_group": {"pt": "Peso das amostras (IDW)", "en": "Sample weights (IDW)",
-                       "es": "Peso de las muestras (IDW)"},
-    "p3_curve_x": {"pt": "distância até a amostra (m)", "en": "distance to the sample (m)",
-                   "es": "distancia a la muestra (m)"},
-    "p3_curve_y": {"pt": "peso relativo", "en": "relative weight", "es": "peso relativo"},
-    "p3_curve_radius": {"pt": "raio", "en": "radius", "es": "radio"},
+        "pt": "<b>Como o IDW calcula os pesos</b> (Shepard, 1968)<br><br>Cada vizinha i recebe o peso <b>w<sub>i</sub> = 1 / d<sub>i</sub><sup>P</sup></b>, em que d<sub>i</sub> é a distância entre o pixel e a amostra. O valor do pixel é a média ponderada <b>ẑ = Σ w<sub>i</sub> z<sub>i</sub> / Σ w<sub>i</sub></b>. Assim, o que conta é a fatia de cada vizinha, <b>λ<sub>i</sub> = w<sub>i</sub> / Σ w<sub>j</sub></b>, e as fatias somam 100%.<ul><li><b>Perto da amostra</b> o peso cresce sem limite: um pixel exatamente sobre uma amostra recebe o valor dela (o IDW é um interpolador exato).</li><li><b>As barras</b> mostram, num pixel típico do talhão, a fatia de cada vizinha que ele realmente usa (entre o mínimo e o máximo de vizinhas). Mova a barra do P e veja a influência se concentrar na mais próxima (P alto) ou se distribuir entre as vizinhas (P baixo).</li></ul>Referência: Shepard, D. (1968). A two-dimensional interpolation function for irregularly-spaced data. <i>Proceedings of the 23rd ACM National Conference</i>, 517-524.",
+        "en": "<b>How IDW computes the weights</b> (Shepard, 1968)<br><br>Each neighbour i gets the weight <b>w<sub>i</sub> = 1 / d<sub>i</sub><sup>P</sup></b>, where d<sub>i</sub> is the distance between the pixel and the sample. The pixel value is the weighted mean <b>ẑ = Σ w<sub>i</sub> z<sub>i</sub> / Σ w<sub>i</sub></b>. So what matters is each neighbour's share, <b>λ<sub>i</sub> = w<sub>i</sub> / Σ w<sub>j</sub></b>, and the shares add up to 100%.<ul><li><b>Near the sample</b> the weight grows without limit: a pixel exactly on a sample takes its value (IDW is an exact interpolator).</li><li><b>The bars</b> show, for a typical pixel of the field, the share of each neighbour it really uses (between the minimum and the maximum of neighbours). Move the P slider and watch the influence concentrate on the nearest sample (high P) or spread among neighbours (low P).</li></ul>Reference: Shepard, D. (1968). A two-dimensional interpolation function for irregularly-spaced data. <i>Proceedings of the 23rd ACM National Conference</i>, 517-524.",
+        "es": "<b>Cómo calcula el IDW los pesos</b> (Shepard, 1968)<br><br>Cada vecina i recibe el peso <b>w<sub>i</sub> = 1 / d<sub>i</sub><sup>P</sup></b>, donde d<sub>i</sub> es la distancia entre el píxel y la muestra. El valor del píxel es el promedio ponderado <b>ẑ = Σ w<sub>i</sub> z<sub>i</sub> / Σ w<sub>i</sub></b>. Así, lo que cuenta es la parte de cada vecina, <b>λ<sub>i</sub> = w<sub>i</sub> / Σ w<sub>j</sub></b>, y las partes suman 100%.<ul><li><b>Cerca de la muestra</b> el peso crece sin límite: un píxel exactamente sobre una muestra recibe su valor (el IDW es un interpolador exacto).</li><li><b>Las barras</b> muestran, en un píxel típico del lote, la parte de cada vecina que realmente usa (entre el mínimo y el máximo de vecinas). Mueva la barra de P y vea la influencia concentrarse en la más cercana (P alto) o repartirse entre las vecinas (P bajo).</li></ul>Referencia: Shepard, D. (1968). A two-dimensional interpolation function for irregularly-spaced data. <i>Proceedings of the 23rd ACM National Conference</i>, 517-524."},
     "p3_preview_group": {"pt": "Prévia do mapa", "en": "Map preview", "es": "Vista previa del mapa"},
+    "p3_neigh_group": {
+        "pt": "Vizinhas por pixel",
+        "en": "Neighbours per pixel",
+        "es": "Vecinas por píxel"},
+    "p3_neigh_text": {
+        "pt": "Cada pixel usa no mínimo <b>{kmin}</b> e no máximo <b>{kmax}</b> amostras, sempre as mais próximas.",
+        "en": "Each pixel uses at least <b>{kmin}</b> and at most <b>{kmax}</b> samples, always the nearest ones.",
+        "es": "Cada píxel usa como mínimo <b>{kmin}</b> y como máximo <b>{kmax}</b> muestras, siempre las más cercanas."},
+    "p3_neigh_default": {
+        "pt": "Valores padrão; o <b>Ajuste automático</b> escolhe o máximo de cada atributo.",
+        "en": "Default values; <b>Auto-fit</b> chooses the maximum for each attribute.",
+        "es": "Valores por defecto; el <b>Ajuste automático</b> elige el máximo de cada atributo."},
+    "p3_neigh_cv": {
+        "pt": "Máximo escolhido pelo ajuste automático (validação cruzada).",
+        "en": "Maximum chosen by the auto-fit (cross-validation).",
+        "es": "Máximo elegido por el ajuste automático (validación cruzada)."},
+    "p3_neigh_more": {
+        "pt": "<b>Mínimo e máximo de vizinhas</b><br><br>Os interpoladores dos programas de SIG não usam todas as amostras em cada pixel: escolhem as vizinhas por três regras, aplicadas nesta ordem.<ul><li><b>Raio de busca:</b> entram as amostras dentro dele. Serve para economizar cálculo quando a amostragem é muito densa (milhares de pontos de sensor).</li><li><b>Mínimo de vizinhas:</b> se o raio alcançar menos amostras que o mínimo, as mais próximas são buscadas mesmo fora dele. Assim nenhum pixel fica sem valor, por exemplo num vão maior entre passadas.</li><li><b>Máximo de vizinhas:</b> se o raio alcançar mais amostras que o máximo, só as mais próximas entram. O máximo limita o raio.</li></ul><b>Como o máximo muda o mapa:</b> poucas vizinhas deixam o mapa mais local, com mais detalhe e mais ruído; muitas vizinhas suavizam, porque cada pixel passa a ser uma média de uma área maior. O <b>Ajuste automático</b> testa máximos de 4 a 32 junto com o P e escolhe a combinação de menor erro para cada atributo. O mínimo fica em 4.<br><br>Nas barras, veja quantas vizinhas o pixel típico realmente usa e a fatia de cada uma.",
+        "en": "<b>Minimum and maximum of neighbours</b><br><br>GIS interpolators do not use every sample at each pixel: they pick the neighbours with three rules, applied in this order.<ul><li><b>Search radius:</b> samples inside it are taken. It saves computation when sampling is very dense (thousands of sensor points).</li><li><b>Minimum of neighbours:</b> if the radius reaches fewer samples than the minimum, the nearest ones are taken even beyond it. So no pixel is left without value, for example in a wider gap between passes.</li><li><b>Maximum of neighbours:</b> if the radius reaches more samples than the maximum, only the nearest ones are used. The maximum limits the radius.</li></ul><b>How the maximum changes the map:</b> few neighbours make the map more local, with more detail and more noise; many neighbours smooth it, because each pixel becomes the mean of a larger area. <b>Auto-fit</b> tests maxima from 4 to 32 together with P and chooses the combination with the lowest error for each attribute. The minimum stays at 4.<br><br>In the bars, see how many neighbours the typical pixel really uses and each one's share.",
+        "es": "<b>Mínimo y máximo de vecinas</b><br><br>Los interpoladores de los programas de SIG no usan todas las muestras en cada píxel: eligen las vecinas con tres reglas, aplicadas en este orden.<ul><li><b>Radio de búsqueda:</b> entran las muestras dentro de él. Sirve para ahorrar cálculo cuando el muestreo es muy denso (miles de puntos de sensor).</li><li><b>Mínimo de vecinas:</b> si el radio alcanza menos muestras que el mínimo, se buscan las más cercanas aunque estén fuera de él. Así ningún píxel queda sin valor, por ejemplo en un hueco mayor entre pasadas.</li><li><b>Máximo de vecinas:</b> si el radio alcanza más muestras que el máximo, solo entran las más cercanas. El máximo limita el radio.</li></ul><b>Cómo el máximo cambia el mapa:</b> pocas vecinas dejan el mapa más local, con más detalle y más ruido; muchas vecinas lo suavizan, porque cada píxel pasa a ser un promedio de un área mayor. El <b>Ajuste automático</b> prueba máximos de 4 a 32 junto con P y elige la combinación de menor error para cada atributo. El mínimo queda en 4.<br><br>En las barras, vea cuántas vecinas usa realmente el píxel típico y la parte de cada una."},
+    "p3_advanced_group": {
+        "pt": "Avançado: raio de busca",
+        "en": "Advanced: search radius",
+        "es": "Avanzado: radio de búsqueda"},
+    "p3_radius_limits": {
+        "pt": "O raio está limitando a busca: em {pct}% do talhão ele alcança menos de {kmax} amostras, e esses pixels usam só as que estão dentro dele (no mínimo {kmin}).",
+        "en": "The radius is limiting the search: in {pct}% of the field it reaches fewer than {kmax} samples, and those pixels use only the ones inside it (at least {kmin}).",
+        "es": "El radio está limitando la búsqueda: en el {pct}% del lote alcanza menos de {kmax} muestras, y esos píxeles usan solo las que están dentro de él (como mínimo {kmin})."},
+    "sum_col_n": {
+        "pt": "Vizinhas",
+        "en": "Neighbours",
+        "es": "Vecinas"},
+    "sum_n_value": {
+        "pt": "{kmin} a {kmax}",
+        "en": "{kmin} to {kmax}",
+        "es": "{kmin} a {kmax}"},
+    "layer_neigh": {
+        "pt": "V={kmin}-{kmax}",
+        "en": "N={kmin}-{kmax}",
+        "es": "V={kmin}-{kmax}"},
+    "alg_p_min_n": {
+        "pt": "Mínimo de vizinhas (usadas mesmo fora do raio)",
+        "en": "Minimum of neighbours (used even beyond the radius)",
+        "es": "Mínimo de vecinas (usadas aunque estén fuera del radio)"},
+    "alg_p_max_n": {
+        "pt": "Máximo de vizinhas (0 = sem limite)",
+        "en": "Maximum of neighbours (0 = no limit)",
+        "es": "Máximo de vecinas (0 = sin límite)"},
+    "alg_err_neighbours": {
+        "pt": "O máximo de vizinhas ({kmax}) não pode ser menor que o mínimo ({kmin}).",
+        "en": "The maximum of neighbours ({kmax}) cannot be smaller than the minimum ({kmin}).",
+        "es": "El máximo de vecinas ({kmax}) no puede ser menor que el mínimo ({kmin})."},
     "p3_preview_attr": {"pt": "Atributo:", "en": "Attribute:", "es": "Atributo:"},
     "p3_attribute": {"pt": "Atributo:", "en": "Attribute:", "es": "Atributo:"},
     "p3_summary_group": {"pt": "Parâmetros por atributo", "en": "Parameters per attribute",
@@ -726,45 +601,51 @@ STRINGS = {
     "origin_default": {"pt": "padrão", "en": "default", "es": "por defecto"},
     "origin_cv": {"pt": "automático", "en": "auto-fit", "es": "automático"},
     "origin_manual": {"pt": "manual", "en": "manual", "es": "manual"},
-    "origin_default_tip": {"pt": "Valor inicial: P = 2 e raio de 2 vezes a distância de cobertura.",
-                           "en": "Initial value: P = 2 and radius of twice the coverage distance.",
-                           "es": "Valor inicial: P = 2 y radio de 2 veces la distancia de cobertura."},
+    "origin_default_tip": {
+        "pt": "Valor inicial: P = 2, de 4 a 16 vizinhas e raio calculado para alcançar as 16 vizinhas em 95% do talhão (e as 4 em todo ele).",
+        "en": "Initial value: P = 2, 4 to 16 neighbours and a radius computed to reach the 16 neighbours in 95% of the field (and the 4 in all of it).",
+        "es": "Valor inicial: P = 2, de 4 a 16 vecinas y radio calculado para alcanzar las 16 vecinas en el 95% del lote (y las 4 en todo él)."},
     "origin_cv_tip": {"pt": "Obtido pelo ajuste automático (validação cruzada deste atributo).",
                       "en": "Obtained by auto-fit (cross-validation of this attribute).",
                       "es": "Obtenido por el ajuste automático (validación cruzada de este atributo)."},
     "origin_manual_tip": {"pt": "Ajustado pelo usuário.", "en": "Set by the user.",
                           "es": "Ajustado por el usuario."},
     "cv_this": {"pt": "Ajuste automático", "en": "Auto-fit", "es": "Ajuste automático"},
-    "cv_this_tip": {"pt": "Validação cruzada do atributo selecionado, com a tabela de erro por P e raio.",
-                    "en": "Cross-validation of the selected attribute, with the error table by P and radius.",
-                    "es": "Validación cruzada del atributo seleccionado, con la tabla de error por P y radio."},
+    "cv_this_tip": {
+        "pt": "Validação cruzada do atributo selecionado, com a tabela de erro por P e máximo de vizinhas.",
+        "en": "Cross-validation of the selected attribute, with the error table by P and maximum of neighbours.",
+        "es": "Validación cruzada del atributo seleccionado, con la tabla de error por P y máximo de vecinas."},
     "cv_all": {"pt": "Ajuste automático para todos", "en": "Auto-fit all", "es": "Ajuste automático para todos"},
-    "cv_all_tip": {"pt": "Faz a validação cruzada de cada atributo e aplica P e raio próprios a cada um.",
-                   "en": "Cross-validates each attribute and applies its own P and radius to each one.",
-                   "es": "Valida cada atributo y aplica a cada uno su propio P y radio."},
+    "cv_all_tip": {
+        "pt": "Faz a validação cruzada de cada atributo e aplica P e máximo de vizinhas próprios a cada um.",
+        "en": "Cross-validates each attribute and applies its own P and maximum of neighbours to each one.",
+        "es": "Valida cada atributo y aplica a cada uno su propio P y máximo de vecinas."},
     "cv_all_progress": {"pt": "Validação cruzada: {label}...", "en": "Cross-validation: {label}...",
                         "es": "Validación cruzada: {label}..."},
     "cv_all_done": {"pt": "Parâmetros sugeridos e aplicados a cada atributo:\n\n{lines}",
                     "en": "Parameters suggested and applied to each attribute:\n\n{lines}",
                     "es": "Parámetros sugeridos y aplicados a cada atributo:\n\n{lines}"},
-    "cv_all_line": {"pt": "{label}: P = {p}, raio {mult}× ({radius} m), RMSE = {rmse}",
-                    "en": "{label}: P = {p}, radius {mult}× ({radius} m), RMSE = {rmse}",
-                    "es": "{label}: P = {p}, radio {mult}× ({radius} m), RMSE = {rmse}"},
+    "cv_all_line": {
+        "pt": "{label}: P = {p}, até {kmax} vizinhas (raio {radius} m), RMSE = {rmse}",
+        "en": "{label}: P = {p}, up to {kmax} neighbours (radius {radius} m), RMSE = {rmse}",
+        "es": "{label}: P = {p}, hasta {kmax} vecinas (radio {radius} m), RMSE = {rmse}"},
     "cv_all_fail_line": {"pt": "{label}: não aplicado. {reason}", "en": "{label}: not applied. {reason}",
                          "es": "{label}: no aplicado. {reason}"},
     "cv_reason_cover": {"pt": "Não foi possível medir a distância de cobertura deste atributo.",
                         "en": "The coverage distance of this attribute could not be measured.",
                         "es": "No se pudo medir la distancia de cobertura de este atributo."},
-    "p4_item": {"pt": "<li>{layer}: <b>{field}</b> · P = {p} · raio = {r} ({origin})</li>",
-                "en": "<li>{layer}: <b>{field}</b> · P = {p} · radius = {r} ({origin})</li>",
-                "es": "<li>{layer}: <b>{field}</b> · P = {p} · radio = {r} ({origin})</li>"},
+    "p4_item": {
+        "pt": "<li>{layer}: <b>{field}</b> · P = {p} · vizinhas {kmin} a {kmax} · raio = {r} ({origin})</li>",
+        "en": "<li>{layer}: <b>{field}</b> · P = {p} · neighbours {kmin} to {kmax} · radius = {r} ({origin})</li>",
+        "es": "<li>{layer}: <b>{field}</b> · P = {p} · vecinas {kmin} a {kmax} · radio = {r} ({origin})</li>"},
     "alg_p_auto": {
-        "pt": "Escolher P e raio de cada atributo por validação cruzada (substitui os valores acima)",
-        "en": "Choose P and radius of each attribute by cross-validation (replaces the values above)",
-        "es": "Elegir P y radio de cada atributo por validación cruzada (reemplaza los valores de arriba)"},
-    "alg_log_auto": {"pt": "{label}: P = {p}, raio = {r} m (validação cruzada, RMSE = {rmse})",
-                     "en": "{label}: P = {p}, radius = {r} m (cross-validation, RMSE = {rmse})",
-                     "es": "{label}: P = {p}, radio = {r} m (validación cruzada, RMSE = {rmse})"},
+        "pt": "Escolher P e máximo de vizinhas de cada atributo por validação cruzada; o raio é calculado para não cortar o máximo (substitui os valores acima)",
+        "en": "Choose P and maximum of neighbours of each attribute by cross-validation; the radius is computed so it does not cut the maximum (replaces the values above)",
+        "es": "Elegir P y máximo de vecinas de cada atributo por validación cruzada; el radio se calcula para no cortar el máximo (reemplaza los valores de arriba)"},
+    "alg_log_auto": {
+        "pt": "{label}: P = {p}, até {kmax} vizinhas, raio = {r} m (validação cruzada, RMSE = {rmse})",
+        "en": "{label}: P = {p}, up to {kmax} neighbours, radius = {r} m (cross-validation, RMSE = {rmse})",
+        "es": "{label}: P = {p}, hasta {kmax} vecinas, radio = {r} m (validación cruzada, RMSE = {rmse})"},
     "alg_log_auto_fail": {
         "pt": "{label}: validação cruzada não foi possível ({reason}); usando P = {p} e raio = {r}.",
         "en": "{label}: cross-validation not possible ({reason}); using P = {p} and radius = {r}.",
@@ -782,100 +663,39 @@ STRINGS = {
                   "en": "No combination could estimate the validation samples. Check the data.",
                   "es": "Ninguna combinación pudo estimar las muestras de validación. Verifique los datos."},
     "cv_header": {
-        "pt": "<b>Atributo:</b> {attribute}<br><b>{n} amostras de validação</b>, espalhadas pelo talhão, "
-              "longe da borda e sem valores discrepantes. Ao validar cada uma, as amostras a menos de "
-              "{exclusion} m foram ignoradas (zona de exclusão). Distância de cobertura: {spacing} m.",
-        "en": "<b>Attribute:</b> {attribute}<br><b>{n} validation samples</b>, spread over the field, "
-              "away from the border and without outliers. When validating each one, samples closer "
-              "than {exclusion} m were ignored (exclusion zone). Coverage distance: {spacing} m.",
-        "es": "<b>Atributo:</b> {attribute}<br><b>{n} muestras de validación</b>, distribuidas en el "
-              "lote, lejos del borde y sin valores atípicos. Al validar cada una, se ignoraron las "
-              "muestras a menos de {exclusion} m (zona de exclusión). Distancia de cobertura: {spacing} m."},
-    "cv_col": {"pt": "{mult}×\n({radius} m)", "en": "{mult}×\n({radius} m)", "es": "{mult}×\n({radius} m)"},
-    "cv_axes": {"pt": "Linhas: potência P  ·  Colunas: raio de busca (múltiplos da distância de cobertura)",
-                "en": "Rows: power P  ·  Columns: search radius (multiples of the coverage distance)",
-                "es": "Filas: potencia P  ·  Columnas: radio de búsqueda (múltiplos de la distancia de cobertura)"},
+        "pt": "<b>Atributo:</b> {attribute}<br><b>{n} amostras de validação</b>, espalhadas pelo talhão, longe da borda e sem valores discrepantes. Ao validar cada uma, as amostras a menos de {exclusion} m foram ignoradas (zona de exclusão). Mínimo de {kmin} vizinhas. Distância de cobertura: {spacing} m.",
+        "en": "<b>Attribute:</b> {attribute}<br><b>{n} validation samples</b>, spread over the field, away from the border and without outliers. When validating each one, samples closer than {exclusion} m were ignored (exclusion zone). Minimum of {kmin} neighbours. Coverage distance: {spacing} m.",
+        "es": "<b>Atributo:</b> {attribute}<br><b>{n} muestras de validación</b>, distribuidas en el lote, lejos del borde y sin valores atípicos. Al validar cada una, se ignoraron las muestras a menos de {exclusion} m (zona de exclusión). Mínimo de {kmin} vecinas. Distancia de cobertura: {spacing} m."},
+    "cv_col": {
+        "pt": "até {k}\nvizinhas",
+        "en": "up to {k}\nneighbours",
+        "es": "hasta {k}\nvecinas"},
+    "cv_axes": {
+        "pt": "Linhas: potência P  ·  Colunas: máximo de vizinhas (o mínimo fica em 4)",
+        "en": "Rows: power P  ·  Columns: maximum of neighbours (the minimum stays at 4)",
+        "es": "Filas: potencia P  ·  Columnas: máximo de vecinas (el mínimo queda en 4)"},
     "cv_na": {"pt": "n/d", "en": "n/a", "es": "n/d"},
-    "cv_na_tip": {"pt": "Raio curto demais: nenhuma amostra vizinha para estimar.",
-                  "en": "Radius too short: no neighbouring sample to estimate from.",
-                  "es": "Radio demasiado corto: ninguna muestra vecina para estimar."},
+    "cv_na_tip": {
+        "pt": "Nenhuma amostra vizinha para estimar.",
+        "en": "No neighbouring sample to estimate from.",
+        "es": "Ninguna muestra vecina para estimar."},
     "cv_cell_tip": {"pt": "{cov}% das amostras de validação foram estimadas (em cinza quando abaixo de 95%).",
                     "en": "{cov}% of the validation samples were estimated (grey when below 95%).",
                     "es": "{cov}% de las muestras de validación fueron estimadas (en gris por debajo de 95%)."},
-    "cv_gap_tip": {"pt": "Este raio não alcança amostras em {gap}% do talhão, por isso não pode ser sugerido.",
-                   "en": "This radius reaches no sample in {gap}% of the field, so it cannot be suggested.",
-                   "es": "Este radio no alcanza muestras en el {gap}% del lote, por eso no puede sugerirse."},
     "cv_best": {
-        "pt": "<b>Melhor combinação: P = {p} e raio {mult}× ({radius} m).</b> Erro médio (RMSE) = {rmse}, "
-              "cerca de {pct}% da média. O P foi refinado em passos de 0,1 para o raio escolhido.",
-        "en": "<b>Best combination: P = {p} and radius {mult}× ({radius} m).</b> Mean error (RMSE) = {rmse}, "
-              "about {pct}% of the mean. P was refined in 0.1 steps for the chosen radius.",
-        "es": "<b>Mejor combinación: P = {p} y radio {mult}× ({radius} m).</b> Error medio (RMSE) = {rmse}, "
-              "cerca del {pct}% de la media. P se refinó en pasos de 0,1 para el radio elegido."},
+        "pt": "<b>Melhor combinação: P = {p} e até {kmax} vizinhas.</b> Erro médio (RMSE) = {rmse}, cerca de {pct}% da média. O P foi refinado em passos de 0,1 para esse máximo. O raio de busca fica em {radius} m, para não cortar as {kmax} vizinhas em 95% do talhão.",
+        "en": "<b>Best combination: P = {p} and up to {kmax} neighbours.</b> Mean error (RMSE) = {rmse}, about {pct}% of the mean. P was refined in 0.1 steps for this maximum. The search radius is set to {radius} m, so it does not cut the {kmax} neighbours in 95% of the field.",
+        "es": "<b>Mejor combinación: P = {p} y hasta {kmax} vecinas.</b> Error medio (RMSE) = {rmse}, cerca del {pct}% de la media. P se refinó en pasos de 0,1 para ese máximo. El radio de búsqueda queda en {radius} m, para no cortar las {kmax} vecinas en el 95% del lote."},
     "cv_explain": {
-        "pt": "Cada número da tabela é o erro médio ao estimar as amostras de validação como se elas "
-              "não existissem. Quanto menor, melhor o mapa representa os dados. Compare as linhas (P) e "
-              "as colunas (raio) para ver como cada parâmetro muda o erro. Valores em cinza vêm de raios "
-              "que não alcançam amostras em parte do talhão e não são sugeridos.",
-        "en": "Each number in the table is the average error when estimating the validation samples as "
-              "if they did not exist. The lower, the better the map represents the data. Compare rows (P) "
-              "and columns (radius) to see how each parameter changes the error. Grey values come from radii "
-              "that reach no sample in part of the field and are not suggested.",
-        "es": "Cada número de la tabla es el error medio al estimar las muestras de validación como si no "
-              "existieran. Cuanto menor, mejor representa el mapa los datos. Compare filas (P) y columnas "
-              "(radio) para ver cómo cada parámetro cambia el error. Los valores en gris vienen de radios "
-              "que no alcanzan muestras en parte del lote y no se sugieren."},
+        "pt": "Cada número da tabela é o erro médio ao estimar as amostras de validação como se elas não existissem. Quanto menor, melhor o mapa representa os dados. Compare as linhas (P) e as colunas (máximo de vizinhas): poucas vizinhas deixam o mapa mais local; muitas, mais suave.",
+        "en": "Each number in the table is the average error when estimating the validation samples as if they did not exist. The lower, the better the map represents the data. Compare rows (P) and columns (maximum of neighbours): few neighbours make the map more local; many, smoother.",
+        "es": "Cada número de la tabla es el error medio al estimar las muestras de validación como si no existieran. Cuanto menor, mejor representa el mapa los datos. Compare filas (P) y columnas (máximo de vecinas): pocas vecinas dejan el mapa más local; muchas, más suave."},
     "cv_apply": {"pt": "Aplicar", "en": "Apply", "es": "Aplicar"},
     "cv_close": {"pt": "Fechar", "en": "Close", "es": "Cerrar"},
     "cv_more": {
-        "pt": "<b>Validação cruzada</b><br><br>Algumas amostras são retiradas uma de cada vez e estimadas "
-              "pelas demais, com cada combinação de P e raio. O erro (RMSE, raiz do erro quadrático "
-              "médio) mostra qual combinação reproduz melhor os valores reais.<br><br>"
-              "<b>Escolha das amostras de validação</b> (até 60, sorteio reprodutível):<ul>"
-              "<li>espalhadas por todo o talhão (o talhão é dividido em blocos);</li>"
-              "<li>longe da borda, onde o IDW tem menos vizinhos;</li>"
-              "<li>sem valores discrepantes (fora de ±3 desvios padrão), que distorceriam o erro;</li>"
-              "<li>equilibradas entre valores baixos, médios e altos, para que o ajuste valha para toda a "
-              "variabilidade, e não só para os valores próximos da média.</li></ul>"
-              "<b>Zona de exclusão:</b> dados de sensores (como a CE) têm pontos a 1 ou 2 m na mesma "
-              "passada, quase iguais entre si. Se esses vizinhos fossem usados, o erro pareceria "
-              "pequeno demais e o método escolheria sempre P alto e raio curto (Roberts et al., 2017, "
-              "<i>Ecography</i> 40: 913-929). Por isso, ao validar cada amostra, as vizinhas mais próximas "
-              "que a distância típica entre um pixel e a amostra mais próxima são ignoradas.<br><br>"
-              "Para referência, Mueller et al. (2004, <i>Soil Science</i> 169: 841-851) obtiveram o melhor "
-              "resultado com IDW de potência 1,7 em mapas de condutividade elétrica do solo.",
-        "en": "<b>Cross-validation</b><br><br>Some samples are removed one at a time and estimated from "
-              "the others with each combination of P and radius. The error (RMSE, root mean square "
-              "error) shows which combination best reproduces the real values.<br><br>"
-              "<b>Choice of validation samples</b> (up to 60, reproducible draw):<ul>"
-              "<li>spread over the whole field (the field is split into blocks);</li>"
-              "<li>away from the border, where IDW has fewer neighbours;</li>"
-              "<li>without outliers (beyond ±3 standard deviations), which would distort the error;</li>"
-              "<li>balanced among low, medium and high values, so the fit holds for all the variability, "
-              "not only for values near the mean.</li></ul>"
-              "<b>Exclusion zone:</b> sensor data (such as EC) have points 1 or 2 m apart on the same pass, "
-              "almost identical. If those neighbours were used, the error would look too small and the "
-              "method would always choose high P and a short radius (Roberts et al., 2017, "
-              "<i>Ecography</i> 40: 913-929). So, when validating each sample, neighbours closer than the "
-              "typical distance between a pixel and its nearest sample are ignored.<br><br>"
-              "For reference, Mueller et al. (2004, <i>Soil Science</i> 169: 841-851) obtained the best "
-              "results with IDW power 1.7 for soil electrical conductivity maps.",
-        "es": "<b>Validación cruzada</b><br><br>Algunas muestras se retiran una a una y se estiman con las "
-              "demás, con cada combinación de P y radio. El error (RMSE, raíz del error cuadrático medio) "
-              "muestra qué combinación reproduce mejor los valores reales.<br><br>"
-              "<b>Elección de las muestras de validación</b> (hasta 60, sorteo reproducible):<ul>"
-              "<li>distribuidas por todo el lote (el lote se divide en bloques);</li>"
-              "<li>lejos del borde, donde el IDW tiene menos vecinas;</li>"
-              "<li>sin valores atípicos (fuera de ±3 desviaciones estándar), que distorsionarían el error;</li>"
-              "<li>equilibradas entre valores bajos, medios y altos, para que el ajuste valga para toda la "
-              "variabilidad y no solo para los valores cercanos a la media.</li></ul>"
-              "<b>Zona de exclusión:</b> los datos de sensores (como la CE) tienen puntos a 1 o 2 m en la "
-              "misma pasada, casi iguales. Si se usaran esas vecinas, el error parecería demasiado pequeño "
-              "y el método elegiría siempre P alto y radio corto (Roberts et al., 2017, <i>Ecography</i> "
-              "40: 913-929). Por eso, al validar cada muestra, se ignoran las vecinas más cercanas que la "
-              "distancia típica entre un píxel y su muestra más próxima.<br><br>"
-              "Como referencia, Mueller et al. (2004, <i>Soil Science</i> 169: 841-851) obtuvieron el mejor "
-              "resultado con IDW de potencia 1,7 en mapas de conductividad eléctrica del suelo."},
+        "pt": "<b>Validação cruzada</b><br><br>Algumas amostras são retiradas uma de cada vez e estimadas pelas demais, com cada combinação de P e máximo de vizinhas. O erro (RMSE, raiz do erro quadrático médio) mostra qual combinação reproduz melhor os valores reais.<br><br><b>Escolha das amostras de validação</b> (até 60, sorteio reprodutível):<ul><li>espalhadas por todo o talhão (o talhão é dividido em blocos);</li><li>longe da borda, onde o IDW tem menos vizinhos;</li><li>sem valores discrepantes (fora de ±3 desvios padrão), que distorceriam o erro;</li><li>equilibradas entre valores baixos, médios e altos, para que o ajuste valha para toda a variabilidade, e não só para os valores próximos da média.</li></ul><b>Zona de exclusão:</b> dados de sensores (como a CE) têm pontos a 1 ou 2 m na mesma passada, quase iguais entre si. Se esses vizinhos fossem usados, o erro pareceria pequeno demais e o método escolheria sempre P alto e poucas vizinhas (Roberts et al., 2017, <i>Ecography</i> 40: 913-929). Por isso, ao validar cada amostra, as vizinhas mais próximas que a distância típica entre um pixel e a amostra mais próxima são ignoradas.<br><br>Para referência, Mueller et al. (2004, <i>Soil Science</i> 169: 841-851) obtiveram o melhor resultado com IDW de potência 1,7 em mapas de condutividade elétrica do solo.",
+        "en": "<b>Cross-validation</b><br><br>Some samples are removed one at a time and estimated from the others with each combination of P and maximum of neighbours. The error (RMSE, root mean square error) shows which combination best reproduces the real values.<br><br><b>Choice of validation samples</b> (up to 60, reproducible draw):<ul><li>spread over the whole field (the field is split into blocks);</li><li>away from the border, where IDW has fewer neighbours;</li><li>without outliers (beyond ±3 standard deviations), which would distort the error;</li><li>balanced among low, medium and high values, so the fit holds for all the variability, not only for values near the mean.</li></ul><b>Exclusion zone:</b> sensor data (such as EC) have points 1 or 2 m apart on the same pass, almost identical. If those neighbours were used, the error would look too small and the method would always choose high P and few neighbours (Roberts et al., 2017, <i>Ecography</i> 40: 913-929). So, when validating each sample, neighbours closer than the typical distance between a pixel and its nearest sample are ignored.<br><br>For reference, Mueller et al. (2004, <i>Soil Science</i> 169: 841-851) obtained the best results with IDW power 1.7 for soil electrical conductivity maps.",
+        "es": "<b>Validación cruzada</b><br><br>Algunas muestras se retiran una a una y se estiman con las demás, con cada combinación de P y máximo de vecinas. El error (RMSE, raíz del error cuadrático medio) muestra qué combinación reproduce mejor los valores reales.<br><br><b>Elección de las muestras de validación</b> (hasta 60, sorteo reproducible):<ul><li>distribuidas por todo el lote (el lote se divide en bloques);</li><li>lejos del borde, donde el IDW tiene menos vecinas;</li><li>sin valores atípicos (fuera de ±3 desviaciones estándar), que distorsionarían el error;</li><li>equilibradas entre valores bajos, medios y altos, para que el ajuste valga para toda la variabilidad y no solo para los valores cercanos a la media.</li></ul><b>Zona de exclusión:</b> los datos de sensores (como la CE) tienen puntos a 1 o 2 m en la misma pasada, casi iguales. Si se usaran esas vecinas, el error parecería demasiado pequeño y el método elegiría siempre P alto y pocas vecinas (Roberts et al., 2017, <i>Ecography</i> 40: 913-929). Por eso, al validar cada muestra, se ignoran las vecinas más cercanas que la distancia típica entre un píxel y su muestra más próxima.<br><br>Como referencia, Mueller et al. (2004, <i>Soil Science</i> 169: 841-851) obtuvieron el mejor resultado con IDW de potencia 1,7 en mapas de conductividad eléctrica del suelo."},
     "p3_preview_n": {"pt": "{n} amostras", "en": "{n} samples", "es": "{n} muestras"},
     "p3_preview_note": {
         "pt": "Prévia em baixa resolução, só para comparar parâmetros. Vermelho = valores baixos, "
@@ -928,8 +748,10 @@ STRINGS = {
     # ---------------------------------------------------------------- pipeline
     "log_interpolating": {"pt": "Interpolando {label}...", "en": "Interpolating {label}...",
                           "es": "Interpolando {label}..."},
-    "log_params": {"pt": "  {label}: P = {p}, raio = {r}", "en": "  {label}: P = {p}, radius = {r}",
-                   "es": "  {label}: P = {p}, radio = {r}"},
+    "log_params": {
+        "pt": "  {label}: P = {p}, vizinhas {kmin} a {kmax}, raio = {r}",
+        "en": "  {label}: P = {p}, neighbours {kmin} to {kmax}, radius = {r}",
+        "es": "  {label}: P = {p}, vecinas {kmin} a {kmax}, radio = {r}"},
     "log_fixing": {"pt": "Corrigindo geometrias do contorno...", "en": "Fixing boundary geometries...",
                    "es": "Corrigiendo geometrías del contorno..."},
     "log_grid": {"pt": "Criando a grade de polígonos...", "en": "Creating the polygon grid...",
@@ -942,12 +764,9 @@ STRINGS = {
                        "en": "{label}: no valid value in the area, field skipped.",
                        "es": "{label}: ningún valor válido en el área, atributo omitido."},
     "warn_fallback": {
-        "pt": "{label}: em {pct}% do talhão o raio de busca não alcançou nenhuma amostra; nesses pontos "
-              "foram usadas as {k} amostras mais próximas. Para evitar, aumente o raio.",
-        "en": "{label}: in {pct}% of the field the search radius reached no sample; there the {k} "
-              "nearest samples were used. To avoid it, increase the radius.",
-        "es": "{label}: en el {pct}% del lote el radio de búsqueda no alcanzó ninguna muestra; allí se "
-              "usaron las {k} muestras más cercanas. Para evitarlo, aumente el radio."},
+        "pt": "{label}: em {pct}% do talhão o raio de busca alcançou menos de {k} amostras; nesses pontos foram usadas as {k} mais próximas, mesmo fora do raio (mínimo de vizinhas).",
+        "en": "{label}: in {pct}% of the field the search radius reached fewer than {k} samples; there the {k} nearest were used, even beyond the radius (minimum of neighbours).",
+        "es": "{label}: en el {pct}% del lote el radio de búsqueda alcanzó menos de {k} muestras; allí se usaron las {k} más cercanas, aunque estuvieran fuera del radio (mínimo de vecinas)."},
     "warn_load": {"pt": "Não foi possível carregar a camada de {label}.",
                   "en": "Could not load the layer for {label}.",
                   "es": "No se pudo cargar la capa de {label}."},
@@ -981,8 +800,10 @@ STRINGS = {
     "alg_p_tolerance": {"pt": "Tolerância além do contorno (m)", "en": "Tolerance beyond boundary (m)",
                         "es": "Tolerancia más allá del contorno (m)"},
     "alg_p_power": {"pt": "Potência P do IDW", "en": "IDW power P", "es": "Potencia P del IDW"},
-    "alg_p_radius": {"pt": "Raio de busca (m, 0 = sem limite)", "en": "Search radius (m, 0 = no limit)",
-                     "es": "Radio de búsqueda (m, 0 = sin límite)"},
+    "alg_p_radius": {
+        "pt": "Raio de busca (m, 0 = sem raio; só economiza cálculo)",
+        "en": "Search radius (m, 0 = no radius; only saves computation)",
+        "es": "Radio de búsqueda (m, 0 = sin radio; solo ahorra cálculo)"},
     "alg_p_pixel": {"pt": "Tamanho do pixel (m)", "en": "Pixel size (m)", "es": "Tamaño del píxel (m)"},
     "alg_p_folder": {"pt": "Pasta para os rasters interpolados", "en": "Folder for interpolated rasters",
                      "es": "Carpeta para los ráster interpolados"},
@@ -992,40 +813,7 @@ STRINGS = {
                     "en": "Layer '{name}' is in {crs}. Reproject it to a projected CRS in metres.",
                     "es": "La capa '{name}' está en {crs}. Reproyéctela a un SRC proyectado en metros."},
     "alg_help": {
-        "pt": "Interpola por IDW os atributos escolhidos de uma camada de pontos e calcula, por estatística "
-              "zonal, a média de cada atributo em cada célula de uma grade vetorial (gerada com o tamanho "
-              "de célula informado ou uma grade existente).\n\n"
-              "A interpolação cobre o retângulo do contorno com 100 m de margem, sem recorte. A média é "
-              "calculada nas células inteiras que tocam o talhão e só depois a grade é recortada pelo "
-              "contorno. A grade gerada é salva na pasta dos rasters como [contorno]_Grade Padrão_[célula]x[célula].shp "
-              "e reutilizada se já existir. As colunas recebem o nome do atributo (até 10 caracteres).\n\nA tolerância aceita "
-              "pontos um pouco fora do contorno. Raio 0 usa todas as amostras.\n\n"
-              "Opção: escolher P e raio de cada atributo por validação cruzada.\n\n"
-              "As camadas devem estar em um sistema projetado em metros. A saída é carregada com estilo "
-              "graduado (5 classes, Jenks, RdYlGn) do primeiro atributo. Para uma camada estilizada por "
-              "atributo, use o assistente em Vetor > AgriPrecisa.",
-        "en": "Interpolates the chosen fields of a point layer by IDW and computes, by zonal statistics, the "
-              "mean of each field in each cell of a vector grid (created with the given cell size or an "
-              "existing grid).\n\n"
-              "Interpolation covers the boundary rectangle plus a 100 m margin, without clipping. The mean is "
-              "computed in the whole cells touching the field and only then the grid is clipped by the "
-              "boundary. The created grid is saved in the raster folder as [boundary]_Grade Padrão_[cell]x[cell].shp "
-              "and reused if it already exists. Columns are named after the attributes (up to 10 characters).\n\nThe tolerance accepts points "
-              "slightly outside the boundary. Radius 0 uses all samples.\n\n"
-              "Option: choose P and radius of each attribute by cross-validation.\n\n"
-              "Layers must be in a projected CRS in metres. The output is loaded with a graduated style "
-              "(5 classes, Jenks, RdYlGn) on the first field. For one styled layer per field, use the "
-              "wizard in Vector > AgriPrecisa.",
-        "es": "Interpola por IDW los atributos elegidos de una capa de puntos y calcula, por estadística "
-              "zonal, el promedio de cada atributo en cada celda de una cuadrícula vectorial (creada con el "
-              "tamaño de celda indicado o una existente).\n\n"
-              "La interpolación cubre el rectángulo del contorno con 100 m de margen, sin recorte. La media "
-              "se calcula en las celdas enteras que tocan el lote y solo después se recorta por el contorno. "
-              "La cuadrícula creada se guarda en la carpeta de los ráster como [contorno]_Grade Padrão_[celda]x[celda].shp "
-              "y se reutiliza si ya existe. Las columnas llevan el nombre del atributo (hasta 10 caracteres).\n\nLa tolerancia "
-              "acepta puntos algo fuera del contorno. Radio 0 usa todas las muestras.\n\n"
-              "Opción: elegir P y radio de cada atributo por validación cruzada.\n\n"
-              "Las capas deben estar en un SRC proyectado en metros. La salida se carga con estilo "
-              "graduado (5 clases, Jenks, RdYlGn) del primer atributo. Para una capa con estilo por "
-              "atributo, use el asistente en Vectorial > AgriPrecisa."},
+        "pt": "Interpola por IDW os atributos escolhidos de uma camada de pontos e calcula, por estatística zonal, a média de cada atributo em cada célula de uma grade vetorial (gerada com o tamanho de célula informado ou uma grade existente).\n\nA interpolação cobre o retângulo do contorno com 100 m de margem, sem recorte. A média é calculada nas células inteiras que tocam o talhão e só depois a grade é recortada pelo contorno. A grade gerada é salva na pasta dos rasters como [contorno]_Grade Padrão_[célula]x[célula].shp e reutilizada se já existir. As colunas recebem o nome do atributo (até 10 caracteres).\n\nA tolerância aceita pontos um pouco fora do contorno.\n\nVizinhas: cada pixel usa no mínimo [mínimo] e no máximo [máximo] amostras, as mais próximas (padrão 4 e 16; máximo 0 = sem limite). O raio de busca só economiza cálculo: se alcançar menos que o mínimo, as mais próximas são usadas mesmo fora dele; se alcançar mais que o máximo, só as mais próximas entram. Raio 0 = sem raio.\n\nOpção: escolher P e máximo de vizinhas de cada atributo por validação cruzada; o raio é calculado para não cortar o máximo.\n\nAs camadas devem estar em um sistema projetado em metros. A saída é carregada com estilo graduado (5 classes, Jenks, RdYlGn) do primeiro atributo. Para uma camada estilizada por atributo, use o assistente em Vetor > AgriPrecisa.",
+        "en": "Interpolates the chosen fields of a point layer by IDW and computes, by zonal statistics, the mean of each field in each cell of a vector grid (created with the given cell size or an existing grid).\n\nInterpolation covers the boundary rectangle plus a 100 m margin, without clipping. The mean is computed in the whole cells touching the field and only then the grid is clipped by the boundary. The created grid is saved in the raster folder as [boundary]_Grade Padrão_[cell]x[cell].shp and reused if it already exists. Columns are named after the attributes (up to 10 characters).\n\nThe tolerance accepts points slightly outside the boundary.\n\nNeighbours: each pixel uses at least [minimum] and at most [maximum] samples, the nearest ones (default 4 and 16; maximum 0 = no limit). The search radius only saves computation: if it reaches fewer than the minimum, the nearest ones are used even beyond it; if it reaches more than the maximum, only the nearest ones are used. Radius 0 = no radius.\n\nOption: choose P and maximum of neighbours of each attribute by cross-validation; the radius is computed so it does not cut the maximum.\n\nLayers must be in a projected CRS in metres. The output is loaded with a graduated style (5 classes, Jenks, RdYlGn) on the first field. For one styled layer per field, use the wizard in Vector > AgriPrecisa.",
+        "es": "Interpola por IDW los atributos elegidos de una capa de puntos y calcula, por estadística zonal, el promedio de cada atributo en cada celda de una cuadrícula vectorial (creada con el tamaño de celda indicado o una existente).\n\nLa interpolación cubre el rectángulo del contorno con 100 m de margen, sin recorte. La media se calcula en las celdas enteras que tocan el lote y solo después se recorta por el contorno. La cuadrícula creada se guarda en la carpeta de los ráster como [contorno]_Grade Padrão_[celda]x[celda].shp y se reutiliza si ya existe. Las columnas llevan el nombre del atributo (hasta 10 caracteres).\n\nLa tolerancia acepta puntos algo fuera del contorno.\n\nVecinas: cada píxel usa como mínimo [mínimo] y como máximo [máximo] muestras, las más cercanas (por defecto 4 y 16; máximo 0 = sin límite). El radio de búsqueda solo ahorra cálculo: si alcanza menos que el mínimo, se usan las más cercanas aunque estén fuera de él; si alcanza más que el máximo, solo entran las más cercanas. Radio 0 = sin radio.\n\nOpción: elegir P y máximo de vecinas de cada atributo por validación cruzada; el radio se calcula para no cortar el máximo.\n\nLas capas deben estar en un SRC proyectado en metros. La salida se carga con estilo graduado (5 clases, Jenks, RdYlGn) del primer atributo. Para una capa con estilo por atributo, use el asistente en Vectorial > AgriPrecisa."},
 }

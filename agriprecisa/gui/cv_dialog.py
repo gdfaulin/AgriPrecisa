@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-AgriPrecisa: result of the IDW cross-validation (RMSE table by power P and radius).
+AgriPrecisa: result of the IDW cross-validation (RMSE table by power P and maximum of neighbours).
 """
 
 import math
@@ -14,7 +14,7 @@ from qgis.PyQt.QtWidgets import (
 
 from ..i18n import tr, fmt
 
-from ..core.idw_math import CV_POWERS, CV_MULTIPLES  # noqa: E402  (shared with the core)
+from ..core.idw_math import CV_POWERS, CV_MAX_NEIGHBOURS, MIN_NEIGHBOURS
 BEST_COLOR = QColor(166, 217, 106)      # light green of the RdYlGn ramp
 
 
@@ -30,25 +30,26 @@ class CrossValidationDialog(QDialog):
     linkActivated = pyqtSignal(str)
 
     def __init__(self, parent, attribute, rmse, coverage, spacing, best, best_power,
-                 n_val, exclusion, mean, map_coverage=None):
+                 n_val, exclusion, mean, max_neighbours=None, radius=None):
         super().__init__(parent)
         self.setWindowTitle(tr("cv_title"))
         self.resize(720, 620)
         i, j = best
         best_rmse = float(rmse[i, j])
         pct = abs(best_rmse / mean * 100) if mean else float("nan")
-        mult = CV_MULTIPLES[j]
+        kmax = max_neighbours or CV_MAX_NEIGHBOURS[j]
 
         header = QLabel(tr("cv_header", attribute=attribute, n=fmt(n_val),
-                           exclusion=fmt(exclusion, 1), spacing=fmt(spacing)))
+                           exclusion=fmt(exclusion, 1), spacing=fmt(spacing),
+                           kmin=MIN_NEIGHBOURS))
         header.setWordWrap(True)
 
-        table = QTableWidget(len(CV_POWERS), len(CV_MULTIPLES))
+        table = QTableWidget(len(CV_POWERS), len(CV_MAX_NEIGHBOURS))
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         table.setHorizontalHeaderLabels(
-            [tr("cv_col", mult=fmt(m, 1), radius=fmt(m * spacing)) for m in CV_MULTIPLES])
+            [tr("cv_col", k=k) for k in CV_MAX_NEIGHBOURS])
         table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -56,7 +57,7 @@ class CrossValidationDialog(QDialog):
         table.setVerticalHeaderLabels([tr("p3_power_value", p=fmt(p, 1)) for p in CV_POWERS])
         table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         for r in range(len(CV_POWERS)):
-            for c in range(len(CV_MULTIPLES)):
+            for c in range(len(CV_MAX_NEIGHBOURS)):
                 v = rmse[r, c]
                 cov = coverage[r, c]
                 if v is None or (isinstance(v, float) and math.isnan(v)):
@@ -67,9 +68,6 @@ class CrossValidationDialog(QDialog):
                     item.setToolTip(tr("cv_cell_tip", cov=fmt(cov * 100)))
                     if cov < 0.95:
                         item.setForeground(QColor(150, 150, 150))
-                    if map_coverage is not None and map_coverage[c] < 0.99:
-                        item.setForeground(QColor(150, 150, 150))
-                        item.setToolTip(tr("cv_gap_tip", gap=fmt((1 - map_coverage[c]) * 100, 1)))
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 if (r, c) == (i, j):
                     font = QFont(item.font())
@@ -82,9 +80,9 @@ class CrossValidationDialog(QDialog):
         rows_h = sum(table.rowHeight(r) for r in range(table.rowCount()))
         table.setMinimumHeight(table.horizontalHeader().minimumHeight() + rows_h + 6)
 
-        best_label = QLabel(tr("cv_best", p=fmt(best_power, 1), mult=fmt(mult, 1),
-                               radius=fmt(mult * spacing), rmse=fmt(best_rmse, decimals),
-                               pct=fmt(pct, 1)))
+        best_label = QLabel(tr("cv_best", p=fmt(best_power, 1), kmax=kmax,
+                               radius=fmt(radius) if radius else tr("no_limit"),
+                               rmse=fmt(best_rmse, decimals), pct=fmt(pct, 1)))
         best_label.setWordWrap(True)
         explain = QLabel(tr("cv_explain") + f'  <a href="cv_more">{tr("learn_more")}</a>')
         explain.setWordWrap(True)
@@ -107,4 +105,5 @@ class CrossValidationDialog(QDialog):
         layout.addWidget(buttons)
 
         self.table = table
-        self.result_summary = {"power": best_power, "multiple": mult, "rmse": best_rmse}
+        self.result_summary = {"power": best_power, "max_neighbours": kmax, "radius": radius,
+                               "rmse": best_rmse}

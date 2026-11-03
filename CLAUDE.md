@@ -25,13 +25,13 @@ Os complementos são usados em aula (por exemplo, Laboratório de Agricultura de
 ```
 agriprecisa/                pasta do complemento (é o que vai no ZIP)
   metadata.txt              versão, changelog, metadados do repositório do QGIS
-  core/idw_math.py          matemática pura, sem QGIS (IDW, cobertura, validação cruzada; testada com pytest)
+  core/idw_math.py          matemática pura, sem QGIS (IDW com mínimo e máximo de vizinhas, cobertura, validação cruzada; testada com pytest)
   core/pipeline.py          fluxo IDW (retângulo + 100 m) > células inteiras > estatística zonal > recorte
   core/compat.py            constantes compatíveis com QGIS 3.x e 4.x
   core/paths.py             pasta de saída padrão, nomes de arquivos (Grade Padrão) e de campos Shapefile
   gui/idw_wizard.py         assistente em 4 etapas
-  gui/params_page.py        Etapa 3: parâmetros por atributo (layout único), ajuste automático
-  gui/widgets.py            curva de peso (Shepard), barras de influência e prévia do mapa
+  gui/params_page.py        Etapa 3: P, vizinhas (mín./máx.), raio em Avançado, ajuste automático
+  gui/widgets.py            barras de influência (vizinhas usadas) e prévia do mapa
   gui/cv_dialog.py          tabela de erro da validação cruzada
   processing_provider/      provedor e algoritmo da Caixa de Ferramentas
   i18n.py                   textos em pt, en e es (toda chave nos três idiomas)

@@ -36,3 +36,5 @@ FIELD_NUMERIC = _first(lambda: Qgis.ProcessingFieldParameterDataType.Numeric,
                        lambda: QgsProcessingParameterField.Numeric)
 NUMBER_DOUBLE = _first(lambda: Qgis.ProcessingNumberParameterType.Double,
                        lambda: QgsProcessingParameterNumber.Double)
+NUMBER_INTEGER = _first(lambda: Qgis.ProcessingNumberParameterType.Integer,
+                        lambda: QgsProcessingParameterNumber.Integer)
