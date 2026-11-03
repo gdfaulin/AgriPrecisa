@@ -11,12 +11,13 @@ from qgis.core import (
     QgsProcessingLayerPostProcessorInterface, QgsProcessingParameterBoolean,
 )
 
-from ..core.compat import SRC_POINT, SRC_POLYGON, FIELD_NUMERIC, NUMBER_DOUBLE
+from ..core.compat import SRC_POINT, SRC_POLYGON, FIELD_NUMERIC, NUMBER_DOUBLE, NUMBER_INTEGER
 from ..core.pipeline import (
     IdwJob, run_idw_job, crs_in_meters, features_extent, style_graduated, boundary_geometry,
     field_cell_centres, edge_distances, extract_points, buffered,
 )
-from ..core.idw_math import coverage_distances, suggest_parameters, CV_MIN_VALIDATION
+from ..core.idw_math import (coverage_distances, suggest_parameters, CV_MIN_VALIDATION,
+                             MIN_NEIGHBOURS, DEFAULT_MAX_NEIGHBOURS)
 from ..core.paths import grid_file_name
 from ..i18n import tr
 
@@ -50,6 +51,8 @@ class IdwGridAlgorithm(QgsProcessingAlgorithm):
     TOLERANCE = "TOLERANCE"
     POWER = "POWER"
     RADIUS = "RADIUS"
+    MIN_NEIGHBOURS = "MIN_NEIGHBOURS"
+    MAX_NEIGHBOURS = "MAX_NEIGHBOURS"
     PIXEL = "PIXEL"
     AUTO_PARAMS = "AUTO_PARAMS"
     CELL_SIZE = "CELL_SIZE"
@@ -96,6 +99,12 @@ class IdwGridAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(QgsProcessingParameterNumber(
             self.RADIUS, tr("alg_p_radius"), NUMBER_DOUBLE, 100.0, minValue=0.0))
         self.addParameter(QgsProcessingParameterNumber(
+            self.MIN_NEIGHBOURS, tr("alg_p_min_n"), NUMBER_INTEGER, MIN_NEIGHBOURS,
+            minValue=1, maxValue=64))
+        self.addParameter(QgsProcessingParameterNumber(
+            self.MAX_NEIGHBOURS, tr("alg_p_max_n"), NUMBER_INTEGER, DEFAULT_MAX_NEIGHBOURS,
+            minValue=0, maxValue=256))
+        self.addParameter(QgsProcessingParameterNumber(
             self.PIXEL, tr("alg_p_pixel"), NUMBER_DOUBLE, 5.0, minValue=0.1))
         self.addParameter(QgsProcessingParameterBoolean(
             self.AUTO_PARAMS, tr("alg_p_auto"), defaultValue=False))
@@ -139,10 +148,14 @@ class IdwGridAlgorithm(QgsProcessingAlgorithm):
         tolerance = self.parameterAsDouble(parameters, self.TOLERANCE, context)
         power = self.parameterAsDouble(parameters, self.POWER, context)
         radius = self.parameterAsDouble(parameters, self.RADIUS, context)
-        params = [(power, radius)] * len(fields)
+        min_n = self.parameterAsInt(parameters, self.MIN_NEIGHBOURS, context)
+        max_n = self.parameterAsInt(parameters, self.MAX_NEIGHBOURS, context)
+        if max_n and max_n < min_n:
+            raise QgsProcessingException(tr("alg_err_neighbours", kmin=min_n, kmax=max_n))
+        params = [(power, radius, max_n)] * len(fields)
         if self.parameterAsBoolean(parameters, self.AUTO_PARAMS, context):
             params = self.cross_validated_params(boundary, points, fields, extent, tolerance,
-                                                 power, radius, context, feedback)
+                                                 power, radius, max_n, context, feedback)
 
         cell = self.parameterAsDouble(parameters, self.CELL_SIZE, context)
         pixel = self.parameterAsDouble(parameters, self.PIXEL, context)
@@ -162,6 +175,8 @@ class IdwGridAlgorithm(QgsProcessingAlgorithm):
             grid_input=grid_input,
             grid_path=grid_path,
             reuse_grid=reuse,
+            min_neighbours=min_n,
+            max_neighbours=max_n,
             boundary_input=parameters[self.BOUNDARY],
             boundary_extent=extent,
             boundary_crs=boundary.sourceCrs(),
@@ -184,10 +199,11 @@ class IdwGridAlgorithm(QgsProcessingAlgorithm):
         return {self.OUTPUT: output, self.RASTER_FOLDER: folder}
 
     def cross_validated_params(self, boundary, points, fields, extent, tolerance,
-                               power, radius, context, feedback):
+                               power, radius, max_n, context, feedback):
         """
-        (power, radius) for each field chosen by its own cross-validation; each attribute
-        has its own spatial dependence and variability. Falls back to the given values.
+        (power, radius, max_neighbours) for each field chosen by its own cross-validation;
+        each attribute has its own spatial dependence and variability. Falls back to the
+        given values.
         """
         geom = boundary_geometry(boundary.getFeatures())
         px, py, _, _ = field_cell_centres(geom)
@@ -204,16 +220,17 @@ class IdwGridAlgorithm(QgsProcessingAlgorithm):
             res = None
             if cover:
                 res = suggest_parameters(xs, ys, zs, edge_distances(geom, xs, ys), cover, typical,
-                                         pixel_nearest=nearest)
+                                         pixels=(px, py))
             if res is None or res.get("error"):
                 reason = (tr("cv_reason_cover") if res is None else
                           tr("cv_few", n=res["n_val"], min=CV_MIN_VALIDATION)
                           if res["error"] == "few" else tr("cv_failed"))
                 feedback.reportError(tr("alg_log_auto_fail", label=label, reason=reason,
                                         p=f"{power:g}", r=f"{radius:g} m"), fatalError=False)
-                out.append((power, radius))
+                out.append((power, radius, max_n))
                 continue
             feedback.pushInfo(tr("alg_log_auto", label=label, p=f"{res['power']:g}",
-                                 r=f"{res['radius']:.1f}", rmse=f"{res['best_rmse']:.4g}"))
-            out.append((res["power"], res["radius"]))
+                                 kmax=res["max_neighbours"], r=f"{res['radius']:.1f}",
+                                 rmse=f"{res['best_rmse']:.4g}"))
+            out.append((res["power"], res["radius"], res["max_neighbours"]))
         return out

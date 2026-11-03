@@ -2,43 +2,25 @@
 """
 AgriPrecisa: small didactic widgets used by the wizard.
 
-WeightCurve   : IDW weight 1/d^P relative to the weight at the typical pixel-to-sample
-                distance (Shepard, 1968), with distance ticks and the search radius.
-InfluenceBars : share of each neighbouring sample (lambda = w_i / sum w_j, 100 % in total)
+InfluenceBars : share of each neighbouring sample actually used (lambda = w_i / sum w_j, 100 % in total)
                 in the estimate of a typical pixel of the field.
 PreviewMap    : low-resolution live IDW map of the field with the real samples.
 """
 
-import math
-
 import numpy as np
 
 from qgis.PyQt.QtCore import Qt, QPointF, QRectF
-from qgis.PyQt.QtGui import QColor, QImage, QPainter, QPainterPath, QPen, QBrush
+from qgis.PyQt.QtGui import QColor, QImage, QPainter, QPen, QBrush
 from qgis.PyQt.QtWidgets import QSizePolicy, QWidget
 from qgis.core import QgsStyle
 
-from ..core.idw_math import NODATA, idw_grid, relative_weights, normalized_weights
+from ..core.idw_math import NODATA, idw_grid, normalized_weights, MIN_NEIGHBOURS
 from ..core.pipeline import field_cell_centres
 from ..i18n import tr, fmt
 
 CURVE_COLOR = QColor(26, 150, 65)        # green of the RdYlGn ramp
-RADIUS_COLOR = QColor(215, 25, 28)       # red of the RdYlGn ramp
 REF_COLOR = QColor(120, 120, 120)
-Y_MAX = 4.0                              # relative weight axis is cut here (it tends to infinity)
 MAX_BARS = 6
-
-
-def nice_step(span, target=5):
-    """Round tick step (1, 2 or 5 x 10^n) giving about ``target`` intervals."""
-    if span <= 0:
-        return 1.0
-    raw = span / target
-    mag = 10 ** math.floor(math.log10(raw))
-    for m in (1, 2, 5, 10):
-        if raw <= m * mag:
-            return m * mag
-    return 10 * mag
 
 
 def _small_font(painter):
@@ -46,113 +28,6 @@ def _small_font(painter):
     font.setPointSizeF(max(font.pointSizeF() - 1, 7))
     painter.setFont(font)
     return painter.fontMetrics().height()
-
-
-class WeightCurve(QWidget):
-    """w(d) / w(d_ref) = (d_ref / d)^P, from 0 to beyond the search radius."""
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setMinimumSize(270, 180)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.setToolTip(tr("p3_curve_tip"))
-        self.power = 2.0
-        self.radius = 100.0
-        self.d_ref = 10.0
-
-    def set_params(self, power, radius, d_ref):
-        self.power = power
-        self.radius = radius
-        self.d_ref = max(d_ref or 1.0, 0.1)
-        self.update()
-
-    def x_max(self):
-        base = self.radius if self.radius > 0 else 4 * self.d_ref
-        return max(base * 1.15, 2 * self.d_ref)
-
-    def paintEvent(self, event):
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        fh = _small_font(p)
-        pal = self.palette()
-        text_color = pal.color(pal.ColorRole.WindowText)
-        left, right, top, bottom = fh + 26, 10, fh + 6, 3 * fh + 12
-        w, h = self.width() - left - right, self.height() - top - bottom
-        if w <= 20 or h <= 20:
-            p.end()
-            return
-        x_max = self.x_max()
-
-        def to_px(d, wgt):
-            return QPointF(left + d / x_max * w, top + (1 - min(wgt, Y_MAX) / Y_MAX) * h)
-
-        # axes
-        p.setPen(QPen(text_color, 1))
-        p.drawLine(QPointF(left, top + h), QPointF(left + w, top + h))
-        p.drawLine(QPointF(left, top), QPointF(left, top + h))
-        # y ticks: 0 .. Y_MAX, the top one marks that the axis is cut
-        for v in range(int(Y_MAX) + 1):
-            y = to_px(0, v).y()
-            p.drawLine(QPointF(left - 4, y), QPointF(left, y))
-            label = fmt(v) if v < Y_MAX else "≥" + fmt(v)
-            p.drawText(QRectF(0, y - fh / 2, left - 6, fh), Qt.AlignmentFlag.AlignRight, label)
-        # x ticks with a round step
-        step = nice_step(x_max)
-        t = 0.0
-        while t <= x_max + 1e-9:
-            x = to_px(t, 0).x()
-            p.drawLine(QPointF(x, top + h), QPointF(x, top + h + 4))
-            p.drawText(QRectF(x - 30, top + h + 4, 60, fh), Qt.AlignmentFlag.AlignHCenter, fmt(t))
-            t += step
-        p.drawText(QRectF(left, top + h + fh + 4, w, fh), Qt.AlignmentFlag.AlignHCenter,
-                   tr("p3_curve_x"))
-        p.save()
-        p.translate(2, top + h / 2)
-        p.rotate(-90)
-        p.drawText(QRectF(-h / 2, 0, h, fh), Qt.AlignmentFlag.AlignHCenter, tr("p3_curve_y"))
-        p.restore()
-
-        # curve (starts where it enters the cut axis, so it never draws a fake plateau)
-        d0 = self.d_ref * (1.0 / Y_MAX) ** (1.0 / self.power)    # where the weight equals Y_MAX
-        d = np.linspace(d0, x_max, 240)
-        wts = relative_weights(d, self.power, self.d_ref)
-        path = QPainterPath()
-        for i, (di, wi) in enumerate(zip(d, wts)):
-            pt = to_px(di, wi)
-            if i == 0:
-                path.moveTo(pt)
-            else:
-                path.lineTo(pt)
-        p.setPen(QPen(CURVE_COLOR, 2.5))
-        p.drawPath(path)
-
-        # reference point: weight 1 at the typical pixel-to-sample distance
-        ref = to_px(self.d_ref, 1.0)
-        p.setBrush(QBrush(CURVE_COLOR))
-        p.drawEllipse(ref, 3.5, 3.5)
-        p.setPen(text_color)
-        text = tr("p3_curve_ref_point", d=fmt(self.d_ref, 1))
-        tw = p.fontMetrics().horizontalAdvance(text)
-        tx = min(ref.x() + 6, left + w - tw)            # keep the label inside the plot
-        p.drawText(QRectF(tx, ref.y() - fh - 4, tw + 4, fh), Qt.AlignmentFlag.AlignLeft, text)
-
-        # search radius
-        if self.radius > 0:
-            x = to_px(min(self.radius, x_max), 0).x()
-            p.setPen(QPen(RADIUS_COLOR, 1.5, Qt.PenStyle.DashLine))
-            p.drawLine(QPointF(x, top), QPointF(x, top + h))
-            p.setPen(RADIUS_COLOR)
-            p.drawText(QRectF(x - 80, 0, 160, fh), Qt.AlignmentFlag.AlignHCenter,
-                       tr("p3_curve_radius") + " " + fmt(self.radius) + " m")
-
-        # one-line legend
-        ly = top + h + 2 * fh + 8 + fh / 2
-        p.setPen(QPen(CURVE_COLOR, 2.5))
-        p.drawLine(QPointF(left, ly), QPointF(left + 18, ly))
-        p.setPen(text_color)
-        p.drawText(QRectF(left + 22, ly - fh / 2, w, fh), Qt.AlignmentFlag.AlignLeft,
-                   tr("p3_power_value", p=fmt(self.power, 1)))
-        p.end()
 
 
 class InfluenceBars(QWidget):
@@ -263,7 +138,7 @@ class PreviewMap(QWidget):
     def set_points(self, xs, ys, zs):
         self.points = (np.asarray(xs, float), np.asarray(ys, float), np.asarray(zs, float))
 
-    def compute(self, power, radius):
+    def compute(self, power, radius, max_neighbours=0, min_neighbours=MIN_NEIGHBOURS):
         """Recompute the preview. Returns (min, max) of the interpolated values or None."""
         xs, ys, zs = self.points
         if self.grid is None or zs.size == 0:
@@ -271,7 +146,8 @@ class PreviewMap(QWidget):
             self.update()
             return None
         xmin, ymax, ncol, nrow, res = self.grid
-        values = idw_grid(xs, ys, zs, xmin, ymax, ncol, nrow, res, power, radius)
+        values = idw_grid(xs, ys, zs, xmin, ymax, ncol, nrow, res, power, radius,
+                          min_neighbours=min_neighbours, max_neighbours=max_neighbours)
         valid = (values != NODATA) & self.mask
         if valid.any():
             vmin, vmax = float(values[valid].min()), float(values[valid].max())

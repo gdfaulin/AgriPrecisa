@@ -30,7 +30,7 @@ from ..core.pipeline import (
     sample_stats,
     style_graduated, rect_to_crs, N_CLASSES, COLOR_RAMP,
 )
-from ..core.idw_math import snap_extent, sample_density
+from ..core.idw_math import snap_extent, sample_density, MIN_NEIGHBOURS
 from ..i18n import tr, fmt
 from ..core.paths import (
     default_output_folder, prepare_output_folder, grid_file_name, result_file_name,
@@ -433,9 +433,10 @@ class SummaryPage(QWizardPage):
         w = self.wizard()
         origins = getattr(w, "param_origins", ["default"] * len(w.items))
         items = "".join(
-            tr("p4_item", layer=l.name(), field=f, p=fmt(p, 1),
+            tr("p4_item", layer=l.name(), field=f, p=fmt(p, 1), kmin=MIN_NEIGHBOURS,
+               kmax=kmax if kmax else tr("no_limit"),
                r=tr("no_limit") if r == 0 else fmt(r) + " m", origin=tr(ORIGIN_TEXT[o]))
-            for (l, f), (p, r), o in zip(w.items, w.params, origins))
+            for (l, f), (p, r, kmax), o in zip(w.items, w.params, origins))
         sel = f" ({tr('selected_features')})" if w.selected_only else ""
         self.text.setHtml(tr(
             "p4_summary", boundary=w.boundary.name() + sel, crs=crs_code(w.boundary.crs()),
@@ -473,7 +474,7 @@ class IdwWizard(QWizard):
         self.tolerance = 50.0
         self.folder = ""
         self.items = []
-        self.params = []          # (power, radius) per item, set in step 3
+        self.params = []          # (power, radius, max_neighbours) per item, set in step 3
         self.grid_layer = None    # existing grid chosen in step 1 (None = generate)
         self.cell_size = 5.0
         self.param_origins = []
@@ -520,7 +521,9 @@ def load_results(result, wizard):
     first = None
     for i, info in enumerate(result["layers"]):
         r = tr("no_limit") if info["radius"] == 0 else f"R={info['radius']:.0f} m"
-        name = f"{info['label']} | IDW P={info['power']:g} {r} {wizard.pixel:g} m"
+        k = tr("layer_neigh", kmin=info.get("min_neighbours", MIN_NEIGHBOURS),
+               kmax=info.get("max_neighbours") or tr("no_limit"))
+        name = f"{info['label']} | IDW P={info['power']:g} {k} {r} {wizard.pixel:g} m"
         layer = QgsVectorLayer(result["output"], name, "ogr")
         if not layer.isValid():
             result["warnings"].append(tr("warn_load", label=info["label"]))

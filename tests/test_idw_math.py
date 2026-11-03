@@ -34,9 +34,13 @@ def test_radius_gap_uses_nearest_samples_instead_of_nodata():
     g, used = idw_grid(xs, ys, zs, 12.5, 7.5, 1, 1, 5.0, 2, 5.0, return_fallback=True)
     assert g[0, 0] != NODATA and used[0, 0]
     assert g[0, 0] == pytest.approx(2.0)          # 4 nearest, symmetric -> mean of 1 and 3
-    # pixels the radius reaches are not flagged
-    g2, used2 = idw_grid(xs, ys, zs, -2.5, 2.5, 1, 1, 5.0, 2, 5.0, return_fallback=True)
+    # pixels where the radius reaches the minimum are not flagged
+    g2, used2 = idw_grid(xs, ys, zs, -2.5, 2.5, 1, 1, 5.0, 2, 5.0, min_neighbours=1,
+                         return_fallback=True)
     assert not used2[0, 0]
+    # with the default minimum (4) the same pixel reaches only 1 sample and goes beyond
+    _, used3 = idw_grid(xs, ys, zs, -2.5, 2.5, 1, 1, 5.0, 2, 5.0, return_fallback=True)
+    assert used3[0, 0]
 
 
 def test_radius_leaves_far_pixels_nodata():
@@ -253,10 +257,23 @@ def test_exclusion_zone_ignores_close_neighbours():
     assert with_excl[0, 0] == pytest.approx(10.0)  # realistic: only the 30 m sample is used
 
 
-def test_radius_without_neighbours_has_no_coverage():
+def test_cross_validation_minimum_neighbours_beyond_radius():
+    # with a 10 m radius nothing is reachable, but the minimum of neighbours still predicts
     xs, ys = np.array([0.0, 50.0]), np.zeros(2)
-    rmse, cov = cross_validate_idw(xs, ys, np.array([1.0, 2.0]), [0], [2], [10, 100], 0.0)
-    assert np.isnan(rmse[0, 0]) and cov[0, 0] == 0 and cov[0, 1] == 1
+    rmse, cov = cross_validate_idw(xs, ys, np.array([1.0, 2.0]), [0], [2], [4, 8], 0.0, radius=10.0)
+    assert np.allclose(cov, 1.0) and rmse[0, 0] == pytest.approx(1.0)
+    none, cov0 = cross_validate_idw(xs, ys, np.array([1.0, 2.0]), [0], [2], [4], 0.0, radius=10.0,
+                                    min_neighbours=0)
+    assert np.isnan(none[0, 0]) and cov0[0, 0] == 0
+
+
+def test_cross_validation_maximum_limits_neighbours():
+    # validation at 0; neighbours at 10 m (value 10) and 20, 30, 40 m (value 0)
+    xs, ys = np.array([0.0, 10.0, 20.0, 30.0, 40.0]), np.zeros(5)
+    zs = np.array([10.0, 10.0, 0.0, 0.0, 0.0])
+    rmse, _ = cross_validate_idw(xs, ys, zs, [0], [2], [1, 4], 0.0, min_neighbours=1)
+    assert rmse[0, 0] == pytest.approx(0.0)        # only the nearest (same value)
+    assert rmse[0, 1] > 1.0                        # the far ones pull the estimate down
 
 
 def test_best_combination_prefers_covered_minimum():
@@ -268,7 +285,7 @@ def test_best_combination_prefers_covered_minimum():
 def test_suggest_parameters_differs_between_attributes():
     # two attributes on the same sensor passes: one smooth (long-range dependence) and one
     # with strong short-range variation; each must get its own parameters
-    from agriprecisa.core.idw_math import suggest_parameters, coverage_distances
+    from agriprecisa.core.idw_math import suggest_parameters, coverage_distances, CV_MAX_NEIGHBOURS
     rng = np.random.default_rng(3)
     xs = np.concatenate([np.arange(0, 300, 2.0) for _ in range(15)])
     ys = np.repeat(np.arange(15) * 20.0 + 10, 150)
@@ -277,11 +294,13 @@ def test_suggest_parameters_differs_between_attributes():
     edge = np.minimum.reduce([xs, ys, 300 - xs, 300 - ys])
     px, py = _grid(60, 5.0)
     typical, cover = coverage_distances(px, py, xs, ys)
-    a = suggest_parameters(xs, ys, smooth, edge, cover, typical)
-    b = suggest_parameters(xs, ys, rough, edge, cover, typical)
+    a = suggest_parameters(xs, ys, smooth, edge, cover, typical, pixels=(px, py))
+    b = suggest_parameters(xs, ys, rough, edge, cover, typical, pixels=(px, py))
     assert a["n_val"] == 60 and b["n_val"] == 60
-    assert (a["power"], a["multiple"]) != (b["power"], b["multiple"])
-    assert a["multiple"] >= b["multiple"]           # smooth field tolerates a larger radius
+    assert a["max_neighbours"] in CV_MAX_NEIGHBOURS and b["max_neighbours"] in CV_MAX_NEIGHBOURS
+    assert (a["power"], a["max_neighbours"]) != (b["power"], b["max_neighbours"])
+    # a smooth field gains from more neighbours (or a lower P) than a rough one
+    assert a["max_neighbours"] >= b["max_neighbours"] or a["power"] < b["power"]
 
 
 def test_suggest_parameters_few_samples():
@@ -291,17 +310,73 @@ def test_suggest_parameters_few_samples():
     assert r == {"error": "few", "n_val": 9}
 
 
-def test_suggested_radius_never_leaves_gaps_in_the_map():
-    # Regression: the short-range attribute got radius 1x the coverage distance, which by
-    # definition leaves ~5 % of the field without value (grey strips between passes).
-    from agriprecisa.core.idw_math import suggest_parameters, coverage_distances, MIN_PIXEL_COVERAGE
+def test_suggested_radius_does_not_cut_the_maximum_of_neighbours():
+    # the radius set by the auto-fit must reach the chosen maximum in 95 % of the field, so
+    # the maximum (not the radius) decides how many samples a pixel uses
+    from agriprecisa.core.idw_math import (suggest_parameters, coverage_distances,
+                                           kth_nearest_distances)
     rng = np.random.default_rng(3)
     xs = np.concatenate([np.arange(0, 300, 2.0) for _ in range(15)])
     ys = np.repeat(np.arange(15) * 20.0 + 10, 150)
     rough = np.sin(xs / 6.0) * np.cos(ys / 7.0) + rng.normal(0, 0.02, xs.size)
     edge = np.minimum.reduce([xs, ys, 300 - xs, 300 - ys])
     px, py = _grid(130, 2.3)                                 # fine pixels, not aligned to passes
-    typical, cover, nearest = coverage_distances(px, py, xs, ys, return_nearest=True)
-    r = suggest_parameters(xs, ys, rough, edge, cover, typical, pixel_nearest=nearest)
-    assert np.mean(nearest <= r["radius"]) >= MIN_PIXEL_COVERAGE
-    assert r["map_coverage"][0] < MIN_PIXEL_COVERAGE        # 1x is reported as leaving gaps
+    typical, cover = coverage_distances(px, py, xs, ys)
+    r = suggest_parameters(xs, ys, rough, edge, cover, typical, pixels=(px, py))
+    kth = kth_nearest_distances(px, py, xs, ys, r["max_neighbours"])
+    assert np.mean(kth <= r["radius"]) >= 0.95
+    assert r["radius"] >= cover
+    # Regression: with a maximum of 4, 5 % of the field reached fewer than the minimum and
+    # step 3 showed the orange warning right after the auto-fit
+    k4 = kth_nearest_distances(px, py, xs, ys, 4)
+    assert (k4 <= r["radius"]).all()
+
+
+def test_minimum_neighbours_is_always_met_beyond_radius():
+    # every pixel has a value even with a tiny radius; flagged pixels went beyond it
+    rng = np.random.default_rng(5)
+    xs, ys, zs = rng.uniform(0, 100, 40), rng.uniform(0, 100, 40), rng.uniform(0, 10, 40)
+    g, used = idw_grid(xs, ys, zs, 0, 100, 20, 20, 5.0, 2, 1.0, max_neighbours=16,
+                       return_fallback=True)
+    assert (g != NODATA).all() and used.mean() > 0.9
+
+
+def test_maximum_neighbours_limits_the_radius():
+    # pixel at x = 0: samples at 1 m (value 10) and 50 m (value 0, nine of them)
+    xs = np.array([1.0] + [50.0] * 9)
+    ys = np.array([0.0] + list(np.linspace(-1, 1, 9)))
+    zs = np.array([10.0] + [0.0] * 9)
+    all_n = idw_grid(xs, ys, zs, -0.5, 0.5, 1, 1, 1.0, 1, 0, min_neighbours=1, max_neighbours=0)
+    one = idw_grid(xs, ys, zs, -0.5, 0.5, 1, 1, 1.0, 1, 0, min_neighbours=1, max_neighbours=1)
+    assert one[0, 0] == pytest.approx(10.0)
+    assert all_n[0, 0] < 10.0
+    # the maximum never goes below the minimum
+    four = idw_grid(xs, ys, zs, -0.5, 0.5, 1, 1, 1.0, 1, 0, min_neighbours=4, max_neighbours=1)
+    assert four[0, 0] < 10.0
+
+
+def test_select_neighbour_distances_rule():
+    from agriprecisa.core.idw_math import select_neighbour_distances
+    d = np.array([1.0, 2.0, 3.0, 10.0, 20.0, 30.0])
+    assert select_neighbour_distances(d, 5.0, 4, 16).tolist() == [1, 2, 3, 10]   # minimum
+    assert select_neighbour_distances(d, 25.0, 2, 3).tolist() == [1, 2, 3]       # maximum
+    assert select_neighbour_distances(d, 25.0, 2, 0).tolist() == [1, 2, 3, 10, 20]
+    assert select_neighbour_distances(d, 0, 2, 0).size == 6                       # no radius
+
+
+def test_share_beyond_radius_and_knn():
+    from agriprecisa.core.idw_math import nearest_k_distances, share_beyond_radius
+    xs, ys = np.array([0.0, 10.0, 20.0]), np.zeros(3)
+    knn = nearest_k_distances([0.0, 20.0], [0.0, 0.0], xs, ys, 4)
+    assert knn.shape == (2, 4) and knn[0, :3].tolist() == [0, 10, 20] and np.isinf(knn[0, 3])
+    assert share_beyond_radius(knn, 2, 10.0) == 0.0
+    assert share_beyond_radius(knn, 3, 10.0) == 100.0
+
+
+def test_radius_from_knn_reaches_minimum_everywhere():
+    from agriprecisa.core.idw_math import radius_from_knn
+    knn = np.array([[1.0, 2.0, 3.0, 4.0], [1.0, 2.0, 3.0, 50.0]] + [[1.0, 2.0, 3.0, 4.0]] * 18)
+    # max 3 in 95 % -> 3 m, but the minimum of 4 reaches 50 m in one pixel
+    assert radius_from_knn(knn, 3, 4) == 50.0
+    assert radius_from_knn(knn, 3, 2) == 3.0
+    assert radius_from_knn(knn, 3, 2, coverage=7.2) == 8.0

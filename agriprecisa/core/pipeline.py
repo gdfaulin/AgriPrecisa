@@ -18,7 +18,8 @@ from qgis.core import (
 )
 
 from .compat import UNIT_METERS
-from .idw_math import NODATA, idw_grid, safe_name, snap_extent, unique_prefixes, FALLBACK_NEIGHBOURS
+from .idw_math import (NODATA, idw_grid, safe_name, snap_extent, unique_prefixes,
+                       MIN_NEIGHBOURS, DEFAULT_MAX_NEIGHBOURS)
 from .paths import shapefile_field_names
 from ..i18n import tr, fmt
 
@@ -248,9 +249,12 @@ class IdwJob:
     output_path    : path of the final polygon grid (.shp in the wizard)
     raster_folder  : folder for the interpolated GeoTIFFs
     stamp          : text added to raster file names (avoids overwriting)
-    params         : optional list of (power, radius), one per item; each attribute has
-                     its own spatial dependence, so each may have its own IDW parameters.
-                     When omitted, ``power`` and ``radius`` are used for every item.
+    params         : optional list of (power, radius) or (power, radius, max_neighbours),
+                     one per item; each attribute has its own spatial dependence, so each
+                     may have its own IDW parameters. When omitted, ``power``, ``radius``
+                     and ``max_neighbours`` are used for every item.
+    min_neighbours : every pixel uses at least this many samples (beyond the radius if needed)
+    max_neighbours : and at most this many (the nearest ones); 0 = no maximum
     cell_size      : side of the vector grid cells (default: pixel size)
     grid_input     : existing polygon grid to use instead of generating one (only the
                      cells touching the boundary are used)
@@ -261,7 +265,8 @@ class IdwJob:
     def __init__(self, boundary_input, boundary_extent, boundary_crs, items,
                  tolerance, power, radius, pixel, raster_folder, output_path, stamp="",
                  params=None, cell_size=None, grid_input=None, grid_path=None,
-                 reuse_grid=False):
+                 reuse_grid=False, min_neighbours=MIN_NEIGHBOURS,
+                 max_neighbours=DEFAULT_MAX_NEIGHBOURS):
         self.boundary_input = boundary_input
         self.boundary_extent = boundary_extent
         self.boundary_crs = boundary_crs
@@ -273,11 +278,15 @@ class IdwJob:
         self.raster_folder = raster_folder
         self.output_path = output_path
         self.stamp = stamp
+        self.min_neighbours = int(min_neighbours)
+        self.max_neighbours = int(max_neighbours)
         if params is None:
             params = [(self.power, self.radius)] * len(items)
         if len(params) != len(items):
             raise ValueError("params must have one (power, radius) per item")
-        self.params = [(float(p), float(r)) for p, r in params]
+        self.params = [(float(t[0]), float(t[1]),
+                        int(t[2]) if len(t) > 2 and t[2] is not None else self.max_neighbours)
+                       for t in params]
         self.cell_size = float(cell_size) if cell_size else self.pixel
         self.grid_input = grid_input
         self.grid_path = grid_path
@@ -296,8 +305,8 @@ class IdwJob:
 
 def fallback_share_in_field(used_fallback, xmin, ymax, res, field_geom, field_engine):
     """
-    Percentage of the field area whose pixels had no sample within the search radius and
-    therefore used the nearest samples (fallback). Pixels of the 100 m margin do not count.
+    Percentage of the field area whose pixels had fewer samples within the search radius
+    than the minimum of neighbours and therefore used the nearest samples beyond it. Pixels of the 100 m margin do not count.
     """
     import numpy as np
     rows, cols = np.nonzero(used_fallback)
@@ -366,7 +375,7 @@ def run_idw_job(job, context, feedback):
         field_engine.prepareGeometry()
 
     # 1) IDW for each field, over the boundary extent plus a safety margin
-    for (source, field), prefix, (power, radius) in zip(job.items, prefixes, job.params):
+    for (source, field), prefix, (power, radius, max_n) in zip(job.items, prefixes, job.params):
         steps.setCurrentStep(step)
         step += 1
         label = f"{field} ({name_of(source)})"
@@ -382,8 +391,11 @@ def run_idw_job(job, context, feedback):
             return not feedback.isCanceled()
 
         feedback.pushInfo(tr("log_params", label=label, p=f"{power:g}",
-                             r=tr("no_limit") if radius == 0 else f"{radius:.1f} m"))
+                             r=tr("no_limit") if radius == 0 else f"{radius:.1f} m",
+                             kmin=job.min_neighbours,
+                             kmax=max_n if max_n else tr("no_limit")))
         result = idw_grid(xs, ys, zs, xmin, ymax, ncol, nrow, res, power, radius, cb,
+                          min_neighbours=job.min_neighbours, max_neighbours=max_n,
                           return_fallback=True)
         if result is None or feedback.isCanceled():
             raise QgsProcessingException(tr("canceled"))
@@ -391,7 +403,7 @@ def run_idw_job(job, context, feedback):
         fallback_pct = fallback_share_in_field(used_fallback, xmin, ymax, res, field_geom, field_engine)
         if fallback_pct > 0:
             warnings.append(tr("warn_fallback", label=label, pct=fmt(fallback_pct, 1),
-                               k=FALLBACK_NEIGHBOURS))
+                               k=job.min_neighbours))
             feedback.pushInfo(warnings[-1])
         raster = os.path.join(
             job.raster_folder,
@@ -399,6 +411,7 @@ def run_idw_job(job, context, feedback):
         write_geotiff(raster, grid, xmin, ymax, res, crs)
         layers.append({"prefix": prefix, "field": field, "label": label,
                        "raster": raster, "n": len(zs), "power": power, "radius": radius,
+                       "max_neighbours": max_n, "min_neighbours": job.min_neighbours,
                        "fallback_pct": fallback_pct})
 
     if not layers:
