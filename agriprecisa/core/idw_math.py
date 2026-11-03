@@ -59,17 +59,25 @@ def unique_prefixes(pairs):
     return out
 
 
-def idw_grid(xs, ys, zs, xmin, ymax, ncol, nrow, res, power, radius, callback=None):
+FALLBACK_NEIGHBOURS = 4   # samples used where the search radius reaches none
+
+
+def idw_grid(xs, ys, zs, xmin, ymax, ncol, nrow, res, power, radius, callback=None,
+             fallback_neighbours=FALLBACK_NEIGHBOURS, return_fallback=False):
     """
     Inverse Distance Weighting evaluated at each pixel centre.
 
     value = sum(z / d^P) / sum(1 / d^P), using only samples within ``radius``.
-    ``radius`` = 0 means all samples are used. Pixels with no sample within
-    the radius receive NODATA. A pixel lying exactly on a sample takes that
-    sample's value (mean if several samples coincide).
+    ``radius`` = 0 means all samples are used. A pixel lying exactly on a sample takes
+    that sample's value (mean if several samples coincide).
 
-    ``callback(fraction)`` may return False to cancel; the function then
-    returns None. Work is done in blocks to bound memory use.
+    Where the radius reaches no sample (e.g. a wide gap between sensor passes), the pixel
+    uses its ``fallback_neighbours`` nearest samples instead of being left empty, so the
+    map never has holes. With ``fallback_neighbours`` = 0 those pixels receive NODATA.
+
+    ``callback(fraction)`` may return False to cancel; the function then returns None.
+    With ``return_fallback`` the result is (grid, mask of pixels that used the fallback).
+    Work is done in blocks to bound memory use.
     """
     xs = np.asarray(xs, dtype=np.float64)
     ys = np.asarray(ys, dtype=np.float64)
@@ -81,9 +89,48 @@ def idw_grid(xs, ys, zs, xmin, ymax, ncol, nrow, res, power, radius, callback=No
     gx, gy = gx.ravel(), gy.ravel()
 
     out = np.full(gx.size, NODATA, dtype=np.float64)
+    used_fallback = np.zeros(gx.size, dtype=bool)
     n = xs.size
     if n == 0:
-        return out.reshape(nrow, ncol)
+        grid = out.reshape(nrow, ncol)
+        return (grid, used_fallback.reshape(nrow, ncol)) if return_fallback else grid
+
+    block = max(1, int(4_000_000 // n))
+    r2 = radius * radius if radius > 0 else None
+    k = min(int(fallback_neighbours or 0), n)
+
+    for start in range(0, gx.size, block):
+        end = min(start + block, gx.size)
+        dx = gx[start:end, None] - xs[None, :]
+        dy = gy[start:end, None] - ys[None, :]
+        d2 = dx * dx + dy * dy
+
+        valid = (d2 <= r2) if r2 is not None else np.ones_like(d2, dtype=bool)
+        empty = ~valid.any(axis=1)
+        if k > 0 and empty.any():
+            # nearest k samples for pixels the radius does not reach
+            rows = np.flatnonzero(empty)
+            nearest = np.argpartition(d2[rows], k - 1, axis=1)[:, :k]
+            valid[rows[:, None], nearest] = True
+            used_fallback[start + rows] = True
+        zero = d2 < 1e-12
+        d2_safe = np.where(zero, 1.0, d2)
+        weights = np.where(valid, d2_safe ** (-power / 2.0), 0.0)
+
+        on_sample = zero.any(axis=1)
+        if on_sample.any():
+            weights[on_sample] = zero[on_sample].astype(float)
+
+        wsum = weights.sum(axis=1)
+        ok = wsum > 0
+        values = np.full(end - start, NODATA)
+        values[ok] = (weights[ok] @ zs) / wsum[ok]
+        out[start:end] = values
+
+        if callback is not None and callback(end / gx.size) is False:
+            return None
+    grid = out.reshape(nrow, ncol)
+    return (grid, used_fallback.reshape(nrow, ncol)) if return_fallback else grid
 
     block = max(1, int(4_000_000 // n))
     r2 = radius * radius if radius > 0 else None
