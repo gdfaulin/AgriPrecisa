@@ -19,7 +19,7 @@ from qgis.PyQt.QtWidgets import (
     QRadioButton, QGridLayout, QSplitter, QWidget, QSizePolicy,
 )
 from qgis.core import (
-    QgsSettings, QgsGeometry, QgsVectorFileWriter,
+    QgsSettings, QgsGeometry,
     QgsApplication, QgsProject, QgsVectorLayer, QgsProcessingContext, QgsProcessingFeedback,
     QgsProcessingException, QgsProcessingFeatureSourceDefinition,
 )
@@ -33,7 +33,7 @@ from ..core.pipeline import (
 from ..core.idw_math import snap_extent, sample_density, MIN_NEIGHBOURS
 from ..i18n import tr, fmt
 from ..core.paths import (
-    default_output_folder, prepare_output_folder, grid_file_name, result_file_name,
+    default_output_folder, prepare_output_folder, grid_file_name,
 )
 from .params_page import ParametersPage, ORIGIN_TEXT
 
@@ -570,19 +570,45 @@ def load_results(result, wizard):
     return first
 
 
-def ask_existing_grid(parent, file_name):
-    """'reuse', 'overwrite' or None (cancel) when the standard grid already exists."""
-    box = QMessageBox(parent)
-    box.setWindowTitle(tr("grid_exists_title"))
-    box.setIcon(QMessageBox.Icon.Question)
-    box.setText(tr("grid_exists_text", name=file_name))
-    b_reuse = box.addButton(tr("grid_reuse"), QMessageBox.ButtonRole.AcceptRole)
-    b_over = box.addButton(tr("grid_overwrite"), QMessageBox.ButtonRole.DestructiveRole)
-    box.addButton(tr("cancel"), QMessageBox.ButtonRole.RejectRole)
-    box.setDefaultButton(b_reuse)
-    box.exec()
-    clicked = box.clickedButton()
-    return "reuse" if clicked == b_reuse else "overwrite" if clicked == b_over else None
+def release_output(path):
+    """
+    Remove from the project the layers that read the standard grid at ``path`` (results of
+    a previous run): the file is rewritten now, and an open layer would keep it locked on
+    Windows. Returns [(layer name, styled column)] so the columns kept from the previous
+    run can be loaded again afterwards (reload_previous).
+    """
+    target = os.path.normcase(os.path.abspath(path))
+    project = QgsProject.instance()
+    ids, removed = [], []
+    for layer in project.mapLayers().values():
+        src = layer.source().split("|")[0] if hasattr(layer, "source") else ""
+        if src and os.path.normcase(os.path.abspath(src)) == target:
+            ids.append(layer.id())
+            renderer = layer.renderer() if hasattr(layer, "renderer") else None
+            column = renderer.classAttribute() if hasattr(renderer, "classAttribute") else ""
+            removed.append((layer.name(), column))
+    if ids:
+        project.removeMapLayers(ids)
+    return removed
+
+
+def reload_previous(result, removed):
+    """Load again, styled, the layers of columns that were kept from a previous run."""
+    kept = set(result.get("kept") or [])
+    if not kept or not removed:
+        return
+    project = QgsProject.instance()
+    group = project.layerTreeRoot().findGroup(tr("group_name"))
+    if group is None:
+        group = project.layerTreeRoot().insertGroup(0, tr("group_name"))
+    for name, column in removed:
+        if column not in kept:
+            continue
+        layer = QgsVectorLayer(result["output"], name, "ogr")
+        if layer.isValid() and layer.fields().indexOf(column) >= 0:
+            style_graduated(layer, column)
+            project.addMapLayer(layer, False)
+            group.addLayer(layer).setItemVisibilityChecked(False)
 
 
 def run_wizard(iface):
@@ -595,21 +621,12 @@ def run_wizard(iface):
     if wizard.selected_only:
         boundary_input = QgsProcessingFeatureSourceDefinition(wizard.boundary.id(), True)
     name = wizard.boundary.name()
-    grid_path, reuse = None, False
-    if wizard.grid_layer is None:
-        grid_path = os.path.join(wizard.folder, grid_file_name(name, wizard.cell_size))
-        if os.path.exists(grid_path):
-            choice = ask_existing_grid(iface.mainWindow(), os.path.basename(grid_path))
-            if choice is None:
-                return
-            reuse = choice == "reuse"
-            if not reuse:
-                QgsVectorFileWriter.deleteShapeFile(grid_path)
-    output = os.path.join(wizard.folder, result_file_name(name, wizard.cell_size, stamp))
+    # single output: the standard grid with the means; a previous file is completed
+    output = os.path.join(wizard.folder, grid_file_name(name, wizard.cell_size))
+    removed = release_output(output)
     job = IdwJob(boundary_input, wizard.boundary_extent, wizard.boundary.crs(), wizard.items,
                  wizard.tolerance, 2.0, 0.0, wizard.pixel, wizard.folder, output, stamp,
-                 params=wizard.params, cell_size=wizard.cell_size, grid_input=wizard.grid_layer,
-                 grid_path=grid_path, reuse_grid=reuse)
+                 params=wizard.params, cell_size=wizard.cell_size, grid_input=wizard.grid_layer)
 
     progress = QProgressDialog(tr("starting"), tr("cancel"), 0, 100, iface.mainWindow())
     progress.setWindowTitle(tr("wizard_title"))
@@ -633,6 +650,7 @@ def run_wizard(iface):
         return
 
     first = load_results(result, wizard)
+    reload_previous(result, removed)
     progress.close()
     if first is not None:
         canvas = iface.mapCanvas()
@@ -643,8 +661,8 @@ def run_wizard(iface):
     summary = "\n".join(tr("done_line", label=i["label"], n=i["n"]) for i in result["layers"])
     msg = tr("done_msg", summary=summary, folder=wizard.folder,
              output=os.path.basename(result["output"]))
-    if result.get("grid_path"):
-        msg += "\n" + tr("done_grid", grid=os.path.basename(result["grid_path"]))
+    if result.get("kept"):
+        msg += "\n" + tr("done_kept", cols=", ".join(result["kept"]))
     if result["warnings"]:
         msg += "\n\n" + tr("warnings") + "\n" + "\n".join(result["warnings"])
     QMessageBox.information(iface.mainWindow(), tr("wizard_title"), msg)

@@ -7,8 +7,9 @@ from qgis.PyQt.QtGui import QIcon
 from qgis.core import (
     QgsProcessingAlgorithm, QgsProcessingException, QgsProcessingParameterFeatureSource,
     QgsProcessingParameterField, QgsProcessingParameterNumber,
-    QgsProcessingParameterFolderDestination, QgsProcessingParameterVectorDestination,
+    QgsProcessingParameterFolderDestination, QgsProcessingOutputVectorLayer,
     QgsProcessingLayerPostProcessorInterface, QgsProcessingParameterBoolean,
+    QgsProcessingContext, QgsFeatureRequest,
 )
 
 from ..core.compat import SRC_POINT, SRC_POLYGON, FIELD_NUMERIC, NUMBER_DOUBLE, NUMBER_INTEGER
@@ -42,6 +43,20 @@ class _StylePostProcessor(QgsProcessingLayerPostProcessorInterface):
     def create(field):
         _StylePostProcessor.instance = _StylePostProcessor(field)
         return _StylePostProcessor.instance
+
+
+def typical_cell_size(source):
+    """Side (sqrt of the median area) of the first cells of an existing grid; None if empty."""
+    import math
+    areas = []
+    for f in source.getFeatures(QgsFeatureRequest().setNoAttributes().setLimit(500)):
+        g = f.geometry()
+        if g is not None and not g.isEmpty():
+            areas.append(g.area())
+    if not areas:
+        return None
+    areas.sort()
+    return round(math.sqrt(areas[len(areas) // 2]), 2)
 
 
 class IdwGridAlgorithm(QgsProcessingAlgorithm):
@@ -114,8 +129,8 @@ class IdwGridAlgorithm(QgsProcessingAlgorithm):
             self.GRID, tr("alg_p_grid"), [SRC_POLYGON], optional=True))
         self.addParameter(QgsProcessingParameterFolderDestination(
             self.RASTER_FOLDER, tr("alg_p_folder")))
-        self.addParameter(QgsProcessingParameterVectorDestination(
-            self.OUTPUT, tr("alg_p_output"), SRC_POLYGON))
+        # single output, like the wizard: the standard grid saved in the output folder
+        self.addOutput(QgsProcessingOutputVectorLayer(self.OUTPUT, tr("alg_p_output"), SRC_POLYGON))
 
     def processAlgorithm(self, parameters, context, feedback):
         boundary = self.parameterAsSource(parameters, self.BOUNDARY, context)
@@ -143,7 +158,6 @@ class IdwGridAlgorithm(QgsProcessingAlgorithm):
 
         folder = self.parameterAsString(parameters, self.RASTER_FOLDER, context)
         os.makedirs(folder, exist_ok=True)
-        output = self.parameterAsOutputLayer(parameters, self.OUTPUT, context)
 
         tolerance = self.parameterAsDouble(parameters, self.TOLERANCE, context)
         power = self.parameterAsDouble(parameters, self.POWER, context)
@@ -159,22 +173,21 @@ class IdwGridAlgorithm(QgsProcessingAlgorithm):
 
         cell = self.parameterAsDouble(parameters, self.CELL_SIZE, context)
         pixel = self.parameterAsDouble(parameters, self.PIXEL, context)
-        grid_input, grid_path, reuse = None, None, False
+        grid_input = None
         grid_src = self.parameterAsSource(parameters, self.GRID, context)
         if grid_src is not None:
             grid_input = parameters[self.GRID]
-        else:
-            if pixel > cell:
-                raise QgsProcessingException(tr("alg_err_pixel_cell", pixel=f"{pixel:g}", cell=f"{cell:g}"))
-            grid_path = os.path.join(folder, grid_file_name(boundary.sourceName(), cell))
-            reuse = os.path.exists(grid_path)      # same boundary and cell size: same grid
+            cell = typical_cell_size(grid_src) or cell
+        elif pixel > cell:
+            raise QgsProcessingException(tr("alg_err_pixel_cell", pixel=f"{pixel:g}", cell=f"{cell:g}"))
+        # single output: [boundary]_Grade Padrão_[c]x[c].shp in the output folder; columns of a
+        # previous run are kept and the attributes of this run are added or replaced
+        output = os.path.join(folder, grid_file_name(boundary.sourceName(), cell))
 
         job = IdwJob(
             params=params,
             cell_size=cell,
             grid_input=grid_input,
-            grid_path=grid_path,
-            reuse_grid=reuse,
             min_neighbours=min_n,
             max_neighbours=max_n,
             boundary_input=parameters[self.BOUNDARY],
@@ -190,9 +203,13 @@ class IdwGridAlgorithm(QgsProcessingAlgorithm):
         )
         result = run_idw_job(job, context, feedback)
 
-        if context.willLoadLayerOnCompletion(output) and result["layers"]:
-            details = context.layerToLoadOnCompletionDetails(output)
+        if result["layers"]:
+            details = QgsProcessingContext.LayerDetails(
+                os.path.splitext(os.path.basename(output))[0], context.project(), self.OUTPUT)
             details.setPostProcessor(_StylePostProcessor.create(result["layers"][0]["mean_field"]))
+            context.addLayerToLoadOnCompletion(output, details)
+        if result.get("kept"):
+            feedback.pushInfo(tr("log_grid_kept", cols=", ".join(result["kept"])))
 
         for info in result["layers"]:
             feedback.pushInfo(tr("done_line", label=info["label"], n=info["n"]))
