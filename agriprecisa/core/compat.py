@@ -8,7 +8,7 @@ falling back to the older one.
 
 from qgis.core import (
     Qgis, QgsWkbTypes, QgsUnitTypes, QgsProcessing, QgsFeatureRequest,
-    QgsProcessingParameterField, QgsProcessingParameterNumber,
+    QgsProcessingParameterField, QgsProcessingParameterNumber, QgsVectorFileWriter,
 )
 
 
@@ -38,3 +38,17 @@ NUMBER_DOUBLE = _first(lambda: Qgis.ProcessingNumberParameterType.Double,
                        lambda: QgsProcessingParameterNumber.Double)
 NUMBER_INTEGER = _first(lambda: Qgis.ProcessingNumberParameterType.Integer,
                         lambda: QgsProcessingParameterNumber.Integer)
+WRITER_NO_ERROR = _first(lambda: QgsVectorFileWriter.WriterError.NoError,
+                         lambda: QgsVectorFileWriter.NoError)
+
+
+def _field_int():
+    """Integer field type: QMetaType from QGIS 3.38 on (required by Qt6/QGIS 4), else QVariant."""
+    if Qgis.QGIS_VERSION_INT >= 33800:
+        from qgis.PyQt.QtCore import QMetaType
+        return QMetaType.Type.Int
+    from qgis.PyQt.QtCore import QVariant
+    return QVariant.Int
+
+
+FIELD_INT = _field_int()

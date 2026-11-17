@@ -54,20 +54,25 @@ tmp = tempfile.mkdtemp()
 errors = []
 
 # 1) Processing algorithm, as used from the toolbox / modeler
-out = os.path.join(tmp, "grid.gpkg")
 res = processing.run("agriprecisa:idw_vector_grid", {
     "BOUNDARY": boundary, "POINTS": points, "FIELDS": ["argila", "pH"],
     "TOLERANCE": 50, "POWER": 2, "RADIUS": 0, "PIXEL": 5, "CELL_SIZE": 5,
-    "RASTER_FOLDER": os.path.join(tmp, "rasters"), "OUTPUT": out})
+    "RASTER_FOLDER": os.path.join(tmp, "rasters")})
 grid = QgsVectorLayer(res["OUTPUT"], "g", "ogr")
 names = [fl.name() for fl in grid.fields()]
-print("Processing output fields:", names, "features:", grid.featureCount())
+print("Processing output:", os.path.basename(res["OUTPUT"]), names, "features:", grid.featureCount())
 print("raster folder:", sorted(os.listdir(os.path.join(tmp, "rasters"))))
-if not {"argila", "pH"} <= set(names):
-    errors.append("mean columns should be named after the attributes (argila, pH)")
+# 1.8.0: single output, the standard grid with ID 1..n and one column per attribute
 std_grid = os.path.join(tmp, "rasters", "talhao_Grade Padrão_5x5.shp")
-if not os.path.exists(std_grid):
-    errors.append("standard grid '<boundary>_Grade Padrão_5x5.shp' not saved")
+if os.path.normcase(res["OUTPUT"]) != os.path.normcase(std_grid):
+    errors.append("Processing output should be '<boundary>_Grade Padrão_5x5.shp' in the output folder")
+if names != ["id", "argila", "pH"]:
+    errors.append(f"standard grid should hold only id, argila, pH (got {names})")
+_ids = sorted(ft["id"] for ft in grid.getFeatures())
+if _ids != list(range(1, len(_ids) + 1)):
+    errors.append("grid IDs should be numbered 1, 2, 3... without gaps")
+if any("_IDW_" in n for n in os.listdir(os.path.join(tmp, "rasters"))):
+    errors.append("the separate _IDW_ result file should no longer be created")
 if grid.featureCount() == 0:
     errors.append("empty grid")
 vals = [ft["argila"] for ft in grid.getFeatures()]
@@ -92,13 +97,12 @@ if len([n for n in os.listdir(os.path.join(tmp, "rasters")) if n.endswith(".tif"
 from qgis.core import QgsProcessingFeatureSourceDefinition
 boundary.selectAll()
 ctx = QgsProcessingContext(); ctx.setProject(QgsProject.instance())
-from agriprecisa.core.paths import grid_file_name, result_file_name
+from agriprecisa.core.paths import grid_file_name
 grid_path2 = os.path.join(tmp, grid_file_name("talhao", 10))
 job = IdwJob(QgsProcessingFeatureSourceDefinition(boundary.id(), True),
              features_extent(boundary.getSelectedFeatures()), boundary.crs(),
              [(points, "argila"), (points, "pH")], 50, 2, 100, 3, tmp,
-             os.path.join(tmp, result_file_name("talhao", 10, "_t")), "_t",
-             cell_size=10, grid_path=grid_path2)
+             grid_path2, "_t", cell_size=10)
 r = run_idw_job(job, ctx, QgsProcessingFeedback())
 print("Wizard pipeline layers:", [l["mean_field"] for l in r["layers"]], "n:", [l["n"] for l in r["layers"]])
 if [l["n"] for l in r["layers"]] != [20, 19]:
@@ -122,13 +126,16 @@ def check_result(path, label):
 
 # cell 10 m, pixel 3 m (not aligned): whole cells, clipped only at the end
 check_result(r["output"], "10x10 cells / 3 m pixel")
-if not r["output"].endswith("talhao_IDW_10x10_t.shp"):
-    errors.append("result should be '<boundary>_IDW_10x10<stamp>.shp'")
+if r["output"] != grid_path2 or any("_IDW_" in n and n.endswith(".shp") for n in os.listdir(tmp)):
+    errors.append("the only result should be '<boundary>_Grade Padrão_10x10.shp'")
 saved = QgsVectorLayer(grid_path2, "g", "ogr")
-whole = [f.geometry().area() for f in saved.getFeatures()]
-print("Standard grid:", os.path.basename(grid_path2), len(whole), "whole cells")
-if not whole or any(abs(a - 100.0) > 1e-6 for a in whole):
-    errors.append("standard grid should keep whole 10 x 10 m cells")
+_names = [f.name() for f in saved.fields()]
+_ids = sorted(f["id"] for f in saved.getFeatures())
+print("Standard grid:", os.path.basename(grid_path2), _names, len(_ids), "cells, ids", _ids[:3], "...", _ids[-1:])
+if _names != ["id", "argila", "pH"]:
+    errors.append(f"standard grid should hold only id and the attributes, got {_names}")
+if _ids != list(range(1, len(_ids) + 1)):
+    errors.append("standard grid IDs should be 1, 2, 3... without gaps")
 # raster covers the boundary plus the 100 m margin, never clipped
 from osgeo import gdal as _gdal
 ds = _gdal.Open(r["layers"][0]["raster"])
@@ -142,14 +149,40 @@ if min(ext.xMinimum() - r_xmin, r_xmax - ext.xMaximum(), ext.yMinimum() - r_ymin
     errors.append("raster should extend at least 100 m beyond the boundary")
 ds = None
 
-# reuse the saved grid
-job_r = IdwJob(boundary, boundary.extent(), boundary.crs(), [(points, "argila"), (points, "pH")],
-               50, 2, 100, 3, tmp, os.path.join(tmp, "reuse.shp"), "_r",
-               cell_size=10, grid_path=grid_path2, reuse_grid=True)
-r_r = run_idw_job(job_r, ctx, QgsProcessingFeedback())
-check_result(r_r["output"], "reused grid")
-if r_r["grid_path"] != grid_path2:
-    errors.append("reused grid path not reported")
+# 1.8.0: running again adds columns to the standard grid and keeps the previous ones
+apath = os.path.join(tmp, grid_file_name("append", 10))
+def _run_attrs(attrs, pts=points):
+    j = IdwJob(boundary, boundary.extent(), boundary.crs(), [(pts, a) for a in attrs],
+               50, 2, 100, 3, tmp, apath, "_a", cell_size=10)
+    return run_idw_job(j, ctx, QgsProcessingFeedback())
+_run_attrs(["argila"])
+first_vals = {f["id"]: f["argila"] for f in QgsVectorLayer(apath, "a", "ogr").getFeatures()}
+r_a = _run_attrs(["pH"])
+la = QgsVectorLayer(apath, "a", "ogr")
+print("Append run:", [f.name() for f in la.fields()], "kept:", r_a["kept"])
+if [f.name() for f in la.fields()] != ["id", "pH", "argila"] or r_a["kept"] != ["argila"]:
+    errors.append("a second run should add pH and keep argila")
+elif any(abs(f["argila"] - first_vals[f["id"]]) > 1e-9 for f in la.getFeatures()):
+    errors.append("kept column values should stay attached to the same IDs")
+la = None
+r_a = _run_attrs(["argila"])
+la = QgsVectorLayer(apath, "a", "ogr")
+if [f.name() for f in la.fields()] != ["id", "argila", "pH"]:
+    errors.append("an attribute computed again should replace its column, not create argila_2")
+la = None
+# a file that does not match the grid (e.g. an old whole-cell standard grid) is replaced
+mism = os.path.join(tmp, grid_file_name("mism", 10))
+processing.run("native:creategrid", {"TYPE": 2,
+    "EXTENT": f"{X0-50},{X0+50},{Y0-50},{Y0+50} [EPSG:31982]", "HSPACING": 10, "VSPACING": 10,
+    "HOVERLAY": 0, "VOVERLAY": 0, "CRS": boundary.crs(), "OUTPUT": mism})
+j = IdwJob(boundary, boundary.extent(), boundary.crs(), [(points, "argila")],
+           50, 2, 100, 3, tmp, mism, "_m", cell_size=10)
+r_m = run_idw_job(j, ctx, QgsProcessingFeedback())
+lm = QgsVectorLayer(mism, "m", "ogr")
+print("Mismatch:", [f.name() for f in lm.fields()], r_m["warnings"][:1])
+if [f.name() for f in lm.fields()] != ["id", "argila"] or not any(("substituído" in w or "replaced" in w) for w in r_m["warnings"]):
+    errors.append("an incompatible old file should be replaced with a warning")
+lm = None
 
 # existing grid chosen by the user (here: a 10 m grid covering a larger area)
 big = processing.run("native:creategrid", {"TYPE": 2,
@@ -159,6 +192,9 @@ job_e = IdwJob(boundary, boundary.extent(), boundary.crs(), [(points, "argila"),
                50, 2, 100, 3, tmp, os.path.join(tmp, "existing.shp"), "_e", grid_input=big)
 r_e = run_idw_job(job_e, ctx, QgsProcessingFeedback())
 lyr_e = check_result(r_e["output"], "existing grid")
+# an existing grid chosen by the user keeps its own columns (only generated grids are cleaned)
+if [f.name() for f in lyr_e.fields()][:5] != ["id", "left", "top", "right", "bottom"]:
+    errors.append("an existing grid should keep its own columns")
 if lyr_e.featureCount() >= big.featureCount():
     errors.append("only cells touching the field should be used from an existing grid")
 
@@ -212,6 +248,26 @@ rend = first.renderer()
 if not isinstance(rend, QgsGraduatedSymbolRenderer) or len(rend.ranges()) != 5:
     errors.append("graduated renderer with 5 classes not applied")
 print("classes:", [f"{x.lowerValue():.1f}-{x.upperValue():.1f}" for x in rend.ranges()])
+
+# 1.8.0: before rewriting the standard grid, the wizard removes the layers that read it
+# (they would lock the file on Windows) and loads the kept columns again afterwards
+removed = idw_wizard.release_output(r["output"])
+print("Released layers:", removed)
+left_over = [l for l in QgsProject.instance().mapLayers().values()
+             if l.source().split("|")[0] == r["output"]]
+if len(removed) != 2 or left_over:
+    errors.append("layers reading the standard grid should be removed before rewriting it")
+_j = IdwJob(QgsProcessingFeatureSourceDefinition(boundary.id(), True),
+            features_extent(boundary.getSelectedFeatures()), boundary.crs(),
+            [(points, "pH")], 50, 2, 100, 3, tmp, r["output"], "_w", cell_size=10)
+_r = run_idw_job(_j, ctx, QgsProcessingFeedback())
+idw_wizard.load_results(_r, W)
+idw_wizard.reload_previous(_r, removed)
+names_now = sorted(l.name() for l in QgsProject.instance().mapLayers().values()
+                   if l.source().split("|")[0] == r["output"])
+print("After rerun:", _r["kept"], names_now)
+if _r["kept"] != ["argila"] or not any(n == removed[0][0] for n in names_now if "argila" in n):
+    errors.append("the layer of the kept column (argila) should be loaded again with its name")
 
 
 # 3b) Step 2: "name [EPSG:xxxx]" and a warning icon (with tooltip) to the right for non-metric layers

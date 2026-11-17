@@ -38,7 +38,7 @@ def test_prepare_creates_missing_folder(tmp_path):
 
 
 from agriprecisa.core.paths import (
-    grid_file_name, result_file_name, format_size, sanitize_file_name, shapefile_field_names,
+    grid_file_name, format_size, sanitize_file_name, shapefile_field_names,
 )
 
 
@@ -46,10 +46,6 @@ def test_grid_file_name_uses_boundary_layer_and_cell_size():
     assert grid_file_name("Talhão 1", 5) == "Talhão 1_Grade Padrão_5x5.shp"
     assert grid_file_name("Talhao1", 2.5) == "Talhao1_Grade Padrão_2,5x2,5.shp"
     assert grid_file_name("A/B:C", 10.0) == "A_B_C_Grade Padrão_10x10.shp"
-
-
-def test_result_file_name():
-    assert result_file_name("Talhao1", 10, "_20261103_1000") == "Talhao1_IDW_10x10_20261103_1000.shp"
 
 
 def test_format_and_sanitize():

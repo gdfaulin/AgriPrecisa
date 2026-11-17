@@ -15,9 +15,10 @@ from qgis.core import (
     QgsCoordinateTransform, QgsFeatureRequest, QgsGeometry, QgsRectangle, QgsPointXY,
     QgsProcessingException, QgsProcessingMultiStepFeedback, QgsProcessingUtils, QgsVectorLayer,
     QgsGraduatedSymbolRenderer, QgsClassificationJenks, QgsStyle, QgsFillSymbol,
+    QgsFeature, QgsField, QgsFields, QgsVectorFileWriter, QgsCoordinateTransformContext,
 )
 
-from .compat import UNIT_METERS
+from .compat import UNIT_METERS, WRITER_NO_ERROR, FIELD_INT
 from .idw_math import (NODATA, idw_grid, safe_name, snap_extent, unique_prefixes,
                        MIN_NEIGHBOURS, DEFAULT_MAX_NEIGHBOURS)
 from .paths import shapefile_field_names
@@ -237,6 +238,121 @@ def style_graduated(layer, field, classes=N_CLASSES, ramp_name=COLOR_RAMP):
 RASTER_MARGIN = 100.0   # metres added around the boundary for the interpolated rasters
 
 
+# ---------------------------------------------------------------------------
+# Standard grid: only an ID numbered 1, 2, 3... and one column per attribute
+# ---------------------------------------------------------------------------
+GRID_ID_FIELD = "id"
+# columns that native:creategrid adds and older versions left in the standard grid
+GRID_AUTO_FIELDS = ("id", "left", "top", "right", "bottom", "row_index", "col_index")
+
+
+def renumbered_cells(layer, crs, field_geom=None, field_engine=None):
+    """
+    Memory copy of the grid cells with a single integer field 'id' numbered 1, 2, 3...
+    in the order of the cells; the columns created automatically by the grid tool
+    (left, top, right, bottom and its own id) are dropped.
+
+    With the field geometry, cells that only touch the boundary along an edge or a corner
+    (no area inside the field) are dropped too: the final clip would remove them and leave
+    gaps in the numbering.
+    """
+    out = QgsVectorLayer(f"Polygon?crs={crs.authid()}", "cells", "memory")
+    out.dataProvider().addAttributes([QgsField(GRID_ID_FIELD, FIELD_INT)])
+    out.updateFields()
+    feats = []
+    n = 0
+    for f in layer.getFeatures():
+        geom = f.geometry()
+        if field_geom is not None and not (
+                field_engine is not None and field_engine.contains(geom.constGet())):
+            inter = field_geom.intersection(geom)
+            if inter is None or inter.isEmpty() or inter.area() <= 1e-9 * max(geom.area(), 1.0):
+                continue
+        n += 1
+        g = QgsFeature(out.fields())
+        g.setGeometry(geom)
+        g.setAttributes([n])
+        feats.append(g)
+    out.dataProvider().addFeatures(feats)
+    out.updateExtents()
+    return out
+
+
+def previous_columns(path, ids, new_names):
+    """
+    Columns of an existing standard grid at ``path`` that must be kept in the new one:
+    every column except the ID, the automatic grid columns and the attributes computed
+    again now (``new_names``, which are replaced). Values are matched by ID, so the old
+    file must hold exactly the same IDs (same boundary and cell size).
+
+    Returns (fields, {id: [values]}) or None when there is nothing to keep, and the
+    string 'mismatch' when the old file does not fit the new grid.
+    """
+    if not path or not os.path.exists(path):
+        return None
+    old = QgsVectorLayer(path, "old", "ogr")
+    if not old.isValid() or old.fields().indexOf(GRID_ID_FIELD) < 0:
+        return "mismatch"
+    keep = [f for f in old.fields()
+            if f.name().lower() not in GRID_AUTO_FIELDS
+            and f.name().lower() not in {n.lower() for n in new_names}]
+    old_ids = set()
+    values = {}
+    for f in old.getFeatures():
+        fid = f[GRID_ID_FIELD]
+        old_ids.add(fid)
+        values[fid] = [f[k.name()] for k in keep]
+    if old_ids != set(ids):
+        return "mismatch"
+    if not keep:
+        return None
+    fields = QgsFields()
+    for k in keep:
+        fields.append(QgsField(k))
+    return fields, values
+
+
+def write_standard_grid(layer, path, kept=None):
+    """
+    Write ``layer`` (clipped cells with ID and the new means) to the Shapefile ``path``,
+    adding the columns kept from the previous file (``kept`` from previous_columns).
+    The old file is replaced.
+    """
+    fields = QgsFields(layer.fields())
+    extra = []
+    if kept:
+        extra_fields, values = kept
+        for f in extra_fields:
+            fields.append(QgsField(f))
+            extra.append(f.name())
+    mem = QgsVectorLayer(f"MultiPolygon?crs={layer.crs().authid()}", "out", "memory")
+    mem.dataProvider().addAttributes(list(fields))
+    mem.updateFields()
+    feats = []
+    for f in layer.getFeatures():
+        g = QgsFeature(mem.fields())
+        geom = QgsGeometry(f.geometry())
+        if not geom.isMultipart():
+            geom.convertToMultiType()
+        g.setGeometry(geom)
+        attrs = list(f.attributes())
+        if extra:
+            attrs += values.get(f[GRID_ID_FIELD], [None] * len(extra))
+        g.setAttributes(attrs)
+        feats.append(g)
+    mem.dataProvider().addFeatures(feats)
+    if os.path.exists(path) and not QgsVectorFileWriter.deleteShapeFile(path):
+        raise QgsProcessingException(tr("err_grid_locked", path=os.path.basename(path)))
+    opts = QgsVectorFileWriter.SaveVectorOptions()
+    opts.driverName = "ESRI Shapefile"
+    opts.fileEncoding = "UTF-8"
+    res = QgsVectorFileWriter.writeAsVectorFormatV3(mem, path, QgsCoordinateTransformContext(),
+                                                    opts)
+    if res[0] != WRITER_NO_ERROR:
+        raise QgsProcessingException(tr("err_create_file", path=path) + f"\n{res[1]}")
+    return extra
+
+
 class IdwJob:
     """
     Everything the workflow needs.
@@ -246,7 +362,8 @@ class IdwJob:
     boundary_extent: QgsRectangle of the boundary features (boundary CRS)
     boundary_crs   : QgsCoordinateReferenceSystem (projected, metres)
     items          : list of (point_source, field_name)
-    output_path    : path of the final polygon grid (.shp in the wizard)
+    output_path    : path of the standard grid with the means (.shp); when it already
+                     exists, its other columns are kept and the new ones added/replaced
     raster_folder  : folder for the interpolated GeoTIFFs
     stamp          : text added to raster file names (avoids overwriting)
     params         : optional list of (power, radius) or (power, radius, max_neighbours),
@@ -258,8 +375,8 @@ class IdwJob:
     cell_size      : side of the vector grid cells (default: pixel size)
     grid_input     : existing polygon grid to use instead of generating one (only the
                      cells touching the boundary are used)
-    grid_path      : where the generated grid is saved (whole cells, reusable)
-    reuse_grid     : True to use the grid already saved at ``grid_path``
+    grid_path      : ignored (kept for compatibility: the standard grid is the output)
+    reuse_grid     : ignored (the grid is generated again, identical, at every run)
     """
 
     def __init__(self, boundary_input, boundary_extent, boundary_crs, items,
@@ -336,15 +453,16 @@ def _run(alg, params, context, feedback):
 def run_idw_job(job, context, feedback):
     """
     Run the workflow. Returns a dict:
-      output    -> path of the final grid
-      grid_path -> path of the reusable grid (generated or reused), or None
+      output    -> path of the standard grid (clipped cells, ID and one column per attribute)
+      kept      -> names of the columns kept from a previous run
       layers    -> list of dicts {prefix, field, label, mean_field, raster, n, power, radius}
       warnings  -> list of messages
     Raises QgsProcessingException on error or cancellation.
 
     Order (avoids cells without value along the border):
       1. IDW rasters over the boundary extent + 100 m, never masked or clipped;
-      2. grid cells touching the boundary, kept WHOLE;
+      2. grid cells touching the boundary, kept WHOLE; a generated grid keeps only an
+         ID numbered 1, 2, 3... (automatic columns of the grid tool removed);
       3. zonal mean of every raster in the whole cells;
       4. only then the cells are clipped by the boundary.
     """
@@ -420,18 +538,14 @@ def run_idw_job(job, context, feedback):
     # 2) The vector grid: whole cells touching the boundary
     steps.setCurrentStep(step)
     step += 1
-    grid_path = None
-    if job.grid_input is not None:
+    generated = job.grid_input is None
+    if not generated:
         feedback.pushInfo(tr("log_grid_existing"))
         grid_src = job.grid_input
         src_layer = QgsProcessingUtils.mapLayerFromString(grid_src, context) if isinstance(grid_src, str) else grid_src
         if src_layer is not None and hasattr(src_layer, "crs") and src_layer.crs() != crs:
             grid_src = _run("native:reprojectlayer", {"INPUT": grid_src, "TARGET_CRS": crs,
                                                      "OUTPUT": "TEMPORARY_OUTPUT"}, context, steps)
-    elif job.reuse_grid and job.grid_path and os.path.exists(job.grid_path):
-        feedback.pushInfo(tr("log_grid_reuse", path=os.path.basename(job.grid_path)))
-        grid_src = job.grid_path
-        grid_path = job.grid_path
     else:
         feedback.pushInfo(tr("log_grid"))
         gx0, gy0, gx1, gy1, _, _ = job.cell_grid()
@@ -442,18 +556,19 @@ def run_idw_job(job, context, feedback):
 
     steps.setCurrentStep(step)
     step += 1
-    save_grid = job.grid_input is None and not (job.reuse_grid and grid_path) and job.grid_path
     cells = _run("native:extractbylocation", {
         "INPUT": grid_src, "PREDICATE": [0], "INTERSECT": fixed,   # 0 = intersects
-        "OUTPUT": job.grid_path if save_grid else "TEMPORARY_OUTPUT"}, context, steps)
-    if save_grid:
-        grid_path = job.grid_path
-        feedback.pushInfo(tr("log_grid_saved", path=os.path.basename(job.grid_path)))
+        "OUTPUT": "TEMPORARY_OUTPUT"}, context, steps)
     cells_layer = QgsProcessingUtils.mapLayerFromString(cells, context)
     if cells_layer is None:
         cells_layer = QgsVectorLayer(cells, "cells", "ogr")
     if cells_layer is None or not cells_layer.isValid() or cells_layer.featureCount() == 0:
         raise QgsProcessingException(tr("err_empty_grid"))
+    if generated:
+        # only the ID, renumbered 1, 2, 3... before the zonal statistics
+        cells_layer = renumbered_cells(cells_layer, crs, field_geom, field_engine)
+        cells = cells_layer
+        feedback.pushInfo(tr("log_grid_ids", n=cells_layer.featureCount()))
 
     # final column names: the attribute names (Shapefile: at most 10 characters)
     existing = [f.name() for f in cells_layer.fields()]
@@ -489,9 +604,26 @@ def run_idw_job(job, context, feedback):
     # 4) Only now clip the cells by the boundary (values already computed on whole cells)
     steps.setCurrentStep(step)
     feedback.pushInfo(tr("log_clip"))
-    _run("native:clip", {"INPUT": current, "OVERLAY": fixed, "OUTPUT": job.output_path},
-         context, steps)
+    clipped = _run("native:clip", {"INPUT": current, "OVERLAY": fixed,
+                                   "OUTPUT": "TEMPORARY_OUTPUT"}, context, steps)
+    clipped_layer = QgsProcessingUtils.mapLayerFromString(clipped, context)
+
+    # 5) Single output: the standard grid. Columns of a previous run are kept (matched by
+    #    ID); the attributes computed now are added or replaced.
+    kept = None
+    if clipped_layer.fields().indexOf(GRID_ID_FIELD) >= 0:
+        ids = [f[GRID_ID_FIELD] for f in clipped_layer.getFeatures()]
+        kept = previous_columns(job.output_path, ids, [i["mean_field"] for i in layers])
+        if kept == "mismatch":
+            warnings.append(tr("warn_grid_replaced", name=os.path.basename(job.output_path)))
+            kept = None
+    elif os.path.exists(job.output_path):
+        warnings.append(tr("warn_grid_replaced", name=os.path.basename(job.output_path)))
+    kept_names = write_standard_grid(clipped_layer, job.output_path, kept)
+    if kept_names:
+        feedback.pushInfo(tr("log_grid_kept", cols=", ".join(kept_names)))
+    feedback.pushInfo(tr("log_grid_saved", path=os.path.basename(job.output_path)))
 
     steps.setCurrentStep(2 * n_items + 5)
-    return {"output": job.output_path, "grid_path": grid_path, "layers": layers,
+    return {"output": job.output_path, "kept": kept_names, "layers": layers,
             "warnings": warnings}

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.8.0 (2026)
+- Single result file: `[boundary]_Grade Padrão_[cell]x[cell].shp` now holds the cells clipped by the field, the ID and one column per attribute. The separate `[boundary]_IDW_[cell]x[cell]_[date]_[time].shp` file is no longer created.
+- Running again with the same field and cell size adds the new columns to the standard grid and keeps the previous ones (matched by ID); attributes computed again are replaced. Layers of the previous run are reloaded with their names and styles. The "Reuse / Overwrite" question was removed.
+- The generated grid keeps only the ID column, numbered 1, 2, 3..., before the zonal statistics (left, top, right, bottom and the original id of the grid tool are removed). An existing grid chosen by the user keeps its own columns.
+- Processing toolbox: single output, the standard grid saved in the output folder (the separate output parameter was removed).
+- Help texts reviewed in the three languages.
+
 ## 1.7.0 (2026)
 - Steps 1 and 2 are split in two: the options on the left and, on the right, a fixed panel explaining every option (like the help panel of the Processing dialogs). The two sides can be resized.
 - The Help button of steps 1 and 2 now explains the concept behind the step (area of interest, edge effect, management cell, sampling density, spatial dependence).

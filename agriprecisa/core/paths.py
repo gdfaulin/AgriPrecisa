@@ -66,12 +66,6 @@ def grid_file_name(boundary_name, cell):
     return f"{sanitize_file_name(boundary_name)}_{GRID_SUFFIX}_{size}x{size}.shp"
 
 
-def result_file_name(boundary_name, cell, stamp=""):
-    """'<boundary layer>_IDW_<cell>x<cell><stamp>.shp' (grid with the interpolated means)."""
-    size = format_size(cell)
-    return f"{sanitize_file_name(boundary_name)}_IDW_{size}x{size}{stamp}.shp"
-
-
 def shapefile_field_names(attributes, existing=()):
     """
     Column names for the interpolated means: the attribute name itself, ASCII, at most
