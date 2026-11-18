@@ -53,6 +53,28 @@ def test_no_empty_error_handlers():
     assert not bad, "empty error handlers (blocked by the QGIS security scan): " + ", ".join(bad)
 
 
+def _short_enum_names(source):
+    """Attribute chains inside the lambdas of compat.py with only Class.Member."""
+    import ast
+    bad = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Lambda) and isinstance(node.body, ast.Attribute):
+            depth, cur = 0, node.body
+            while isinstance(cur, ast.Attribute):
+                depth, cur = depth + 1, cur.value
+            if depth < 2:
+                bad.append(node.lineno)
+    return bad
+
+
+def test_compat_enums_use_scoped_names():
+    """Regression 1.8.3: the Qt6 check of plugins.qgis.org flags short enum names
+    such as QgsWkbTypes.PointGeometry; use QgsWkbTypes.GeometryType.PointGeometry."""
+    with open(os.path.join(PLUGIN, "core", "compat.py"), encoding="utf-8") as fh:
+        bad = _short_enum_names(fh.read())
+    assert not bad, f"core/compat.py: short enum names on lines {bad}"
+
+
 def test_mandatory_files_and_folder_name():
     for name in ("metadata.txt", "__init__.py", "LICENSE", "icon.png"):
         assert os.path.isfile(os.path.join(PLUGIN, name)), name

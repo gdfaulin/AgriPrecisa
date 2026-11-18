@@ -3,7 +3,9 @@
 AgriPrecisa: constants that changed names between QGIS 3.x and QGIS 4.x.
 
 Each value is resolved once, trying the newer (scoped) name first and
-falling back to the older one.
+falling back to the older one. Every name is written in the scoped form
+(Class.EnumType.Member), which works on QGIS 3.x (PyQt5) and is what the Qt6
+checker of plugins.qgis.org requires.
 """
 
 from qgis.core import (
@@ -21,25 +23,23 @@ def _first(*getters):
     raise AttributeError("No compatible constant found")
 
 
-GEOM_POINT = _first(lambda: Qgis.GeometryType.Point, lambda: QgsWkbTypes.PointGeometry)
-GEOM_POLYGON = _first(lambda: Qgis.GeometryType.Polygon, lambda: QgsWkbTypes.PolygonGeometry)
-UNIT_METERS = _first(lambda: Qgis.DistanceUnit.Meters, lambda: QgsUnitTypes.DistanceMeters)
+GEOM_POINT = _first(lambda: Qgis.GeometryType.Point, lambda: QgsWkbTypes.GeometryType.PointGeometry)
+GEOM_POLYGON = _first(lambda: Qgis.GeometryType.Polygon, lambda: QgsWkbTypes.GeometryType.PolygonGeometry)
+UNIT_METERS = _first(lambda: Qgis.DistanceUnit.Meters, lambda: QgsUnitTypes.DistanceUnit.DistanceMeters)
 NO_GEOMETRY = _first(lambda: Qgis.FeatureRequestFlag.NoGeometry,
-                     lambda: QgsFeatureRequest.Flag.NoGeometry,
-                     lambda: QgsFeatureRequest.NoGeometry)
+                     lambda: QgsFeatureRequest.Flag.NoGeometry)
 
 SRC_POINT = _first(lambda: Qgis.ProcessingSourceType.VectorPoint,
-                   lambda: QgsProcessing.TypeVectorPoint)
+                   lambda: QgsProcessing.SourceType.TypeVectorPoint)
 SRC_POLYGON = _first(lambda: Qgis.ProcessingSourceType.VectorPolygon,
-                     lambda: QgsProcessing.TypeVectorPolygon)
+                     lambda: QgsProcessing.SourceType.TypeVectorPolygon)
 FIELD_NUMERIC = _first(lambda: Qgis.ProcessingFieldParameterDataType.Numeric,
-                       lambda: QgsProcessingParameterField.Numeric)
+                       lambda: QgsProcessingParameterField.DataType.Numeric)
 NUMBER_DOUBLE = _first(lambda: Qgis.ProcessingNumberParameterType.Double,
-                       lambda: QgsProcessingParameterNumber.Double)
+                       lambda: QgsProcessingParameterNumber.Type.Double)
 NUMBER_INTEGER = _first(lambda: Qgis.ProcessingNumberParameterType.Integer,
-                        lambda: QgsProcessingParameterNumber.Integer)
-WRITER_NO_ERROR = _first(lambda: QgsVectorFileWriter.WriterError.NoError,
-                         lambda: QgsVectorFileWriter.NoError)
+                        lambda: QgsProcessingParameterNumber.Type.Integer)
+WRITER_NO_ERROR = QgsVectorFileWriter.WriterError.NoError
 
 
 def _field_int():

@@ -5,10 +5,11 @@ qgisMaximumVersion=4.99
 supportsQt6=True
 description=Precision agriculture tools: IDW interpolation to a pixel-sized vector grid with zonal statistics and graduated maps.
 about=AgriPrecisa gathers precision agriculture tools for QGIS, developed at Fatec Pompeia "Shunji Nishimura" (Brazil). This first release provides "IDW vector grid": soil or plant sample points are interpolated by IDW (power, search radius and pixel size set by the user) over the bounding box of the field boundary, accepting samples slightly outside the boundary through a tolerance. A vector grid (cell size chosen by the user, or an existing grid) receives, by zonal statistics on whole cells, the mean of every interpolated field and is then clipped by the boundary, ready for management zones and variable rate maps. Results are styled as graduated maps (5 classes, Jenks natural breaks, RdYlGn). Available as a step-by-step wizard (Vector > AgriPrecisa) and as a Processing algorithm for batch runs and the Graphical Modeler. Interface in Portuguese, English and Spanish. Unlike general interpolation tools, it delivers the result directly as a pixel-sized vector grid clipped to the field, with one styled layer per attribute.
-version=1.8.2
+version=1.8.3
 author=Gustavo Di Chiacchio Faulin
 email=gustavo.faulin@cps.sp.gov.br
 changelog=
+    1.8.3 Fix: the Qt6 compatibility check of plugins.qgis.org flagged 10 enum names written in the short form in core/compat.py; they now use the scoped form (Class.EnumType.Member), valid on QGIS 3 and 4. A regression test checks this.
     1.8.2 Fix: the security scan of plugins.qgis.org blocked version 1.8.1 because of two empty error handlers (try/except with pass or continue); they now set a value explicitly. A regression test forbids this pattern.
     1.8.1 Fix: the plugin package was rejected by plugins.qgis.org because a percent sign in this changelog could not be read; a regression test now checks every metadata field.
     1.8.0 Single result file: [boundary]_Grade Padrão_[cell]x[cell].shp now holds the clipped cells with the means (the separate _IDW_ file with date and time is no longer created); new runs add their columns and keep the previous ones. The generated grid keeps only an ID numbered 1, 2, 3... (automatic columns removed) before the zonal statistics. Processing: single output in the output folder.

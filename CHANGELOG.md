@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.8.3 (2026)
+- Fix: the Qt6 compatibility check of plugins.qgis.org flagged 10 enum names in `core/compat.py` written in the short form (for example `QgsWkbTypes.PointGeometry`); they now use the scoped form (`QgsWkbTypes.GeometryType.PointGeometry`), valid on QGIS 3 and QGIS 4. Same behaviour for the user.
+- New regression test that requires the scoped form for every constant in `core/compat.py`.
+- Help texts reviewed in the three languages (no changes needed).
+
 ## 1.8.2 (2026)
 - Fix: the security scan (Bandit) of plugins.qgis.org blocked version 1.8.1 because of two empty error handlers (`try/except` followed by `pass` or `continue`) in `i18n.py` and `gui/idw_wizard.py`; they now set a value explicitly, with the same behaviour for the user.
 - New regression test that forbids empty error handlers in the plugin code.
