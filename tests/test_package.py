@@ -22,6 +22,14 @@ def test_required_metadata_fields():
     assert "plugin" not in md["name"].lower()
 
 
+def test_every_metadata_field_is_readable():
+    """Regression 1.8.1: a lone '%' in the changelog made plugins.qgis.org reject the ZIP
+    ("'%' must be followed by '%' or '('"), because it parses metadata.txt with ConfigParser."""
+    md = read_metadata()
+    for key in md:
+        md.get(key)  # raises InterpolationSyntaxError if a field has a lone '%'
+
+
 def test_mandatory_files_and_folder_name():
     for name in ("metadata.txt", "__init__.py", "LICENSE", "icon.png"):
         assert os.path.isfile(os.path.join(PLUGIN, name)), name

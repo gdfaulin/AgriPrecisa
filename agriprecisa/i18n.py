@@ -13,7 +13,7 @@ _LANG = None
 
 # Last plugin version for which every Help text (help_page*, *_more, alg_help) was reviewed.
 # Must be updated together with "version=" in metadata.txt (checked by tests/test_package.py).
-HELP_REVIEWED_VERSION = "1.8.0"
+HELP_REVIEWED_VERSION = "1.8.1"
 
 
 def current_language():
