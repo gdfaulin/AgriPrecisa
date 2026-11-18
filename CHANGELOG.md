@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.8.2 (2026)
+- Fix: the security scan (Bandit) of plugins.qgis.org blocked version 1.8.1 because of two empty error handlers (`try/except` followed by `pass` or `continue`) in `i18n.py` and `gui/idw_wizard.py`; they now set a value explicitly, with the same behaviour for the user.
+- New regression test that forbids empty error handlers in the plugin code.
+- Help texts reviewed in the three languages (no changes needed).
+
 ## 1.8.1 (2026)
 - Fix: plugins.qgis.org rejected the package ("'%' must be followed by '%' or '('") because of a percent sign in the changelog of `metadata.txt`; the text was reworded.
 - New regression test that reads every field of `metadata.txt` with the same parser as the QGIS repository.
