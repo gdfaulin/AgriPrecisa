@@ -387,8 +387,8 @@ class PointsPage(QWizardPage):
             try:
                 stats = sample_stats(layer, fields, w.boundary_geom, w.boundary.crs(), rect, tctx)
             except Exception:
-                continue
-            if stats["used"] == 0:
+                stats = None
+            if stats is None or stats["used"] == 0:
                 continue
             w.layer_stats[layer.id()] = stats
             found += 1

@@ -30,6 +30,29 @@ def test_every_metadata_field_is_readable():
         md.get(key)  # raises InterpolationSyntaxError if a field has a lone '%'
 
 
+def test_no_empty_error_handlers():
+    """Regression 1.8.2: Bandit (B110/B112) at plugins.qgis.org blocks a plugin whose
+    generic 'except Exception' body is only 'pass' or 'continue'
+    (specific errors such as ValueError are accepted by Bandit)."""
+    import ast
+    bad = []
+    for root, _dirs, files in os.walk(PLUGIN):
+        for name in files:
+            if not name.endswith(".py"):
+                continue
+            path = os.path.join(root, name)
+            with open(path, encoding="utf-8") as fh:
+                tree = ast.parse(fh.read(), path)
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.ExceptHandler):
+                    continue
+                generic = node.type is None or (
+                    isinstance(node.type, ast.Name) and node.type.id in ("Exception", "BaseException"))
+                if generic and len(node.body) == 1 and isinstance(node.body[0], (ast.Pass, ast.Continue)):
+                    bad.append(f"{os.path.relpath(path, PLUGIN)}:{node.lineno}")
+    assert not bad, "empty error handlers (blocked by the QGIS security scan): " + ", ".join(bad)
+
+
 def test_mandatory_files_and_folder_name():
     for name in ("metadata.txt", "__init__.py", "LICENSE", "icon.png"):
         assert os.path.isfile(os.path.join(PLUGIN, name)), name
