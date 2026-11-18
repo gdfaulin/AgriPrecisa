@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.8.1 (2026)
+- Fix: plugins.qgis.org rejected the package ("'%' must be followed by '%' or '('") because of a percent sign in the changelog of `metadata.txt`; the text was reworded.
+- New regression test that reads every field of `metadata.txt` with the same parser as the QGIS repository.
+- Help texts reviewed in the three languages (no changes needed).
+
 ## 1.8.0 (2026)
 - Single result file: `[boundary]_Grade Padrão_[cell]x[cell].shp` now holds the cells clipped by the field, the ID and one column per attribute. The separate `[boundary]_IDW_[cell]x[cell]_[date]_[time].shp` file is no longer created.
 - Running again with the same field and cell size adds the new columns to the standard grid and keeps the previous ones (matched by ID); attributes computed again are replaced. Layers of the previous run are reloaded with their names and styles. The "Reuse / Overwrite" question was removed.
