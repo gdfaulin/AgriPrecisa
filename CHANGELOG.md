@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.1.0 (2026)
+- **Wizard** for *DTM and plant height* (Raster > AgriPrecisa and toolbar), in the layout of the IDW wizard:
+  1. DSM, crop, row spacing and working resolution, with CRS, pixel, recommended resolution and window size; explanation panel on the right.
+  2. **Live soil mask preview**: miniature of the whole DSM; a click moves a 30 m window (at least 6 row spacings); side by side the DSM and the soil mask of the window; **sliders for the soil tolerance and the window factor** with explanations that change with the value (low, intermediate, high), soil percentage, window size and approximate plant height.
+  3. Statistics (per row segment, per plant, crowns) and output folder (last folder or project folder), with the list of files that will be created (prefixed with the DSM name).
+  4. Summary. Results are loaded and styled in the *DTM and plant height* group; layers of a previous run with the same files are released and replaced (no `_2` names); the final message repeats the key numbers of the log.
+- **Height per row segment** (`Trechos_linhas.shp`): row direction and spacing detected from the plant pattern (log shows the azimuth and the measured spacing); each row cut into segments (default 5 m) with `alt_media`, `alt_p95`, `alt_max`, `cobert_pct`, `falha_m` (stretches without plants between plants, longer than twice the plant distance; headlands do not count) and `compr_m`.
+- **Per plant**: tops (`Topos_plantas.shp`, points) and crowns (`Copas_plantas.shp`, polygons) with `alt_max`, `alt_media`, `area_m2`, `diam_m`; minimum distance between tops per crop (0 = crop value), filled by the crop list.
+- Processing algorithm: new parameters *Length of the row segments* and *Minimum distance between plant tops*, and the three new optional outputs; vector outputs open in QGIS are also saved under a free name.
+- Pure math in `core/mdt_stats.py`, unit-tested on synthetic orchards (rotated rows, missing plants, headlands); integration test drives the wizard (crop, preview, sliders, click, outputs, second run) and saves screenshots with `AGRIPRECISA_MDT_SHOT=folder`.
+- Help texts reviewed in the three languages; new Help for each wizard step and updated Processing help.
+
 ## 2.0.1 (2026)
 - Fix: in the *DTM and plant height in row crops* dialog, choosing a crop did not show its suggested values; the fields stayed at 0. The crop list now fills in row spacing, working resolution and soil tolerance as soon as it changes (and when the dialog opens), and the values can still be adjusted before running. *Custom* keeps the current values. Built on the generic Processing widget wrapper, so it works on QGIS 3 and QGIS 4.
 - In batch mode and in the Model Designer, 0 in a field still means "use the crop value".

@@ -81,9 +81,8 @@ class AgriPrecisaPlugin:
         run_wizard(self.iface)
 
     def run_mdt(self):
-        # standard Processing dialog, the same one opened from the Processing Toolbox
-        from qgis import processing
-        processing.execAlgorithmDialog("agriprecisa:dtm_row_crops")
+        from .gui.mdt_wizard import run_wizard
+        run_wizard(self.iface)
 
     def open_docs(self):
         QDesktopServices.openUrl(QUrl(DOCS_URL))

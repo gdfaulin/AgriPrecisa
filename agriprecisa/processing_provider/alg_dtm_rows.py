@@ -7,14 +7,19 @@ import numpy as np
 from qgis.PyQt.QtGui import QIcon, QColor
 from qgis.core import (
     QgsProcessingAlgorithm, QgsProcessingException, QgsProcessingParameterRasterLayer,
+    QgsProcessingParameterFeatureSink, QgsProcessingOutputLayerDefinition, QgsProperty,
+    QgsFields, QgsField, QgsFeature, QgsGeometry, QgsPointXY, QgsFeatureSink,
+    QgsMarkerSymbol, QgsFillSymbol, QgsGraduatedSymbolRenderer, QgsClassificationJenks,
     QgsProcessingParameterNumber, QgsProcessingParameterBoolean, QgsProcessingParameterEnum,
     QgsProcessingParameterRasterDestination, QgsProcessingLayerPostProcessorInterface,
     QgsProject, QgsStyle, QgsColorRampShader, QgsRasterShader,
     QgsSingleBandPseudoColorRenderer, QgsPalettedRasterRenderer,
 )
 
-from ..core.compat import NUMBER_DOUBLE, SHADER_LINEAR
+from ..core.compat import (NUMBER_DOUBLE, SHADER_LINEAR, SRC_POLYGON, SRC_POINT, FIELD_INT,
+                           FIELD_DOUBLE, WKB_POINT, WKB_POLYGON, WKB_MULTIPOLYGON)
 from ..core import mdt_math as mm
+from ..core import mdt_stats as ms
 from ..core.paths import free_output_path
 from ..i18n import tr, fmt
 
@@ -75,6 +80,66 @@ def style_soil_mask(layer):
     layer.triggerRepaint()
 
 
+def style_graduated_vector(layer, field, kind):
+    """Graduated style (5 classes, Jenks, Viridis) for row segments, plant tops or crowns."""
+    if layer is None or not layer.isValid() or layer.fields().indexOf(field) < 0:
+        return
+    if kind == "points":
+        symbol = QgsMarkerSymbol.createSimple({"name": "circle", "size": "2.2",
+                                              "outline_color": "#202020", "outline_width": "0.2"})
+    elif kind == "crowns":
+        symbol = QgsFillSymbol.createSimple({"outline_color": "#202020", "outline_width": "0.1"})
+    else:
+        symbol = QgsFillSymbol.createSimple({"outline_style": "no"})
+    renderer = QgsGraduatedSymbolRenderer(field)
+    renderer.setSourceSymbol(symbol)
+    ramp = QgsStyle.defaultStyle().colorRamp("Viridis")
+    if ramp is not None:
+        renderer.setSourceColorRamp(ramp)
+    renderer.setClassificationMethod(QgsClassificationJenks())
+    renderer.updateClasses(layer, 5)
+    layer.setRenderer(renderer)
+    layer.triggerRepaint()
+
+
+ROW_FIELDS = [("linha", FIELD_INT), ("trecho", FIELD_INT), ("alt_media", FIELD_DOUBLE),
+              ("alt_p95", FIELD_DOUBLE), ("alt_max", FIELD_DOUBLE), ("cobert_pct", FIELD_DOUBLE),
+              ("falha_m", FIELD_DOUBLE), ("compr_m", FIELD_DOUBLE)]
+PLANT_FIELDS = [("id", FIELD_INT), ("alt_max", FIELD_DOUBLE), ("alt_media", FIELD_DOUBLE),
+                ("area_m2", FIELD_DOUBLE), ("diam_m", FIELD_DOUBLE)]
+
+
+def make_fields(spec):
+    fields = QgsFields()
+    for name, ftype in spec:
+        fields.append(QgsField(name, ftype))
+    return fields
+
+
+def crown_geometries(crowns, gt, wkt):
+    """{plant id: QgsGeometry} from the crown raster (GDAL Polygonize, parts collected)."""
+    from osgeo import gdal, ogr, osr
+    rows, cols = crowns.shape
+    mem = gdal.GetDriverByName("MEM").Create("", cols, rows, 1, gdal.GDT_Int32)
+    mem.SetGeoTransform(gt)
+    mem.SetProjection(wkt)
+    band = mem.GetRasterBand(1)
+    band.WriteArray(crowns)
+    srs = osr.SpatialReference()
+    srs.ImportFromWkt(wkt)
+    vds = ogr.GetDriverByName("Memory").CreateDataSource("crowns")
+    vlayer = vds.CreateLayer("crowns", srs, ogr.wkbPolygon)
+    vlayer.CreateField(ogr.FieldDefn("id", ogr.OFTInteger))
+    gdal.Polygonize(band, band, vlayer, 0, [], callback=None)
+    parts = {}
+    for feat in vlayer:
+        pid = feat.GetField(0)
+        if pid:
+            parts.setdefault(pid, []).append(QgsGeometry.fromWkt(feat.GetGeometryRef().ExportToWkt()))
+    return {pid: (geoms[0] if len(geoms) == 1 else QgsGeometry.collectGeometry(geoms))
+            for pid, geoms in parts.items()}
+
+
 class _RasterStylePostProcessor(QgsProcessingLayerPostProcessorInterface):
     """Applies the AgriPrecisa style when an output is loaded into the project."""
 
@@ -91,6 +156,12 @@ class _RasterStylePostProcessor(QgsProcessingLayerPostProcessorInterface):
             style_pseudocolor(layer, self.vmin, self.vmax, "Viridis")
         elif self.kind == "mask":
             style_soil_mask(layer)
+        elif self.kind == "rows":
+            style_graduated_vector(layer, "alt_media", "rows")
+        elif self.kind == "plants":
+            style_graduated_vector(layer, "alt_max", "points")
+        elif self.kind == "crowns":
+            style_graduated_vector(layer, "alt_max", "crowns")
 
     @classmethod
     def create(cls, kind, vmin=None, vmax=None):
@@ -175,6 +246,11 @@ class DtmRowCropsAlgorithm(QgsProcessingAlgorithm):
     OUT_DTM = "OUT_DTM"
     OUT_HEIGHT = "OUT_HEIGHT"
     OUT_MASK = "OUT_MASK"
+    SEGMENT = "SEGMENT"
+    PLANT_DISTANCE = "PLANT_DISTANCE"
+    OUT_ROWS = "OUT_ROWS"
+    OUT_PLANTS = "OUT_PLANTS"
+    OUT_CROWNS = "OUT_CROWNS"
 
     def createInstance(self):
         return DtmRowCropsAlgorithm()
@@ -237,6 +313,21 @@ class DtmRowCropsAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(QgsProcessingParameterRasterDestination(
             self.OUT_MASK, tr("mdt_p_out_mask"), defaultValue=default("Mascara_solo.tif"),
             optional=True, createByDefault=True))
+        self.addParameter(QgsProcessingParameterNumber(
+            self.SEGMENT, tr("mdt_p_segment"), NUMBER_DOUBLE, ms.DEFAULT_SEGMENT,
+            minValue=0.5, maxValue=500.0))
+        self.addParameter(QgsProcessingParameterNumber(
+            self.PLANT_DISTANCE, tr("mdt_p_plant_distance"), NUMBER_DOUBLE, 0.0,
+            minValue=0.0, maxValue=20.0))
+        self.addParameter(QgsProcessingParameterFeatureSink(
+            self.OUT_ROWS, tr("mdt_p_out_rows"), SRC_POLYGON,
+            defaultValue=default("Altura_trechos_linhas.shp"), optional=True, createByDefault=True))
+        self.addParameter(QgsProcessingParameterFeatureSink(
+            self.OUT_PLANTS, tr("mdt_p_out_plants"), SRC_POINT,
+            defaultValue=default("Altura_plantas_topos.shp"), optional=True, createByDefault=False))
+        self.addParameter(QgsProcessingParameterFeatureSink(
+            self.OUT_CROWNS, tr("mdt_p_out_crowns"), SRC_POLYGON,
+            defaultValue=default("Altura_plantas_copas.shp"), optional=True, createByDefault=False))
 
     # ------------------------------------------------------------ helpers
     @staticmethod
@@ -256,6 +347,26 @@ class DtmRowCropsAlgorithm(QgsProcessingAlgorithm):
             context.setLayersToLoadOnCompletion(layers)
             context.addLayerToLoadOnCompletion(free, details)
         return free
+
+    def _sink(self, parameters, name, context, fields, wkb, crs, label, feedback):
+        """Feature sink, redirected to a free name when the file is open in QGIS (Windows)."""
+        value = parameters.get(name)
+        if value is None:
+            return None, None
+        params = dict(parameters)
+        target = value.sink.staticValue() if isinstance(value, QgsProcessingOutputLayerDefinition) else value
+        if isinstance(target, str) and target and not target.startswith(("memory:", "ogr:", "postgres")):
+            free = free_output_path(target)
+            if free != target:
+                feedback.reportError(tr("mdt_warn_locked", label=label, old=os.path.basename(target),
+                                        new=os.path.basename(free)), fatalError=False)
+                if isinstance(value, QgsProcessingOutputLayerDefinition):
+                    new = QgsProcessingOutputLayerDefinition(value)
+                    new.sink = QgsProperty.fromValue(free)
+                    params[name] = new
+                else:
+                    params[name] = free
+        return self.parameterAsSink(params, name, context, fields, wkb, crs)
 
     @staticmethod
     def _save(array, path, gt, proj, dtype, nodata):
@@ -285,6 +396,7 @@ class DtmRowCropsAlgorithm(QgsProcessingAlgorithm):
             raise QgsProcessingException(tr("mdt_err_scipy"))
         from osgeo import gdal
 
+        _RasterStylePostProcessor.alive = []
         layer = self.parameterAsRasterLayer(parameters, self.INPUT, context)
         if layer is None:
             raise QgsProcessingException(tr("mdt_err_input"))
@@ -414,7 +526,93 @@ class DtmRowCropsAlgorithm(QgsProcessingAlgorithm):
                                  p95=fmt(stats["p95"], 2), max=fmt(stats["max"], 2),
                                  plants=fmt(stats["plant_percent"], 1)))
 
-        _RasterStylePostProcessor.alive = []
+        crop_key = mm.CROPS[crop][0]
+        plant_min = ms.plant_threshold(tol)
+        distance = self.parameterAsDouble(parameters, self.PLANT_DISTANCE, context)
+        if distance <= 0:
+            distance = ms.plant_distance(crop_key, spacing)
+        segment = self.parameterAsDouble(parameters, self.SEGMENT, context)
+        crs = layer.crs()
+        extra = {}
+
+        # 7. row segments
+        if parameters.get(self.OUT_ROWS) is not None:
+            feedback.pushInfo(tr("mdt_step_rows"))
+            plant_mask = valid & np.isfinite(height) & (height >= plant_min)
+            theta, score = ms.row_direction(plant_mask, valid, gt, spacing)
+            if score < 0.02:
+                feedback.reportError(tr("mdt_warn_no_rows"), fatalError=False)
+            else:
+                s_found, phi = ms.row_comb(plant_mask, valid, gt, theta, spacing)
+                azimuth = np.degrees(np.arctan2(-np.sin(theta), np.cos(theta))) % 180.0
+                feedback.pushInfo(tr("mdt_log_rows_found", az=fmt(azimuth, 1), s=fmt(s_found, 2),
+                                     informed=fmt(spacing, 2)))
+                segs = ms.row_segments(height, valid, gt, theta, s_found, phi, segment, plant_min,
+                                       ms.min_gap_length(distance, pixel))
+                sink, dest = self._sink(parameters, self.OUT_ROWS, context, make_fields(ROW_FIELDS),
+                                        WKB_POLYGON, crs, tr("mdt_p_out_rows"), feedback)
+                if sink is not None:
+                    for o in segs:
+                        f = QgsFeature()
+                        f.setGeometry(QgsGeometry.fromPolygonXY([[QgsPointXY(x, y) for x, y in o["corners"]]]))
+                        f.setAttributes([o["row"], o["segment"], round(o["mean"], 3), round(o["p95"], 3),
+                                         round(o["max"], 3), round(100 * o["coverage"], 1),
+                                         round(o["gap"], 2), round(o["length"], 2)])
+                        sink.addFeature(f, QgsFeatureSink.Flag.FastInsert)
+                    extra[self.OUT_ROWS] = dest
+                    self._style_on_load(context, dest, _RasterStylePostProcessor.create("rows"))
+                total_len = sum(o["length"] for o in segs)
+                total_gap = sum(o["gap"] for o in segs)
+                feedback.pushInfo(tr(
+                    "mdt_log_rows", rows=len({o["row"] for o in segs}), segs=len(segs),
+                    cov=fmt(100 * np.mean([o["coverage"] for o in segs]) if segs else 0, 1),
+                    gap=fmt(total_gap, 1), gap_pct=fmt(100 * total_gap / total_len if total_len else 0, 1),
+                    min_gap=fmt(ms.min_gap_length(distance, pixel), 2)))
+            if feedback.isCanceled():
+                return {}
+
+        # 8. plants (tops and crowns)
+        if parameters.get(self.OUT_PLANTS) is not None or parameters.get(self.OUT_CROWNS) is not None:
+            feedback.pushInfo(tr("mdt_step_plants", d=fmt(distance, 2)))
+            plants, crowns = ms.detect_plants(height, valid, gt, distance, plant_min)
+            area_ha = valid.sum() * pixel * pixel / 10000.0
+            if plants:
+                feedback.pushInfo(tr(
+                    "mdt_log_plants", n=fmt(len(plants)), dens=fmt(len(plants) / area_ha if area_ha else 0),
+                    h=fmt(float(np.mean([p["height"] for p in plants])), 2),
+                    d=fmt(float(np.mean([p["diameter"] for p in plants])), 2)))
+            else:
+                feedback.reportError(tr("mdt_log_no_plants"), fatalError=False)
+            if parameters.get(self.OUT_PLANTS) is not None:
+                sink, dest = self._sink(parameters, self.OUT_PLANTS, context, make_fields(PLANT_FIELDS),
+                                        WKB_POINT, crs, tr("mdt_p_out_plants"), feedback)
+                if sink is not None:
+                    for p in plants:
+                        f = QgsFeature()
+                        f.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(p["x"], p["y"])))
+                        f.setAttributes([p["id"], round(p["height"], 3), round(p["mean"], 3),
+                                         round(p["area"], 3), round(p["diameter"], 3)])
+                        sink.addFeature(f, QgsFeatureSink.Flag.FastInsert)
+                    extra[self.OUT_PLANTS] = dest
+                    self._style_on_load(context, dest, _RasterStylePostProcessor.create("plants"))
+            if parameters.get(self.OUT_CROWNS) is not None:
+                sink, dest = self._sink(parameters, self.OUT_CROWNS, context, make_fields(PLANT_FIELDS),
+                                        WKB_MULTIPOLYGON, crs, tr("mdt_p_out_crowns"), feedback)
+                if sink is not None:
+                    geoms = crown_geometries(crowns, gt, proj) if plants else {}
+                    for p in plants:
+                        g = geoms.get(p["id"])
+                        if g is None:
+                            continue
+                        g.convertToMultiType()
+                        f = QgsFeature()
+                        f.setGeometry(g)
+                        f.setAttributes([p["id"], round(p["height"], 3), round(p["mean"], 3),
+                                         round(p["area"], 3), round(p["diameter"], 3)])
+                        sink.addFeature(f, QgsFeatureSink.Flag.FastInsert)
+                    extra[self.OUT_CROWNS] = dest
+                    self._style_on_load(context, dest, _RasterStylePostProcessor.create("crowns"))
+
         self._style_on_load(context, out_dtm, _RasterStylePostProcessor.create("dtm", dmin, dmax))
         self._style_on_load(context, out_height, _RasterStylePostProcessor.create("height", 0.0, hmax))
         self._style_on_load(context, out_mask, _RasterStylePostProcessor.create("mask"))
@@ -422,4 +620,5 @@ class DtmRowCropsAlgorithm(QgsProcessingAlgorithm):
         result = {self.OUT_DTM: out_dtm, self.OUT_HEIGHT: out_height}
         if out_mask:
             result[self.OUT_MASK] = out_mask
+        result.update(extra)
         return result

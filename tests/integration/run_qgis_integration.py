@@ -802,6 +802,97 @@ print("styles:", _lh.renderer().type(), _lm.renderer().type())
 if _lh.renderer().type() != "singlebandpseudocolor" or _lm.renderer().type() != "paletted":
     errors.append("DTM tool: styles not applied")
 
+# 2.1.0: row and plant statistics in the algorithm
+_r3 = processing.run("agriprecisa:dtm_row_crops", dict(
+    _params, OUT_ROWS=os.path.join(_mdt_dir, "Trechos.shp"),
+    OUT_PLANTS=os.path.join(_mdt_dir, "Topos.shp"), OUT_CROWNS=os.path.join(_mdt_dir, "Copas.shp")))
+_rows_l = QgsVectorLayer(_r3["OUT_ROWS"], "rows", "ogr")
+_names = [f.name() for f in _rows_l.fields()]
+_lin = {f["linha"] for f in _rows_l.getFeatures()}
+_p95 = [f["alt_p95"] for f in _rows_l.getFeatures() if f["compr_m"] >= 4.9]
+print(f"row segments: {_rows_l.featureCount()} in {len(_lin)} rows, median p95 {_np.median(_p95):.2f} m, fields {_names}")
+if _names != ["linha", "trecho", "alt_media", "alt_p95", "alt_max", "cobert_pct", "falha_m", "compr_m"]:
+    errors.append("row stats: unexpected fields")
+# synthetic field: 60 m wide, rows every 3.6 m (minus the 2 m no-data border) -> 16 or 17 rows
+if not (15 <= len(_lin) <= 17) or abs(_np.median(_p95) - 2.0) > 0.15:
+    errors.append("row stats: rows or heights not recovered")
+_pl = QgsVectorLayer(_r3["OUT_PLANTS"], "p", "ogr")
+_cr = QgsVectorLayer(_r3["OUT_CROWNS"], "c", "ogr")
+print("plants:", _pl.featureCount(), "crowns:", _cr.featureCount())
+if _pl.featureCount() == 0 or _cr.featureCount() == 0 or _cr.featureCount() > _pl.featureCount():
+    errors.append("plant stats: tops or crowns missing")
+
+# Wizard (2.1.0): crop fills the fields, live mask preview with sliders, run and load styled results
+from agriprecisa.gui import mdt_wizard as _mw
+_dsm_layer = QgsRasterLayer(_dsm_path, "DSM_teste")
+QgsProject.instance().addMapLayer(_dsm_layer)
+_shot_dir = os.environ.get("AGRIPRECISA_MDT_SHOT")
+_wz = _mw.MdtWizard(main)
+_wz.resize(1140, 820)
+_wz.show()
+_p1 = _wz.currentPage()
+_p1.combo_dsm.setLayer(_dsm_layer)
+_p1.combo_crop.setCurrentIndex(1)                     # citrus
+if (_p1.spin_spacing.value(), _p1.spin_res.value()) != (6.5, 0.25):
+    errors.append("wizard step 1: crop did not fill the fields")
+_p1.combo_crop.setCurrentIndex(0)                     # coffee
+app.processEvents()
+print("wizard step 1 info:", _p1.label_info.text()[:90])
+if "31982" not in _p1.label_info.text():
+    errors.append("wizard step 1: CRS not shown")
+if _shot_dir:
+    _wz.grab().save(os.path.join(_shot_dir, "mdt_etapa1.png"))
+_wz.next()
+_p2 = _wz.currentPage()
+app.processEvents()
+_soil0 = _p2.soil_pct
+print(f"wizard step 2: soil {_soil0:.1f}% window {_p2.window_px} px, plant height {_p2.plant_height}")
+if not (40 < _soil0 < 70) or _p2.view_mask.image is None or _p2.overview.image is None:
+    errors.append("wizard step 2: preview not computed")
+_p2.slider_tol.setValue(100)                          # 1.00 m: the text warns about high tolerance
+if _p2.tolerance() != 1.0 or _p2.soil_pct < _soil0 or "alta" not in _p2.label_tol_text.text():
+    errors.append("wizard step 2: tolerance slider does not update the mask and the text")
+_p2.slider_tol.setValue(25)
+_p2.slider_factor.setValue(10)                        # factor 1.0
+if "estreita" not in _p2.label_factor_text.text():
+    errors.append("wizard step 2: factor text not updated")
+_p2.slider_factor.setValue(15)
+_ext = _p2.overview.extent
+_p2.move_window(_ext[0] + 20, _ext[1] + 20)          # click near a corner
+if abs(_p2.overview.window[0] - (_ext[0] + 20 - _p2.window_side() / 2)) > 1e-6:
+    errors.append("wizard step 2: click did not move the window")
+app.processEvents()
+if _shot_dir:
+    _p2.move_window((_ext[0] + _ext[2]) / 2, (_ext[1] + _ext[3]) / 2)
+    app.processEvents()
+    _wz.grab().save(os.path.join(_shot_dir, "mdt_etapa2.png"))
+_wz.next()
+_p3 = _wz.currentPage()
+_p3.edit_folder.setText(os.path.join(_mdt_dir, "wizard"))
+_p3.box_plants.setChecked(True)
+app.processEvents()
+if "DSM_teste_Trechos_linhas.shp" not in _p3.label_files.text():
+    errors.append("wizard step 3: file list not shown")
+if _shot_dir:
+    _wz.grab().save(os.path.join(_shot_dir, "mdt_etapa3.png"))
+_wz.next()
+app.processEvents()
+if _shot_dir:
+    _wz.grab().save(os.path.join(_shot_dir, "mdt_etapa4.png"))
+_fb = _mw._LogFeedback()
+_res = _mw.run_mdt_job(_wz, _fb)
+_grp = QgsProject.instance().layerTreeRoot().findGroup(i18n.tr("mdt_group_name"))
+_kids = [n.layer() for n in _grp.findLayers()] if _grp else []
+print("wizard loaded:", [(l.name().split(" | ")[1], l.renderer().type()) for l in _kids])
+if len(_kids) != 6:
+    errors.append("wizard: results not loaded")
+print("wizard log:", [ln for ln in _fb.lines if ln.startswith(("Linhas", "Plantas", "   Linhas"))])
+# run again with the layers still open: they are released and replaced, no _2 names
+_res2 = _mw.run_mdt_job(_wz, _mw._LogFeedback())
+if os.path.basename(_res2["OUT_DTM"]) != "DSM_teste_MDT.tif" or len(_grp.findLayers()) != 6:
+    errors.append("wizard: second run should replace the previous layers")
+_wz.hide()
+
 # Regression 2.0.1: choosing a crop did not show its values in the dialog (fields stayed at 0).
 import qgis.utils as _qu
 _qu.iface = iface
@@ -816,11 +907,13 @@ def _vals():
 
 
 print("dialog opens with:", _vals())
-if _vals() != (3.6, 0.25, 0.25):
+if _vals()[:3] != (3.6, 0.25, 0.25):
     errors.append(f"crop list: dialog should open with the coffee values, got {_vals()}")
 _combo = _wr["CROP"].combobox
 _combo.setCurrentIndex(3)                       # soybean
-print("soybean:", _vals())
+print("soybean:", _vals(), "plant distance", _wr["PLANT_DISTANCE"].parameterValue())
+if abs(float(_wr["PLANT_DISTANCE"].parameterValue()) - 0.1) > 1e-9:
+    errors.append("crop list: plant distance not filled")
 if _vals() != (0.5, 0.1, 0.1):
     errors.append(f"crop list: soybean values not filled, got {_vals()}")
 _wr["SPACING"].setParameterValue(0.45, QgsProcessingContext())

@@ -93,7 +93,8 @@ def test_soil_percent_and_fill_nearest():
 
 def test_crop_field_values_for_the_dialog():
     """Regression 2.0.1: choosing a crop must show its values in the dialog fields."""
-    assert mm.crop_field_values(0) == {"SPACING": 3.6, "RESOLUTION": 0.25, "TOLERANCE": 0.25}
+    assert mm.crop_field_values(0) == {"SPACING": 3.6, "RESOLUTION": 0.25, "TOLERANCE": 0.25,
+                                       "PLANT_DISTANCE": 0.8}
     assert mm.crop_field_values(3)["SPACING"] == 0.5
     assert mm.crop_field_values(mm.CUSTOM) == {}
     assert mm.crop_field_values(None) == {}

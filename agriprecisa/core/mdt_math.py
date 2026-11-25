@@ -59,7 +59,7 @@ def resolve_parameters(crop_index, spacing, resolution, tolerance):
     return spacing, resolution, tolerance
 
 
-CROP_FIELDS = ("SPACING", "RESOLUTION", "TOLERANCE")
+CROP_FIELDS = ("SPACING", "RESOLUTION", "TOLERANCE", "PLANT_DISTANCE")
 
 
 def crop_field_values(index):
@@ -70,8 +70,10 @@ def crop_field_values(index):
         return {}
     if not 0 <= index < len(CROPS) or index == CUSTOM:
         return {}
-    _key, spacing, res, tol = CROPS[index]
-    return {"SPACING": spacing, "RESOLUTION": res, "TOLERANCE": tol}
+    from .mdt_stats import PLANT_DISTANCE
+    key, spacing, res, tol = CROPS[index]
+    return {"SPACING": spacing, "RESOLUTION": res, "TOLERANCE": tol,
+            "PLANT_DISTANCE": PLANT_DISTANCE[key]}
 
 
 def recommended_resolution(spacing):
