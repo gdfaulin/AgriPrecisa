@@ -2,7 +2,7 @@
 """
 AgriPrecisa: step-by-step wizard for "DTM and plant height in row crops".
 
-Steps: DSM and crop -> live preview of the soil mask in a window chosen on the field
+Steps: DSM and crop -> live preview of the plant mask in a window chosen on the field
 (tolerance and window factor sliders) -> statistics and output folder -> summary.
 The Processing algorithm agriprecisa:dtm_row_crops does the work; the wizard loads and
 styles the results in the "DTM and plant height" group.
@@ -31,7 +31,7 @@ from ..core.compat import LAYER_FILTER_RASTER
 from ..core.paths import default_output_folder, prepare_output_folder
 from ..i18n import tr, fmt
 from ..processing_provider.alg_dtm_rows import (
-    crop_name, style_pseudocolor, style_soil_mask, style_graduated_vector,
+    crop_name, style_pseudocolor, style_plant_mask, style_graduated_vector,
 )
 from .idw_wizard import add_side_panel
 
@@ -52,7 +52,7 @@ def output_names(dsm_name):
     """File names of the outputs, prefixed with the DSM name (no characters invalid on Windows)."""
     base = "".join(c if c.isalnum() or c in "-_" else "_" for c in dsm_name).strip("_") or "MDS"
     return {"OUT_DTM": f"{base}_MDT.tif", "OUT_HEIGHT": f"{base}_Altura.tif",
-            "OUT_MASK": f"{base}_Mascara_solo.tif", "OUT_ROWS": f"{base}_Trechos_linhas.shp",
+            "OUT_MASK": f"{base}_Mascara_planta.tif", "OUT_ROWS": f"{base}_Trechos_linhas.shp",
             "OUT_PLANTS": f"{base}_Topos_plantas.shp", "OUT_CROWNS": f"{base}_Copas_plantas.shp"}
 
 
@@ -275,7 +275,7 @@ class DsmPage(QWizardPage):
 
 
 # ---------------------------------------------------------------------------
-# Step 2: soil mask preview
+# Step 2: plant mask preview
 # ---------------------------------------------------------------------------
 class PreviewPage(QWizardPage):
     help_key = "mdt_help_page2"
@@ -764,7 +764,7 @@ def load_mdt_results(result, wizard):
         else:
             layer = QgsRasterLayer(path, title)
             if key == "OUT_MASK":
-                style_soil_mask(layer)
+                style_plant_mask(layer)
             elif key == "OUT_HEIGHT":
                 style_pseudocolor(layer, 0.0, max(result.get("_height_p95", 2.0), 0.1), "Viridis")
                 height_layer = layer

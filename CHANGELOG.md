@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.1 (2026)
+- *DTM and plant height*: the **soil mask became a plant mask**: layer *Plant mask (1 = plant, 0 = soil)*, file `[DSM]_Mascara_planta.tif` (Processing default `Mascara_planta.tif`). **The values are inverted** compared with versions 2.0.0 to 2.1.0 (which wrote 1 = soil): update raster calculator expressions or models that used the old mask. No data stays 255; colours unchanged (green plants, brown soil).
+- The wizard step 2 preview is now called *Plant mask of the window*, with the legend green = plant (1), brown = soil (0).
+- Tests: the integration test checks that the mask is 1 on the plant rows and 0 in the inter-rows, the style classes and the new file name.
+- Help texts reviewed in the three languages (mask renamed everywhere).
+
 ## 2.1.0 (2026)
 - **Wizard** for *DTM and plant height* (Raster > AgriPrecisa and toolbar), in the layout of the IDW wizard:
   1. DSM, crop, row spacing and working resolution, with CRS, pixel, recommended resolution and window size; explanation panel on the right.

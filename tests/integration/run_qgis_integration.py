@@ -715,7 +715,7 @@ import numpy as _np
 from osgeo import gdal as _gdal, osr as _osr
 from qgis.core import QgsRasterLayer, QgsProcessingException
 from agriprecisa.core import paths as _paths
-from agriprecisa.processing_provider.alg_dtm_rows import style_pseudocolor, style_soil_mask
+from agriprecisa.processing_provider.alg_dtm_rows import style_pseudocolor, style_plant_mask
 
 _mdt_dir = tempfile.mkdtemp()
 _n, _px = 240, 0.25
@@ -734,7 +734,7 @@ _ds.GetRasterBand(1).WriteArray(_dsm[::-1])
 _ds = None
 
 _out = {k: os.path.join(_mdt_dir, n) for k, n in
-        (("OUT_DTM", "MDT.tif"), ("OUT_HEIGHT", "Altura_plantas.tif"), ("OUT_MASK", "Mascara_solo.tif"))}
+        (("OUT_DTM", "MDT.tif"), ("OUT_HEIGHT", "Altura_plantas.tif"), ("OUT_MASK", "Mascara_planta.tif"))}
 _params = dict(INPUT=_dsm_path, CROP=0, SPACING=0, FACTOR=1.5, RESOLUTION=0, TOLERANCE=0,
                ZERO_NODATA=True, **_out)
 _r = processing.run("agriprecisa:dtm_row_crops", _params)
@@ -758,7 +758,13 @@ if abs(_plant_h - 2.0) > 0.15 or _dtm_err > 0.15:
 if not (_d[:, :8] == -9999).all() or not (_m[:, :8] == 255).all():
     errors.append("DTM tool: value 0 border should be no data")
 if set(_np.unique(_m)) - {0, 1, 255}:
-    errors.append("DTM tool: soil mask must hold only 0, 1 and no data")
+    errors.append("DTM tool: plant mask must hold only 0, 1 and no data")
+# 2.1.1: plant mask, 1 = plant (rows), 0 = soil (inter-rows)
+_mc, _rc = _m[_c], _rows[_c]
+print(f"plant mask: {100 * (_mc[_rc] == 1).mean():.1f}% of row pixels = 1, "
+      f"{100 * (_mc[~_rc] == 0).mean():.1f}% of inter-row pixels = 0")
+if (_mc[_rc] == 1).mean() < 0.95 or (_mc[~_rc] == 0).mean() < 0.95:
+    errors.append("DTM tool: plant mask must be 1 on plants and 0 on soil")
 
 # Regression 2.0.0: output already loaded in QGIS (locked on Windows) made the run fail at the
 # end ("Deleting MDT.tif failed: Permission denied"); it must be saved under a free name.
@@ -775,7 +781,7 @@ with mock.patch.object(_paths.os, "rename", side_effect=PermissionError("in use"
 _new = [QgsProject.instance().mapLayer(i) for i in set(QgsProject.instance().mapLayers()) - _before]
 _loaded = {os.path.basename(l.source()): l.renderer().type() for l in _new}
 print("loaded:", _loaded)
-if _loaded.get("MDT_3.tif") != "singlebandpseudocolor" or _loaded.get("Mascara_solo_3.tif") != "paletted":
+if _loaded.get("MDT_3.tif") != "singlebandpseudocolor" or _loaded.get("Mascara_planta_3.tif") != "paletted":
     errors.append("DTM tool: loaded outputs not redirected or not styled")
 QgsProject.instance().removeMapLayers([l.id() for l in _new])
 
@@ -797,7 +803,11 @@ except QgsProcessingException as e:
 _lh = QgsRasterLayer(_r["OUT_HEIGHT"], "h")
 style_pseudocolor(_lh, 0.0, 2.0, "Viridis")
 _lm = QgsRasterLayer(_r["OUT_MASK"], "m")
-style_soil_mask(_lm)
+style_plant_mask(_lm)
+_cls = {c.value: c.label for c in _lm.renderer().classes()}
+print("plant mask classes:", _cls)
+if _cls != {1: i18n.tr("mdt_class_plants"), 0: i18n.tr("mdt_class_soil")}:
+    errors.append("DTM tool: plant mask style must show 1 = plants, 0 = soil")
 print("styles:", _lh.renderer().type(), _lm.renderer().type())
 if _lh.renderer().type() != "singlebandpseudocolor" or _lm.renderer().type() != "paletted":
     errors.append("DTM tool: styles not applied")
@@ -873,6 +883,8 @@ _p3.box_plants.setChecked(True)
 app.processEvents()
 if "DSM_teste_Trechos_linhas.shp" not in _p3.label_files.text():
     errors.append("wizard step 3: file list not shown")
+if "DSM_teste_Mascara_planta.tif" not in _p3.label_files.text():
+    errors.append("wizard step 3: plant mask file name")
 if _shot_dir:
     _wz.grab().save(os.path.join(_shot_dir, "mdt_etapa3.png"))
 _wz.next()
