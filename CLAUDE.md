@@ -28,12 +28,14 @@ agriprecisa/                pasta do complemento (é o que vai no ZIP)
   core/idw_math.py          matemática pura, sem QGIS (IDW com mínimo e máximo de vizinhas, cobertura, validação cruzada; testada com pytest)
   core/pipeline.py          fluxo IDW (retângulo + 100 m) > células inteiras (só ID 1..n) > estatística zonal > recorte > Grade Padrão única
   core/mdt_math.py          MDT e altura de plantas em culturas em linhas: matemática pura (abertura morfológica, solo, suavização, valores por cultura; testada com pytest)
+  core/mdt_stats.py         estatísticas de altura por trecho de linha (direção e espaçamento detectados, cobertura, falhas) e por planta (topos e copas); testada com pytest
   core/compat.py            constantes compatíveis com QGIS 3.x e 4.x
   core/paths.py             pasta de saída padrão, nomes de arquivos (Grade Padrão) e de campos Shapefile
   gui/idw_wizard.py         assistente em 4 etapas (Etapas 1 e 2 com painel fixo de explicação à direita)
   gui/params_page.py        Etapa 3: P, raio em Avançado, vizinhas na tabela, ajuste automático
   gui/widgets.py            prévia do mapa
   gui/cv_dialog.py          tabela de erro da validação cruzada
+  gui/mdt_wizard.py         assistente do MDT e altura de plantas em 4 etapas (prévia da máscara com recorte clicável e barras de tolerância e fator)
   processing_provider/      provedor e algoritmos da Caixa de Ferramentas (alg_idw_grid.py; alg_dtm_rows.py = MDT e altura de plantas, menu Raster > AgriPrecisa)
   i18n.py                   textos em pt, en e es (toda chave nos três idiomas)
 tests/                      testes pytest (sem QGIS)
@@ -59,7 +61,7 @@ docs/GUIA_PUBLICACAO.md     guia para o autor
 - Acrescentar linha no topo de `changelog=` (metadata.txt, em inglês) e em `CHANGELOG.md`.
 
 ### 3b. Atualizar a Ajuda (obrigatório em toda versão)
-- Revisar **todos** os textos de Ajuda em `i18n.py`, nos três idiomas: `help_page1` a `help_page4` (botão Ajuda de cada etapa), os textos `*_more` (links "Saiba mais"), `alg_help` (Ajuda do IDW na Caixa de Ferramentas) e `mdt_help` (Ajuda do MDT e altura de plantas).
+- Revisar **todos** os textos de Ajuda em `i18n.py`, nos três idiomas: `help_page1` a `help_page4` (botão Ajuda de cada etapa), os textos `*_more` (links "Saiba mais"), `alg_help` (Ajuda do IDW na Caixa de Ferramentas), `mdt_help` (Ajuda do MDT na Caixa de Ferramentas), `mdt_help_page1` a `mdt_help_page4` e os painéis `mdt_p1_panel` e `mdt_p3_panel` (assistente do MDT).
 - Atualizar o que a nova versão mudou: novos campos, valores padrão, limites, nomes de botões e de arquivos.
 - Não usar `<` e `>` em nomes de exemplo (o QGIS interpreta como marcação); usar colchetes, por exemplo `[contorno]`.
 - Depois da revisão, definir `HELP_REVIEWED_VERSION` em `i18n.py` igual à nova versão. O teste `test_help_reviewed_for_this_version` falha enquanto isso não for feito.
@@ -71,7 +73,7 @@ docs/GUIA_PUBLICACAO.md     guia para o autor
   O QGIS do Ubuntu usa o `python3.12`, não o `python3` padrão.
 - `QT_QPA_PLATFORM=offscreen python3.12 -W ignore tests/integration/run_qgis_integration.py` deve terminar com `ALL INTEGRATION CHECKS PASSED`.
 - Gerar o ZIP com `python3 scripts/build_zip.py`, extrair em pasta limpa e rodar o teste de integração contra o ZIP extraído.
-- Para mostrar telas ao autor: `AGRIPRECISA_SHOT=/caminho/tela.png` no teste de integração salva uma captura do assistente.
+- Para mostrar telas ao autor: `AGRIPRECISA_SHOT=/caminho/tela.png` no teste de integração salva uma captura do assistente do IDW; `AGRIPRECISA_MDT_SHOT=/pasta` salva as quatro etapas do assistente do MDT.
 
 ### 5. Publicar no GitHub
 - Ramo: `versao-X.Y.Z`. Commit em português, terminando com as linhas de atribuição da sessão.

@@ -11,7 +11,7 @@ checker of plugins.qgis.org requires.
 from qgis.core import (
     Qgis, QgsWkbTypes, QgsUnitTypes, QgsProcessing, QgsFeatureRequest,
     QgsProcessingParameterField, QgsProcessingParameterNumber, QgsVectorFileWriter,
-    QgsColorRampShader,
+    QgsColorRampShader, QgsMapLayerProxyModel,
 )
 
 
@@ -40,6 +40,11 @@ NUMBER_DOUBLE = _first(lambda: Qgis.ProcessingNumberParameterType.Double,
                        lambda: QgsProcessingParameterNumber.Type.Double)
 NUMBER_INTEGER = _first(lambda: Qgis.ProcessingNumberParameterType.Integer,
                         lambda: QgsProcessingParameterNumber.Type.Integer)
+WKB_POINT = _first(lambda: Qgis.WkbType.Point, lambda: QgsWkbTypes.Type.Point)
+WKB_POLYGON = _first(lambda: Qgis.WkbType.Polygon, lambda: QgsWkbTypes.Type.Polygon)
+WKB_MULTIPOLYGON = _first(lambda: Qgis.WkbType.MultiPolygon, lambda: QgsWkbTypes.Type.MultiPolygon)
+LAYER_FILTER_RASTER = _first(lambda: Qgis.LayerFilter.RasterLayer,
+                             lambda: QgsMapLayerProxyModel.Filter.RasterLayer)
 SHADER_LINEAR = _first(lambda: Qgis.ShaderInterpolationMethod.Linear,
                        lambda: QgsColorRampShader.Type.Interpolated)
 SHADER_CONTINUOUS = _first(lambda: Qgis.ShaderClassificationMethod.Continuous,
@@ -57,3 +62,15 @@ def _field_int():
 
 
 FIELD_INT = _field_int()
+
+
+def _field_double():
+    """Double field type: QMetaType from QGIS 3.38 on, else QVariant."""
+    if Qgis.QGIS_VERSION_INT >= 33800:
+        from qgis.PyQt.QtCore import QMetaType
+        return QMetaType.Type.Double
+    from qgis.PyQt.QtCore import QVariant
+    return QVariant.Double
+
+
+FIELD_DOUBLE = _field_double()
