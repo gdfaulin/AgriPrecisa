@@ -62,3 +62,29 @@ def test_shapefile_field_names_limit_and_duplicates():
     assert shapefile_field_names(["id"], existing=["id"]) == ["id_2"]
     long_dup = shapefile_field_names(["condutividade", "condutividade"])
     assert long_dup == ["condutivid", "condutiv_2"]
+
+
+# Regression 2.0.0: the DTM tool failed at the very end with "Deleting MDT.tif failed:
+# Permission denied" when MDT.tif from a previous run was still loaded in QGIS (Windows).
+from unittest import mock
+
+from agriprecisa.core import paths as _paths
+
+
+def test_free_output_path_missing_or_unlocked_file_keeps_name(tmp_path):
+    p = tmp_path / "MDT.tif"
+    assert _paths.free_output_path(str(p)) == str(p)
+    p.write_bytes(b"x")
+    assert _paths.free_output_path(str(p)) == str(p)
+    assert p.read_bytes() == b"x"
+    assert not any(n.endswith("lock_test") for n in os.listdir(tmp_path))
+
+
+def test_free_output_path_locked_file_gets_next_free_name(tmp_path):
+    p = tmp_path / "MDT.tif"
+    p.write_bytes(b"x")
+    (tmp_path / "MDT_2.tif").write_bytes(b"y")
+    with mock.patch.object(_paths.os, "rename", side_effect=PermissionError("in use")):
+        assert _paths.file_locked(str(p))
+        assert _paths.free_output_path(str(p)) == str(tmp_path / "MDT_3.tif")
+    assert p.read_bytes() == b"x"

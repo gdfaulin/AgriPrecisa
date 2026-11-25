@@ -710,12 +710,110 @@ if k1.edit_folder.text() or "Salve o projeto" not in k1.label_folder.text():
     errors.append("unsaved project without history should leave the folder empty with a hint")
 w6.hide()
 
+# 3b) DTM and plant height in row crops (2.0.0)
+import numpy as _np
+from osgeo import gdal as _gdal, osr as _osr
+from qgis.core import QgsRasterLayer, QgsProcessingException
+from agriprecisa.core import paths as _paths
+from agriprecisa.processing_provider.alg_dtm_rows import style_pseudocolor, style_soil_mask
+
+_mdt_dir = tempfile.mkdtemp()
+_n, _px = 240, 0.25
+_yy, _xx = _np.mgrid[0:_n, 0:_n] * _px
+_terrain = 600 + 0.05 * _xx + 0.3 * _np.sin(_yy / 15.0)
+_rows = _np.mod(_xx, 3.6) < 1.6
+_dsm = _terrain + _np.where(_rows, 2.0, 0.0)
+_dsm[:, :8] = 0                      # clipped border stored as 0 (no data)
+_dsm_path = os.path.join(_mdt_dir, "DSM.tif")
+_ds = _gdal.GetDriverByName("GTiff").Create(_dsm_path, _n, _n, 1, _gdal.GDT_Float32)
+_ds.SetGeoTransform((X0, _px, 0, Y0 + _n * _px, 0, -_px))
+_srs = _osr.SpatialReference()
+_srs.ImportFromEPSG(31982)
+_ds.SetProjection(_srs.ExportToWkt())
+_ds.GetRasterBand(1).WriteArray(_dsm[::-1])
+_ds = None
+
+_out = {k: os.path.join(_mdt_dir, n) for k, n in
+        (("OUT_DTM", "MDT.tif"), ("OUT_HEIGHT", "Altura_plantas.tif"), ("OUT_MASK", "Mascara_solo.tif"))}
+_params = dict(INPUT=_dsm_path, CROP=0, SPACING=0, FACTOR=1.5, RESOLUTION=0, TOLERANCE=0,
+               ZERO_NODATA=True, **_out)
+_r = processing.run("agriprecisa:dtm_row_crops", _params)
+
+
+def _read(path):
+    ds = _gdal.Open(path)
+    arr = ds.GetRasterBand(1).ReadAsArray()[::-1]
+    ds = None
+    return arr
+
+
+_h, _d, _m = _read(_r["OUT_HEIGHT"]), _read(_r["OUT_DTM"]), _read(_r["OUT_MASK"])
+_c = (slice(30, -30), slice(40, -30))
+_plant_h = float(_np.median(_h[_c][_rows[_c]]))
+_dtm_err = float(_np.max(_np.abs(_d[_c] - _terrain[_c])))
+print(f"DTM tool: plant height {_plant_h:.2f} m, DTM max error {_dtm_err:.3f} m, "
+      f"mask values {sorted(set(_np.unique(_m)))}")
+if abs(_plant_h - 2.0) > 0.15 or _dtm_err > 0.15:
+    errors.append("DTM tool: terrain or plant height not recovered")
+if not (_d[:, :8] == -9999).all() or not (_m[:, :8] == 255).all():
+    errors.append("DTM tool: value 0 border should be no data")
+if set(_np.unique(_m)) - {0, 1, 255}:
+    errors.append("DTM tool: soil mask must hold only 0, 1 and no data")
+
+# Regression 2.0.0: output already loaded in QGIS (locked on Windows) made the run fail at the
+# end ("Deleting MDT.tif failed: Permission denied"); it must be saved under a free name.
+with mock.patch.object(_paths.os, "rename", side_effect=PermissionError("in use")):
+    _r2 = processing.run("agriprecisa:dtm_row_crops", _params)
+print("locked outputs saved as:", [os.path.basename(_r2[k]) for k in sorted(_r2)])
+if os.path.basename(_r2["OUT_DTM"]) != "MDT_2.tif" or not os.path.isfile(_r2["OUT_DTM"]):
+    errors.append("DTM tool: locked output was not redirected to MDT_2.tif")
+
+# Same through the dialog path: outputs loaded into the project, styled, locked name redirected
+_before = set(QgsProject.instance().mapLayers())
+with mock.patch.object(_paths.os, "rename", side_effect=PermissionError("in use")):
+    processing.runAndLoadResults("agriprecisa:dtm_row_crops", _params)
+_new = [QgsProject.instance().mapLayer(i) for i in set(QgsProject.instance().mapLayers()) - _before]
+_loaded = {os.path.basename(l.source()): l.renderer().type() for l in _new}
+print("loaded:", _loaded)
+if _loaded.get("MDT_3.tif") != "singlebandpseudocolor" or _loaded.get("Mascara_solo_3.tif") != "paletted":
+    errors.append("DTM tool: loaded outputs not redirected or not styled")
+QgsProject.instance().removeMapLayers([l.id() for l in _new])
+
+# Custom crop without spacing: clear error
+try:
+    processing.run("agriprecisa:dtm_row_crops", dict(_params, CROP=7))
+    errors.append("DTM tool: custom crop without spacing should fail")
+except QgsProcessingException as e:
+    print("custom crop without spacing ->", str(e)[:60])
+
+# Window too small: soybean spacing with a coarse resolution
+try:
+    processing.run("agriprecisa:dtm_row_crops", dict(_params, CROP=3, RESOLUTION=0.5))
+    errors.append("DTM tool: too small window should fail")
+except QgsProcessingException as e:
+    print("too small window ->", str(e)[:60])
+
+# Styles applied when the layers are loaded
+_lh = QgsRasterLayer(_r["OUT_HEIGHT"], "h")
+style_pseudocolor(_lh, 0.0, 2.0, "Viridis")
+_lm = QgsRasterLayer(_r["OUT_MASK"], "m")
+style_soil_mask(_lm)
+print("styles:", _lh.renderer().type(), _lm.renderer().type())
+if _lh.renderer().type() != "singlebandpseudocolor" or _lm.renderer().type() != "paletted":
+    errors.append("DTM tool: styles not applied")
+
 # 4) Plugin load/unload through classFactory
 import agriprecisa
 QgsApplication.processingRegistry().removeProvider(provider)
 plg = agriprecisa.classFactory(iface)
 plg.initGui()
 reg = QgsApplication.processingRegistry().providerById("agriprecisa") is not None
+_raster_menu = [c.args[1].text() for c in iface.addPluginToRasterMenu.call_args_list]
+print("raster menu:", _raster_menu)
+if not any("MDT" in t for t in _raster_menu):
+    errors.append("DTM tool not added to the Raster menu")
+if QgsApplication.processingRegistry().algorithmById("agriprecisa:dtm_row_crops") is None:
+    errors.append("DTM algorithm not registered")
 print("provider registered by plugin:", reg)
 if not reg:
     errors.append("plugin did not register its provider")

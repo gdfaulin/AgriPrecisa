@@ -41,23 +41,32 @@ class AgriPrecisaPlugin:
 
         self._add_action(os.path.join(PLUGIN_DIR, "icons", "idw.png"),
                          tr("action_idw"), tr("action_idw_tip"), self.run_idw, toolbar=True)
+        self._add_action(os.path.join(PLUGIN_DIR, "icons", "mdt.png"),
+                         tr("action_mdt"), tr("action_mdt_tip"), self.run_mdt, toolbar=True,
+                         raster=True)
         self._add_action(os.path.join(PLUGIN_DIR, "icons", "help.png"),
                          tr("action_help"), tr("action_help"), self.open_docs, toolbar=False)
 
-    def _add_action(self, icon_path, text, tip, callback, toolbar):
+    def _add_action(self, icon_path, text, tip, callback, toolbar, raster=False):
         action = QAction(QIcon(icon_path), text, self.iface.mainWindow())
         action.setToolTip(tip)
         action.setStatusTip(tip)
         action.triggered.connect(callback)
-        self.iface.addPluginToVectorMenu(MENU, action)
+        if raster:
+            self.iface.addPluginToRasterMenu(MENU, action)
+        else:
+            self.iface.addPluginToVectorMenu(MENU, action)
         if toolbar:
             self.toolbar.addAction(action)
-        self.actions.append(action)
+        self.actions.append((action, raster))
         return action
 
     def unload(self):
-        for action in self.actions:
-            self.iface.removePluginVectorMenu(MENU, action)
+        for action, raster in self.actions:
+            if raster:
+                self.iface.removePluginRasterMenu(MENU, action)
+            else:
+                self.iface.removePluginVectorMenu(MENU, action)
         self.actions = []
         if self.toolbar is not None:
             self.toolbar.deleteLater()
@@ -70,6 +79,11 @@ class AgriPrecisaPlugin:
     def run_idw(self):
         from .gui.idw_wizard import run_wizard
         run_wizard(self.iface)
+
+    def run_mdt(self):
+        # standard Processing dialog, the same one opened from the Processing Toolbox
+        from qgis import processing
+        processing.execAlgorithmDialog("agriprecisa:dtm_row_crops")
 
     def open_docs(self):
         QDesktopServices.openUrl(QUrl(DOCS_URL))

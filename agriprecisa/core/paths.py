@@ -88,3 +88,31 @@ def shapefile_field_names(attributes, existing=()):
         used.add(cand.lower())
         out.append(cand)
     return out
+
+
+def file_locked(path):
+    """
+    True when ``path`` exists and cannot be replaced, e.g. a raster loaded in the QGIS project
+    on Windows (deleting it fails with "Permission denied"). Renaming the file and renaming it
+    back tests this without changing anything.
+    """
+    if not os.path.exists(path):
+        return False
+    probe = path + ".agriprecisa_lock_test"
+    try:
+        os.rename(path, probe)
+    except OSError:
+        return True
+    os.rename(probe, path)
+    return False
+
+
+def free_output_path(path):
+    """``path`` itself, or the first free alternative name (_2, _3...) when it is locked."""
+    if not file_locked(path):
+        return path
+    base, ext = os.path.splitext(path)
+    n = 2
+    while os.path.exists(f"{base}_{n}{ext}"):
+        n += 1
+    return f"{base}_{n}{ext}"
