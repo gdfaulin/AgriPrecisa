@@ -15,6 +15,7 @@ Developed by Gustavo Di Chiacchio Faulin at Fatec Pompeia "Shunji Nishimura" (Ce
 | Tool | Where | What it does |
 |---|---|---|
 | **IDW vector grid** | *Vector > AgriPrecisa* (wizard) and *Processing Toolbox > AgriPrecisa > Interpolation* | Interpolates sample points by IDW over the field, builds a pixel-sized polygon grid clipped by the field boundary and stores the mean of each interpolated attribute in every cell (zonal statistics). Results are styled as graduated maps (5 classes, Jenks, RdYlGn). |
+| **DTM and plant height in row crops** | *Raster > AgriPrecisa*, toolbar and *Processing Toolbox > AgriPrecisa > Elevation models* | From a drone DSM of crops planted in rows, finds the soil visible in the inter-rows (morphological opening with a window wider than the inter-row), interpolates the terrain under the plants and delivers the DTM, the plant height (DSM minus DTM) and a soil mask. A crop list fills in suggested row spacing, resolution and soil tolerance. |
 
 ### Workflow of *IDW vector grid*
 
@@ -28,6 +29,22 @@ IDW estimate at each pixel centre:
 $$\hat{z}_0 = \frac{\sum_i z_i\, d_i^{-P}}{\sum_i d_i^{-P}}, \quad d_i \le \text{radius}$$
 
 All layers must be in a **projected CRS in metres** (e.g. SIRGAS 2000 / UTM 22S, EPSG:31982). The tool checks this and warns you.
+
+### *DTM and plant height in row crops*
+
+Works when the soil is visible between the rows: perennials with open inter-rows (coffee, citrus, grapevine, eucalyptus) and annual crops before canopy closure (maize, soybean, young sugarcane).
+
+| Crop | Row spacing | Resolution | Soil tolerance |
+|---|---|---|---|
+| Coffee | 3.6 m | 0.25 m | 0.25 m |
+| Citrus | 6.5 m | 0.25 m | 0.30 m |
+| Maize | 0.8 m | 0.10 m | 0.15 m |
+| Soybean | 0.5 m | 0.10 m | 0.10 m |
+| Sugarcane | 1.5 m | 0.15 m | 0.20 m |
+| Grapevine | 2.5 m | 0.20 m | 0.20 m |
+| Eucalyptus | 3.0 m | 0.25 m | 0.30 m |
+
+Leave a field at 0 to use the crop value, or type your own value (for example, the spacing measured on the orthomosaic). *Custom* needs at least the spacing. The log reports the window size, the soil percentage and the plant height (mean, 95th percentile, maximum) and warns when the resolution is too coarse or the soil share looks wrong. If an output file is open in QGIS, the result is saved under a free name (e.g. `MDT_2.tif`).
 
 ### Installation
 
@@ -44,9 +61,13 @@ Portuguese, English or Spanish, following the QGIS interface language (*Settings
 
 **IDW em grade vetorial** (*Vetor > AgriPrecisa* ou *Caixa de Ferramentas de Processamento > AgriPrecisa*): interpola por IDW os pontos amostrais, cria uma grade de polígonos do tamanho do pixel recortada pelo contorno do talhão e grava em cada célula a média de cada atributo (estatística zonal). Os mapas saem com estilo graduado de 5 classes, quebras naturais (Jenks) e rampa RdYlGn, uma camada por atributo no grupo *Interpolados*. As camadas precisam estar em sistema projetado em metros.
 
+**MDT e altura de plantas em culturas em linhas** (*Raster > AgriPrecisa*, barra de ferramentas ou *Caixa de Ferramentas > AgriPrecisa > Modelos de elevação*): a partir do MDS do drone, encontra o solo visível nas entrelinhas, interpola o terreno sob as plantas e gera o MDT, a altura das plantas (MDS menos MDT) e a máscara de solo. Uma lista de culturas (café, citros, milho, soja, cana, videira, eucalipto ou personalizada) preenche espaçamento, resolução e tolerância sugeridos. Funciona enquanto o solo estiver visível nas entrelinhas.
+
 ## Español
 
 **IDW en cuadrícula vectorial** (*Vectorial > AgriPrecisa* o *Caja de herramientas de Procesos > AgriPrecisa*): interpola por IDW los puntos de muestreo, crea una cuadrícula de polígonos del tamaño del píxel recortada por el contorno del lote y guarda en cada celda el promedio de cada atributo (estadística zonal). Los mapas usan estilo graduado de 5 clases, cortes naturales (Jenks) y rampa RdYlGn. Las capas deben estar en un SRC proyectado en metros.
+
+**MDT y altura de plantas en cultivos en hileras** (*Ráster > AgriPrecisa*, barra de herramientas o *Caja de herramientas > AgriPrecisa > Modelos de elevación*): a partir del MDS del dron, encuentra el suelo visible en las entrehileras, interpola el terreno bajo las plantas y genera el MDT, la altura de las plantas (MDS menos MDT) y la máscara de suelo. Una lista de cultivos completa espaciamiento, resolución y tolerancia sugeridos.
 
 ---
 

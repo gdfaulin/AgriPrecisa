@@ -11,6 +11,7 @@ checker of plugins.qgis.org requires.
 from qgis.core import (
     Qgis, QgsWkbTypes, QgsUnitTypes, QgsProcessing, QgsFeatureRequest,
     QgsProcessingParameterField, QgsProcessingParameterNumber, QgsVectorFileWriter,
+    QgsColorRampShader,
 )
 
 
@@ -39,6 +40,10 @@ NUMBER_DOUBLE = _first(lambda: Qgis.ProcessingNumberParameterType.Double,
                        lambda: QgsProcessingParameterNumber.Type.Double)
 NUMBER_INTEGER = _first(lambda: Qgis.ProcessingNumberParameterType.Integer,
                         lambda: QgsProcessingParameterNumber.Type.Integer)
+SHADER_LINEAR = _first(lambda: Qgis.ShaderInterpolationMethod.Linear,
+                       lambda: QgsColorRampShader.Type.Interpolated)
+SHADER_CONTINUOUS = _first(lambda: Qgis.ShaderClassificationMethod.Continuous,
+                           lambda: QgsColorRampShader.ClassificationMode.Continuous)
 WRITER_NO_ERROR = QgsVectorFileWriter.WriterError.NoError
 
 

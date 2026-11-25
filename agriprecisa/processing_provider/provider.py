@@ -7,6 +7,7 @@ from qgis.PyQt.QtGui import QIcon
 from qgis.core import QgsProcessingProvider
 
 from .alg_idw_grid import IdwGridAlgorithm
+from .alg_dtm_rows import DtmRowCropsAlgorithm
 
 ICON = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icon.png")
 
@@ -14,6 +15,7 @@ ICON = os.path.join(os.path.dirname(os.path.dirname(__file__)), "icon.png")
 class AgriPrecisaProvider(QgsProcessingProvider):
     def loadAlgorithms(self):
         self.addAlgorithm(IdwGridAlgorithm())
+        self.addAlgorithm(DtmRowCropsAlgorithm())
 
     def id(self):
         return "agriprecisa"

@@ -27,13 +27,14 @@ agriprecisa/                pasta do complemento (é o que vai no ZIP)
   metadata.txt              versão, changelog, metadados do repositório do QGIS
   core/idw_math.py          matemática pura, sem QGIS (IDW com mínimo e máximo de vizinhas, cobertura, validação cruzada; testada com pytest)
   core/pipeline.py          fluxo IDW (retângulo + 100 m) > células inteiras (só ID 1..n) > estatística zonal > recorte > Grade Padrão única
+  core/mdt_math.py          MDT e altura de plantas em culturas em linhas: matemática pura (abertura morfológica, solo, suavização, valores por cultura; testada com pytest)
   core/compat.py            constantes compatíveis com QGIS 3.x e 4.x
   core/paths.py             pasta de saída padrão, nomes de arquivos (Grade Padrão) e de campos Shapefile
   gui/idw_wizard.py         assistente em 4 etapas (Etapas 1 e 2 com painel fixo de explicação à direita)
   gui/params_page.py        Etapa 3: P, raio em Avançado, vizinhas na tabela, ajuste automático
   gui/widgets.py            prévia do mapa
   gui/cv_dialog.py          tabela de erro da validação cruzada
-  processing_provider/      provedor e algoritmo da Caixa de Ferramentas
+  processing_provider/      provedor e algoritmos da Caixa de Ferramentas (alg_idw_grid.py; alg_dtm_rows.py = MDT e altura de plantas, menu Raster > AgriPrecisa)
   i18n.py                   textos em pt, en e es (toda chave nos três idiomas)
 tests/                      testes pytest (sem QGIS)
 tests/integration/          teste de ponta a ponta com QGIS real
@@ -58,7 +59,7 @@ docs/GUIA_PUBLICACAO.md     guia para o autor
 - Acrescentar linha no topo de `changelog=` (metadata.txt, em inglês) e em `CHANGELOG.md`.
 
 ### 3b. Atualizar a Ajuda (obrigatório em toda versão)
-- Revisar **todos** os textos de Ajuda em `i18n.py`, nos três idiomas: `help_page1` a `help_page4` (botão Ajuda de cada etapa), os textos `*_more` (links "Saiba mais") e `alg_help` (Ajuda da Caixa de Ferramentas).
+- Revisar **todos** os textos de Ajuda em `i18n.py`, nos três idiomas: `help_page1` a `help_page4` (botão Ajuda de cada etapa), os textos `*_more` (links "Saiba mais"), `alg_help` (Ajuda do IDW na Caixa de Ferramentas) e `mdt_help` (Ajuda do MDT e altura de plantas).
 - Atualizar o que a nova versão mudou: novos campos, valores padrão, limites, nomes de botões e de arquivos.
 - Não usar `<` e `>` em nomes de exemplo (o QGIS interpreta como marcação); usar colchetes, por exemplo `[contorno]`.
 - Depois da revisão, definir `HELP_REVIEWED_VERSION` em `i18n.py` igual à nova versão. O teste `test_help_reviewed_for_this_version` falha enquanto isso não for feito.

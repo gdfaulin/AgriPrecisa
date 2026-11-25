@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.0 (2026)
+- New tool **DTM and plant height in row crops (from the DSM)**: Raster > AgriPrecisa, toolbar button and Processing Toolbox (AgriPrecisa > Elevation models). Generalizes the coffee script to any crop planted in rows with visible soil in the inter-rows.
+- Crop list (coffee, citrus, maize, soybean, sugarcane, grapevine, eucalyptus, custom) fills in suggested row spacing, working resolution and soil tolerance; any field set to a value other than 0 overrides the crop value.
+- Outputs: DTM, plant height and soil mask (1 = soil, 0 = plants), loaded with colour ramps (Spectral for the DTM, Viridis for the height, green and brown for the mask).
+- Teaching messages in the log: values used, window size in pixels and metres, soil percentage, plant height (mean, 95th percentile and maximum over plant pixels only); warnings for coarse resolution, finer resolution than the DSM, too small window, little or too much soil.
+- Fix: an output file already loaded in QGIS (Windows) made the run fail at the end with "Permission denied"; the result is now saved under a free name (`MDT_2.tif`) with a warning. Regression tests in `tests/test_paths.py` and in the integration test.
+- Pure math in `core/mdt_math.py`, unit-tested with a synthetic sloped field with plant rows.
+- Help texts reviewed in the three languages; new Processing help for the DTM tool.
+
 ## 1.8.3 (2026)
 - Fix: the Qt6 compatibility check of plugins.qgis.org flagged 10 enum names in `core/compat.py` written in the short form (for example `QgsWkbTypes.PointGeometry`); they now use the scoped form (`QgsWkbTypes.GeometryType.PointGeometry`), valid on QGIS 3 and QGIS 4. Same behaviour for the user.
 - New regression test that requires the scoped form for every constant in `core/compat.py`.

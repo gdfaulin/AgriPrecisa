@@ -84,7 +84,7 @@ def test_mandatory_files_and_folder_name():
 def test_icons_referenced_exist():
     md = read_metadata()
     assert os.path.isfile(os.path.join(PLUGIN, md["icon"]))
-    for icon in ("idw.png", "help.png"):
+    for icon in ("idw.png", "help.png", "mdt.png"):
         assert os.path.isfile(os.path.join(PLUGIN, "icons", icon))
 
 
