@@ -802,6 +802,42 @@ print("styles:", _lh.renderer().type(), _lm.renderer().type())
 if _lh.renderer().type() != "singlebandpseudocolor" or _lm.renderer().type() != "paletted":
     errors.append("DTM tool: styles not applied")
 
+# Regression 2.0.1: choosing a crop did not show its values in the dialog (fields stayed at 0).
+import qgis.utils as _qu
+_qu.iface = iface
+from processing.gui.AlgorithmDialog import AlgorithmDialog
+_alg = QgsApplication.processingRegistry().createAlgorithmById("agriprecisa:dtm_row_crops")
+_dlg = AlgorithmDialog(_alg, False, main)
+_wr = _dlg.mainWidget().wrappers
+
+
+def _vals():
+    return tuple(round(float(_wr[k].parameterValue()), 3) for k in ("SPACING", "RESOLUTION", "TOLERANCE"))
+
+
+print("dialog opens with:", _vals())
+if _vals() != (3.6, 0.25, 0.25):
+    errors.append(f"crop list: dialog should open with the coffee values, got {_vals()}")
+_combo = _wr["CROP"].combobox
+_combo.setCurrentIndex(3)                       # soybean
+print("soybean:", _vals())
+if _vals() != (0.5, 0.1, 0.1):
+    errors.append(f"crop list: soybean values not filled, got {_vals()}")
+_wr["SPACING"].setParameterValue(0.45, QgsProcessingContext())
+_combo.setCurrentIndex(7)                       # custom keeps the current values
+print("custom:", _vals())
+if _vals() != (0.45, 0.1, 0.1):
+    errors.append(f"crop list: Custom should keep the current values, got {_vals()}")
+_combo.setCurrentIndex(1)                       # citrus overwrites
+if _vals() != (6.5, 0.25, 0.3):
+    errors.append(f"crop list: citrus values not filled, got {_vals()}")
+_wr["INPUT"].setParameterValue(_dsm_path, QgsProcessingContext())
+_run_params = _dlg.mainWidget().createProcessingParameters()
+print("parameters sent:", {k: _run_params[k] for k in ("CROP", "SPACING", "TOLERANCE")})
+if _run_params["CROP"] != 1 or abs(_run_params["SPACING"] - 6.5) > 1e-9:
+    errors.append("crop list: dialog parameters not passed to the algorithm")
+_dlg.close()
+
 # 4) Plugin load/unload through classFactory
 import agriprecisa
 QgsApplication.processingRegistry().removeProvider(provider)

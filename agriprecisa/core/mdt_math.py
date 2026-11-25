@@ -59,6 +59,21 @@ def resolve_parameters(crop_index, spacing, resolution, tolerance):
     return spacing, resolution, tolerance
 
 
+CROP_FIELDS = ("SPACING", "RESOLUTION", "TOLERANCE")
+
+
+def crop_field_values(index):
+    """Values the dialog shows in the fields for a crop; {} for Custom (current values kept)."""
+    try:
+        index = int(index)
+    except (TypeError, ValueError):
+        return {}
+    if not 0 <= index < len(CROPS) or index == CUSTOM:
+        return {}
+    _key, spacing, res, tol = CROPS[index]
+    return {"SPACING": spacing, "RESOLUTION": res, "TOLERANCE": tol}
+
+
 def recommended_resolution(spacing):
     """Coarsest resolution that keeps PIXELS_PER_ROW pixels across the inter-row."""
     return spacing / PIXELS_PER_ROW

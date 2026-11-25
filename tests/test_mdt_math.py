@@ -89,3 +89,12 @@ def test_soil_percent_and_fill_nearest():
     assert mm.soil_percent(soil, valid) == pytest.approx(100 / 3)
     filled = mm.fill_nearest(np.array([[1.0, np.nan], [np.nan, 4.0]]))
     assert not np.isnan(filled).any()
+
+
+def test_crop_field_values_for_the_dialog():
+    """Regression 2.0.1: choosing a crop must show its values in the dialog fields."""
+    assert mm.crop_field_values(0) == {"SPACING": 3.6, "RESOLUTION": 0.25, "TOLERANCE": 0.25}
+    assert mm.crop_field_values(3)["SPACING"] == 0.5
+    assert mm.crop_field_values(mm.CUSTOM) == {}
+    assert mm.crop_field_values(None) == {}
+    assert mm.crop_field_values(99) == {}
