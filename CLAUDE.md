@@ -35,7 +35,7 @@ agriprecisa/                pasta do complemento (é o que vai no ZIP)
   gui/params_page.py        Etapa 3: P, raio em Avançado, vizinhas na tabela, ajuste automático
   gui/widgets.py            prévia do mapa
   gui/cv_dialog.py          tabela de erro da validação cruzada
-  gui/mdt_wizard.py         assistente do MDT e altura de plantas em 4 etapas (prévia da máscara com recorte clicável e barras de tolerância e fator)
+  gui/mdt_wizard.py         assistente do MDT e altura de plantas em 4 etapas (prévia da máscara de planta com recorte clicável e barras de tolerância e fator)
   processing_provider/      provedor e algoritmos da Caixa de Ferramentas (alg_idw_grid.py; alg_dtm_rows.py = MDT e altura de plantas, menu Raster > AgriPrecisa)
   i18n.py                   textos em pt, en e es (toda chave nos três idiomas)
 tests/                      testes pytest (sem QGIS)

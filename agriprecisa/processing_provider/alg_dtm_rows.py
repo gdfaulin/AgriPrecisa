@@ -70,12 +70,12 @@ def style_pseudocolor(layer, vmin, vmax, ramp_name, invert=False):
     layer.triggerRepaint()
 
 
-def style_soil_mask(layer):
-    """0 = plants (green), 1 = soil (brown)."""
+def style_plant_mask(layer):
+    """1 = plant (green), 0 = soil (brown)."""
     if layer is None or not layer.isValid():
         return
-    classes = [QgsPalettedRasterRenderer.Class(0, QColor("#2e7d32"), tr("mdt_class_plants")),
-               QgsPalettedRasterRenderer.Class(1, QColor("#a1785c"), tr("mdt_class_soil"))]
+    classes = [QgsPalettedRasterRenderer.Class(1, QColor("#2e7d32"), tr("mdt_class_plants")),
+               QgsPalettedRasterRenderer.Class(0, QColor("#a1785c"), tr("mdt_class_soil"))]
     layer.setRenderer(QgsPalettedRasterRenderer(layer.dataProvider(), 1, classes))
     layer.triggerRepaint()
 
@@ -155,7 +155,7 @@ class _RasterStylePostProcessor(QgsProcessingLayerPostProcessorInterface):
         elif self.kind == "height":
             style_pseudocolor(layer, self.vmin, self.vmax, "Viridis")
         elif self.kind == "mask":
-            style_soil_mask(layer)
+            style_plant_mask(layer)
         elif self.kind == "rows":
             style_graduated_vector(layer, "alt_media", "rows")
         elif self.kind == "plants":
@@ -311,7 +311,7 @@ class DtmRowCropsAlgorithm(QgsProcessingAlgorithm):
         self.addParameter(QgsProcessingParameterRasterDestination(
             self.OUT_HEIGHT, tr("mdt_p_out_height"), defaultValue=default("Altura_plantas.tif")))
         self.addParameter(QgsProcessingParameterRasterDestination(
-            self.OUT_MASK, tr("mdt_p_out_mask"), defaultValue=default("Mascara_solo.tif"),
+            self.OUT_MASK, tr("mdt_p_out_mask"), defaultValue=default("Mascara_planta.tif"),
             optional=True, createByDefault=True))
         self.addParameter(QgsProcessingParameterNumber(
             self.SEGMENT, tr("mdt_p_segment"), NUMBER_DOUBLE, ms.DEFAULT_SEGMENT,
@@ -510,7 +510,8 @@ class DtmRowCropsAlgorithm(QgsProcessingAlgorithm):
         self._save(np.where(np.isnan(height), NODATA, height).astype("float32"), out_height, gt, proj,
                    gdal.GDT_Float32, NODATA)
         if out_mask:
-            mask = np.where(valid, soil.astype("uint8"), MASK_NODATA).astype("uint8")
+            # plant mask: 1 = plant, 0 = soil (2.1.1; it was a soil mask with 1 = soil)
+            mask = np.where(valid, (~soil).astype("uint8"), MASK_NODATA).astype("uint8")
             self._save(mask, out_mask, gt, proj, gdal.GDT_Byte, MASK_NODATA)
         feedback.setProgress(100)
 
