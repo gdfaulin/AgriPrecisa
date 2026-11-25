@@ -99,6 +99,70 @@ class _RasterStylePostProcessor(QgsProcessingLayerPostProcessorInterface):
         return pp
 
 
+# ---------------------------------------------------------------- crop list -> fields
+def _crop_wrapper_class():
+    """
+    Python widget wrapper for the crop list that fills spacing, resolution and tolerance with
+    the values of the chosen crop (regression 2.0.1: the fields stayed at 0 and the student did
+    not see the suggested values). Built on demand because processing.gui only exists in the
+    QGIS desktop; returns None when it is not available (fields keep the 0 = crop value rule).
+    """
+    try:
+        from processing.gui.wrappers import WidgetWrapper, DIALOG_STANDARD
+        from qgis.PyQt.QtWidgets import QComboBox
+    except ImportError:
+        return None
+
+    class CropWidgetWrapper(WidgetWrapper):
+        def createWidget(self, **kwargs):
+            self.combobox = QComboBox()
+            for i, option in enumerate(self.parameterDefinition().options()):
+                self.combobox.addItem(option, i)
+            default = self.parameterDefinition().defaultValue()
+            self.combobox.setCurrentIndex(int(default) if default is not None else 0)
+            return self.combobox
+
+        def setValue(self, value):
+            index = self.combobox.findData(value)
+            if index >= 0:
+                self.combobox.setCurrentIndex(index)
+
+        def value(self):
+            return self.combobox.currentData()
+
+        def postInitialize(self, wrappers):
+            self._fields = {}
+            if self.dialogType != DIALOG_STANDARD:
+                return  # batch and modeler: fields keep the 0 = crop value rule
+            for w in wrappers:
+                name = w.parameterDefinition().name()
+                if name in CROP_FIELDS:
+                    self._fields[name] = w
+            self.combobox.currentIndexChanged.connect(self.fill_fields)
+            self.fill_fields()
+
+        def fill_fields(self, *_args):
+            for name, value in crop_field_values(self.combobox.currentData()).items():
+                wrapper = self._fields.get(name)
+                if wrapper is not None:
+                    set_wrapper_value(wrapper, value)
+
+    return CropWidgetWrapper
+
+
+CROP_FIELDS = mm.CROP_FIELDS
+crop_field_values = mm.crop_field_values
+
+
+def set_wrapper_value(wrapper, value):
+    """Sets a value on a C++ (QgsAbstractProcessingParameterWidgetWrapper) or Python wrapper."""
+    if hasattr(wrapper, "setParameterValue"):
+        from qgis.core import QgsProcessingContext
+        wrapper.setParameterValue(value, QgsProcessingContext())
+    else:
+        wrapper.setValue(value)
+
+
 # ---------------------------------------------------------------- algorithm
 class DtmRowCropsAlgorithm(QgsProcessingAlgorithm):
     INPUT = "INPUT"
@@ -142,8 +206,12 @@ class DtmRowCropsAlgorithm(QgsProcessingAlgorithm):
     def initAlgorithm(self, config=None):
         self.addParameter(QgsProcessingParameterRasterLayer(self.INPUT, tr("mdt_p_input")))
         crops = [crop_name(i) for i in range(len(mm.CROPS))]
-        self.addParameter(QgsProcessingParameterEnum(
-            self.CROP, tr("mdt_p_crop"), options=crops, defaultValue=0))
+        crop_param = QgsProcessingParameterEnum(
+            self.CROP, tr("mdt_p_crop"), options=crops, defaultValue=0)
+        wrapper_class = _crop_wrapper_class()
+        if wrapper_class is not None:
+            crop_param.setMetadata({"widget_wrapper": {"class": wrapper_class}})
+        self.addParameter(crop_param)
         self.addParameter(QgsProcessingParameterNumber(
             self.SPACING, tr("mdt_p_spacing"), NUMBER_DOUBLE, 0.0, minValue=0.0, maxValue=20.0))
         self.addParameter(QgsProcessingParameterNumber(

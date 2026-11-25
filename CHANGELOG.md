@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.1 (2026)
+- Fix: in the *DTM and plant height in row crops* dialog, choosing a crop did not show its suggested values; the fields stayed at 0. The crop list now fills in row spacing, working resolution and soil tolerance as soon as it changes (and when the dialog opens), and the values can still be adjusted before running. *Custom* keeps the current values. Built on the generic Processing widget wrapper, so it works on QGIS 3 and QGIS 4.
+- In batch mode and in the Model Designer, 0 in a field still means "use the crop value".
+- Regression tests: `crop_field_values` in `tests/test_mdt_math.py`, and the integration test opens the real Processing dialog, switches crops and checks the fields and the parameters sent to the algorithm.
+- Help texts reviewed in the three languages; the DTM help explains the automatic filling.
+
 ## 2.0.0 (2026)
 - New tool **DTM and plant height in row crops (from the DSM)**: Raster > AgriPrecisa, toolbar button and Processing Toolbox (AgriPrecisa > Elevation models). Generalizes the coffee script to any crop planted in rows with visible soil in the inter-rows.
 - Crop list (coffee, citrus, maize, soybean, sugarcane, grapevine, eucalyptus, custom) fills in suggested row spacing, working resolution and soil tolerance; any field set to a value other than 0 overrides the crop value.
