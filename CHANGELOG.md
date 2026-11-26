@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.2.0 (2026)
+- *DTM and plant height* wizard redesigned (Raster > AgriPrecisa):
+  1. **DSM, RGB and spacing**: optional RGB image (shown in the windows; without it the DSM is shown in grey); the working resolution starts at the DSM pixel, with the number of pixels to process and a warning for very large rasters; the crop list was removed. The **row spacing is measured on a 30 x 30 m window** (miniature of the field to move it): click the centre of a row and of another row a few rows away, enter how many inter-rows lie between them, and the spacing (distance divided by that number) fills the field; or **Detect automatically**, which finds the repeating pattern of the rows in the DSM and draws the detected rows (dashed yellow lines) for checking, with their azimuth.
+  2. **DTM adjustment**: DSM of the window, DTM preview with the same grey scale and a **profile across the rows** (DSM and DTM lines); sliders for the window factor, the soil tolerance and the **slope** (0 = automatic); texts that change with each value.
+  3. **Plant mask**: translucent mask over the RGB image (or the DSM) of the window, sliders for the **minimum plant height** and the **transparency**; plant cover, number of polygons and mean height in the window.
+  4. **Output layers**: DTM, plant height, plant mask and **plant polygons**, each with a check box and its own path and file name (QGIS file widget), all on by default in the project folder with the DSM name.
+- **Slope correction** (Processing parameter *Terrain slope*, 0 = automatic): the soil tolerance is raised by slope x half window, after the progressive morphological filter (Zhang et al., 2003), so that soil on crests, terrace edges and slope breaks is not lost. The automatic slope comes from the opening surface, taking the steepest value within the window; the log reports the median.
+- **Plant mask by height**: 1 where the plant height is at least the *Minimum plant height* (default 0.30 m), 0 elsewhere (before it was the complement of the soil classification).
+- **Plant polygons** (new output, Shapefile): one polygon per continuous patch of the plant mask, with `id`, `area_m2`, `alt_media` and `alt_max`; all patches kept.
+- All outputs of the Processing algorithm are optional.
+- **Removed**: height statistics per row segment and per plant (outputs, parameters and `core/mdt_stats.py`).
+- **Fix**: on a small or second monitor the wizard could not shrink below a large minimum size and its Back, Next and Cancel buttons were pushed off the window. Pages now scroll, the minimum size is small and the window fits the screen when it opens. Regression test: the integration test shrinks every step to 620 x 450 and checks the buttons.
+- Tests for the slope correction (ridge), the spacing detection (several angles and spacings) and the plant patches; the integration test drives the new wizard (measuring, detection, RGB, sliders, outputs with custom names, unchecked outputs) and saves screenshots with `AGRIPRECISA_MDT_SHOT=folder`.
+- Help texts reviewed in the three languages; new Help for each step and updated Processing help.
+
 ## 2.1.1 (2026)
 - *DTM and plant height*: the **soil mask became a plant mask**: layer *Plant mask (1 = plant, 0 = soil)*, file `[DSM]_Mascara_planta.tif` (Processing default `Mascara_planta.tif`). **The values are inverted** compared with versions 2.0.0 to 2.1.0 (which wrote 1 = soil): update raster calculator expressions or models that used the old mask. No data stays 255; colours unchanged (green plants, brown soil).
 - The wizard step 2 preview is now called *Plant mask of the window*, with the legend green = plant (1), brown = soil (0).

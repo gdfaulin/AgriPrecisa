@@ -27,15 +27,14 @@ agriprecisa/                pasta do complemento (é o que vai no ZIP)
   metadata.txt              versão, changelog, metadados do repositório do QGIS
   core/idw_math.py          matemática pura, sem QGIS (IDW com mínimo e máximo de vizinhas, cobertura, validação cruzada; testada com pytest)
   core/pipeline.py          fluxo IDW (retângulo + 100 m) > células inteiras (só ID 1..n) > estatística zonal > recorte > Grade Padrão única
-  core/mdt_math.py          MDT e altura de plantas em culturas em linhas: matemática pura (abertura morfológica, solo, suavização, valores por cultura; testada com pytest)
-  core/mdt_stats.py         estatísticas de altura por trecho de linha (direção e espaçamento detectados, cobertura, falhas) e por planta (topos e copas); testada com pytest
+  core/mdt_math.py          MDT e altura de plantas em culturas em linhas: matemática pura (abertura morfológica, correção de declividade, solo, suavização, máscara e manchas de planta, detecção do espaçamento, valores por cultura; testada com pytest)
   core/compat.py            constantes compatíveis com QGIS 3.x e 4.x
   core/paths.py             pasta de saída padrão, nomes de arquivos (Grade Padrão) e de campos Shapefile
   gui/idw_wizard.py         assistente em 4 etapas (Etapas 1 e 2 com painel fixo de explicação à direita)
   gui/params_page.py        Etapa 3: P, raio em Avançado, vizinhas na tabela, ajuste automático
   gui/widgets.py            prévia do mapa
   gui/cv_dialog.py          tabela de erro da validação cruzada
-  gui/mdt_wizard.py         assistente do MDT e altura de plantas em 4 etapas (prévia da máscara de planta com recorte clicável e barras de tolerância e fator)
+  gui/mdt_wizard.py         assistente do MDT em 4 etapas: MDS/RGB e medição do espaçamento; prévia do MDT com perfil (fator, tolerância, declividade); máscara de planta sobre o RGB (altura mínima, transparência); camadas de saída com caminho e nome. Páginas com rolagem e janela ajustada à tela
   processing_provider/      provedor e algoritmos da Caixa de Ferramentas (alg_idw_grid.py; alg_dtm_rows.py = MDT e altura de plantas, menu Raster > AgriPrecisa)
   i18n.py                   textos em pt, en e es (toda chave nos três idiomas)
 tests/                      testes pytest (sem QGIS)
@@ -61,7 +60,7 @@ docs/GUIA_PUBLICACAO.md     guia para o autor
 - Acrescentar linha no topo de `changelog=` (metadata.txt, em inglês) e em `CHANGELOG.md`.
 
 ### 3b. Atualizar a Ajuda (obrigatório em toda versão)
-- Revisar **todos** os textos de Ajuda em `i18n.py`, nos três idiomas: `help_page1` a `help_page4` (botão Ajuda de cada etapa), os textos `*_more` (links "Saiba mais"), `alg_help` (Ajuda do IDW na Caixa de Ferramentas), `mdt_help` (Ajuda do MDT na Caixa de Ferramentas), `mdt_help_page1` a `mdt_help_page4` e os painéis `mdt_p1_panel` e `mdt_p3_panel` (assistente do MDT).
+- Revisar **todos** os textos de Ajuda em `i18n.py`, nos três idiomas: `help_page1` a `help_page4` (botão Ajuda de cada etapa), os textos `*_more` (links "Saiba mais"), `alg_help` (Ajuda do IDW na Caixa de Ferramentas), `mdt_help` (Ajuda do MDT na Caixa de Ferramentas), `mdt_help_page1` a `mdt_help_page4` (assistente do MDT) e os textos explicativos das barras (`mdt_w2_*_low/mid/high`, `mdt_w2_slope_*`, `mdt_w3_height_*`).
 - Atualizar o que a nova versão mudou: novos campos, valores padrão, limites, nomes de botões e de arquivos.
 - Não usar `<` e `>` em nomes de exemplo (o QGIS interpreta como marcação); usar colchetes, por exemplo `[contorno]`.
 - Depois da revisão, definir `HELP_REVIEWED_VERSION` em `i18n.py` igual à nova versão. O teste `test_help_reviewed_for_this_version` falha enquanto isso não for feito.
