@@ -14,6 +14,8 @@ Method (progressive morphological approach, simplified for row crops):
 5. a moving average over the window smooths the result, which is never above the DSM.
 """
 
+import math
+
 import numpy as np
 
 # Typical values per crop: inter-row spacing (m), working resolution (m), soil tolerance (m).
@@ -32,6 +34,8 @@ CROPS = [
 CUSTOM = len(CROPS) - 1
 
 DEFAULT_FACTOR = 1.5
+DEFAULT_PLANT_HEIGHT = 0.30   # m, plant mask: pixels at least this high above the DTM
+MAX_AUTO_SLOPE = 1.0          # 100 percent, cap of the automatic slope
 DEFAULT_RESOLUTION = 0.25
 DEFAULT_TOLERANCE = 0.25
 PIXELS_PER_ROW = 4     # recommended: at least 4 pixels across the inter-row
@@ -59,7 +63,7 @@ def resolve_parameters(crop_index, spacing, resolution, tolerance):
     return spacing, resolution, tolerance
 
 
-CROP_FIELDS = ("SPACING", "RESOLUTION", "TOLERANCE", "PLANT_DISTANCE")
+CROP_FIELDS = ("SPACING", "RESOLUTION", "TOLERANCE")
 
 
 def crop_field_values(index):
@@ -70,10 +74,8 @@ def crop_field_values(index):
         return {}
     if not 0 <= index < len(CROPS) or index == CUSTOM:
         return {}
-    from .mdt_stats import PLANT_DISTANCE
-    key, spacing, res, tol = CROPS[index]
-    return {"SPACING": spacing, "RESOLUTION": res, "TOLERANCE": tol,
-            "PLANT_DISTANCE": PLANT_DISTANCE[key]}
+    _key, spacing, res, tol = CROPS[index]
+    return {"SPACING": spacing, "RESOLUTION": res, "TOLERANCE": tol}
 
 
 def recommended_resolution(spacing):
@@ -96,8 +98,45 @@ def ground_surface(dsm, valid, window):
     return ndimage.maximum_filter(np.where(np.isfinite(eroded), eroded, -np.inf), size=window)
 
 
+def terrain_slope(opening, valid, pixel, window):
+    """
+    Local terrain slope (m/m) from the opening surface smoothed over the window (the opening
+    follows the soil under the plants).
+    """
+    from scipy import ndimage
+    base = np.where(valid & np.isfinite(opening), opening, np.nan)
+    filled = fill_nearest(base)
+    if np.isnan(filled).all():
+        return np.zeros(opening.shape)
+    smooth = ndimage.uniform_filter(filled, size=window)
+    gy, gx = np.gradient(smooth, pixel)
+    return np.clip(np.hypot(gx, gy), 0.0, MAX_AUTO_SLOPE)
+
+
+def soil_threshold(opening, valid, pixel, window, tolerance, slope_percent=0.0):
+    """
+    Height above the opening up to which a pixel is soil: tolerance plus slope x half window.
+    On a slope the opening lies below the soil towards the edges of the window by up to
+    slope x (window / 2) (progressive morphological filter, Zhang et al., 2003).
+    ``slope_percent`` > 0 uses that slope everywhere; 0 estimates it pixel by pixel; None
+    ignores the slope. Returns (threshold, slope used in percent: median over valid pixels).
+    """
+    half = window * pixel / 2.0
+    if slope_percent is None:
+        return tolerance, 0.0
+    if slope_percent > 0:
+        s = slope_percent / 100.0
+        return tolerance + s * half, float(slope_percent)
+    from scipy import ndimage
+    slope = terrain_slope(opening, valid, pixel, window)
+    used = float(np.median(slope[valid])) * 100 if valid.any() else 0.0
+    # steepest slope within the window: at a crest or terrace edge the gradient cancels out
+    # right at the break, but the opening is cut there by the slopes around it
+    return tolerance + ndimage.maximum_filter(slope, size=window) * half, used
+
+
 def classify_soil(dsm, opening, valid, tolerance):
-    """Boolean mask of soil pixels: at most ``tolerance`` above the opening surface."""
+    """Boolean mask of soil pixels: at most ``tolerance`` (number or array) above the opening."""
     with np.errstate(invalid="ignore"):
         return valid & np.isfinite(opening) & ((dsm - opening) <= tolerance)
 
@@ -141,11 +180,131 @@ def height_stats(height, soil, valid):
             "max": float(np.max(h)), "plant_percent": 100.0 * h.size / max(int(valid.sum()), 1)}
 
 
-def dtm_from_dsm(dsm, window, tolerance, fill=fill_nearest):
+def dtm_from_dsm(dsm, window, tolerance, fill=fill_nearest, pixel=1.0, slope_percent=None):
     """Whole method on an array (NaN = no data). Returns (dtm, height, soil)."""
     valid = np.isfinite(dsm)
     opening = ground_surface(dsm, valid, window)
-    soil = classify_soil(dsm, opening, valid, tolerance)
+    threshold, _ = soil_threshold(opening, valid, pixel, window, tolerance, slope_percent)
+    soil = classify_soil(dsm, opening, valid, threshold)
     filled = fill(np.where(soil, dsm, np.nan))
     dtm = smooth_dtm(filled, dsm, valid, window)
     return dtm, dsm - dtm, soil
+
+
+# ---------------------------------------------------------------------------
+# Plant mask and its patches
+# ---------------------------------------------------------------------------
+def plant_mask(height, valid, min_height):
+    """1 where the plant height is at least ``min_height`` (plant), else 0 (soil)."""
+    with np.errstate(invalid="ignore"):
+        return valid & np.isfinite(height) & (height >= min_height)
+
+
+def plant_patches(mask, height, pixel):
+    """
+    Connected patches of the plant mask (4-neighbourhood, like GDAL Polygonize).
+    Returns (labels int32 raster, list of dicts id, area, mean, max).
+    """
+    from scipy import ndimage
+    labels, n = ndimage.label(mask)
+    labels = labels.astype(np.int32)
+    if n == 0:
+        return labels, []
+    ids = np.arange(1, n + 1)
+    h = np.where(np.isfinite(height), height, 0.0)
+    count = ndimage.sum(np.ones(mask.shape), labels, ids)
+    mean = ndimage.mean(h, labels, ids)
+    hmax = ndimage.maximum(h, labels, ids)
+    return labels, [{"id": int(i), "area": float(c) * pixel * pixel, "mean": float(m), "max": float(x)}
+                    for i, c, m, x in zip(ids, count, mean, hmax)]
+
+
+# ---------------------------------------------------------------------------
+# Row spacing detection (for the measuring step of the wizard)
+# ---------------------------------------------------------------------------
+def _profile(u, values, step):
+    """Mean of ``values`` in bins of ``step`` along u (NaN where a bin has few pixels)."""
+    b = np.floor((u - u.min()) / step).astype(np.int64)
+    total = np.bincount(b)
+    sums = np.bincount(b, weights=values, minlength=total.size)
+    ok = total >= max(3, 0.2 * np.median(total[total > 0]))
+    return np.where(ok, sums / np.maximum(total, 1), np.nan)
+
+
+def detect_spacing(dsm, valid, gt, min_spacing=0.3, max_spacing=10.0, max_samples=200000):
+    """
+    Row spacing and direction found in a DSM window. The DSM minus a broad moving average
+    (relief removed) is projected across the rows for every direction; the direction whose
+    profile oscillates the most, and the period of that oscillation, give the rows.
+    Coordinates are local to the window: x = (col + 0.5) * pixel, y = -(row + 0.5) * pixel,
+    u = x cos(theta) + y sin(theta). Returns (spacing m, theta radians across the rows,
+    score 0..1, phi) where the row centres are at u = phi + k * spacing; (None, None, 0, None)
+    when nothing is found.
+    """
+    from scipy import ndimage
+    pixel = abs(gt[1])
+    if valid.sum() < 100:
+        return None, None, 0.0, None
+    filled = fill_nearest(np.where(valid, dsm, np.nan))
+    size = max(3, int(round(2.5 * max_spacing / pixel)) | 1)
+    detail = filled - ndimage.uniform_filter(filled, size=min(size, min(dsm.shape)))
+    rows, cols = np.nonzero(valid)
+    if rows.size > max_samples:
+        sel = np.random.default_rng(0).choice(rows.size, max_samples, replace=False)
+        rows, cols = rows[sel], cols[sel]
+    x = (cols + 0.5) * pixel
+    y = -(rows + 0.5) * pixel
+    vals = detail[rows, cols]
+    step = pixel
+
+    def best_period(theta):
+        u = x * math.cos(theta) + y * math.sin(theta)
+        prof = _profile(u, vals, step)
+        prof = np.where(np.isfinite(prof), prof - np.nanmean(prof), 0.0)
+        if prof.size < 8:
+            return 0.0, None
+        spec = np.abs(np.fft.rfft(prof * np.hanning(prof.size))) ** 2
+        freqs = np.fft.rfftfreq(prof.size, step)
+        ok = (freqs >= 1.0 / max_spacing) & (freqs <= 1.0 / min_spacing)
+        if not ok.any():
+            return 0.0, None
+        i = np.flatnonzero(ok)[np.argmax(spec[ok])]
+        power = spec[i] / max(spec[1:].sum(), 1e-12)
+        return float(power), 1.0 / freqs[i]
+
+    angles = np.radians(np.arange(0.0, 180.0, 2.0))
+    scores = [best_period(t) for t in angles]
+    k = int(np.argmax([sc for sc, _ in scores]))
+    fine = angles[k] + np.radians(np.arange(-2.0, 2.01, 0.25))
+    fscores = [best_period(t) for t in fine]
+    j = int(np.argmax([sc for sc, _ in fscores]))
+    score, period = fscores[j]
+    if period is None:
+        return None, None, 0.0, None
+    theta = float(fine[j]) % math.pi
+    # refine direction and period together with the comb amplitude (sharper than the FFT peak)
+    def comb(theta_, s_):
+        u = x * math.cos(theta_) + y * math.sin(theta_)
+        prof = _profile(u, vals, step)
+        finite = np.isfinite(prof)
+        pos = np.flatnonzero(finite) * step
+        p = prof[finite] - prof[finite].mean()
+        w = 2 * math.pi / s_
+        return math.hypot(np.sum(p * np.cos(w * pos)), np.sum(p * np.sin(w * pos))) / max(p.size, 1)
+
+    spacing = period
+    for span_deg, n_t, span_s in ((3.0, 31, 0.1), (0.5, 21, 0.03)):
+        cands = [(comb(t, spacing), t) for t in theta + np.radians(np.linspace(-span_deg, span_deg, n_t))]
+        theta = max(cands)[1]
+        cands = [(comb(theta, s_), s_) for s_ in np.linspace((1 - span_s) * spacing, (1 + span_s) * spacing, 41)]
+        spacing = float(max(cands)[1])
+    # phase of the comb: the profile peaks (plants above the local relief) are the row centres
+    u = x * math.cos(theta) + y * math.sin(theta)
+    prof = _profile(u, vals, step)
+    finite = np.isfinite(prof)
+    pos = np.flatnonzero(finite) * step
+    p = prof[finite] - prof[finite].mean()
+    w = 2 * math.pi / spacing
+    phase = math.atan2(np.sum(p * np.sin(w * pos)), np.sum(p * np.cos(w * pos)))
+    phi = float(u.min() + (phase / w) % spacing)
+    return spacing, float(theta) % math.pi, float(score), phi

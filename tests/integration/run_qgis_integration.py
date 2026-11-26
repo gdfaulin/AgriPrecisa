@@ -812,96 +812,195 @@ print("styles:", _lh.renderer().type(), _lm.renderer().type())
 if _lh.renderer().type() != "singlebandpseudocolor" or _lm.renderer().type() != "paletted":
     errors.append("DTM tool: styles not applied")
 
-# 2.1.0: row and plant statistics in the algorithm
+# 2.2.0: plant polygons, slope and plant height parameters, optional outputs
 _r3 = processing.run("agriprecisa:dtm_row_crops", dict(
-    _params, OUT_ROWS=os.path.join(_mdt_dir, "Trechos.shp"),
-    OUT_PLANTS=os.path.join(_mdt_dir, "Topos.shp"), OUT_CROWNS=os.path.join(_mdt_dir, "Copas.shp")))
-_rows_l = QgsVectorLayer(_r3["OUT_ROWS"], "rows", "ogr")
-_names = [f.name() for f in _rows_l.fields()]
-_lin = {f["linha"] for f in _rows_l.getFeatures()}
-_p95 = [f["alt_p95"] for f in _rows_l.getFeatures() if f["compr_m"] >= 4.9]
-print(f"row segments: {_rows_l.featureCount()} in {len(_lin)} rows, median p95 {_np.median(_p95):.2f} m, fields {_names}")
-if _names != ["linha", "trecho", "alt_media", "alt_p95", "alt_max", "cobert_pct", "falha_m", "compr_m"]:
-    errors.append("row stats: unexpected fields")
-# synthetic field: 60 m wide, rows every 3.6 m (minus the 2 m no-data border) -> 16 or 17 rows
-if not (15 <= len(_lin) <= 17) or abs(_np.median(_p95) - 2.0) > 0.15:
-    errors.append("row stats: rows or heights not recovered")
-_pl = QgsVectorLayer(_r3["OUT_PLANTS"], "p", "ogr")
-_cr = QgsVectorLayer(_r3["OUT_CROWNS"], "c", "ogr")
-print("plants:", _pl.featureCount(), "crowns:", _cr.featureCount())
-if _pl.featureCount() == 0 or _cr.featureCount() == 0 or _cr.featureCount() > _pl.featureCount():
-    errors.append("plant stats: tops or crowns missing")
+    _params, SLOPE=0, PLANT_HEIGHT=0.5, OUT_POLYGONS=os.path.join(_mdt_dir, "Poligonos.shp"),
+    OUT_DTM=None))
+_pg = QgsVectorLayer(_r3["OUT_POLYGONS"], "pg", "ogr")
+_pg_names = [f.name() for f in _pg.fields()]
+_pg_area = sum(f["area_m2"] for f in _pg.getFeatures())
+_mask_area = float((_read(_r3["OUT_MASK"]) == 1).sum()) * 0.25 * 0.25
+print(f"plant polygons: {_pg.featureCount()} polygons, {_pg_area:.1f} m2 (mask {_mask_area:.1f} m2), fields {_pg_names}")
+if _pg_names != ["id", "area_m2", "alt_media", "alt_max"] or abs(_pg_area - _mask_area) > 0.01:
+    errors.append("plant polygons: fields or area do not match the plant mask")
+_geom_area = sum(f.geometry().area() for f in _pg.getFeatures())
+if abs(_geom_area - _mask_area) > 0.01:
+    errors.append("plant polygons: geometry area differs from the mask")
+# synthetic field: one polygon per hedge row (16 or 17 rows, the 2 m no-data border aside)
+if not (15 <= _pg.featureCount() <= 17):
+    errors.append("plant polygons: one polygon per hedge expected")
+if "OUT_DTM" in _r3:
+    errors.append("DTM tool: unchecked DTM output should not be created")
 
-# Wizard (2.1.0): crop fills the fields, live mask preview with sliders, run and load styled results
+# Wizard (2.2.0)
 from agriprecisa.gui import mdt_wizard as _mw
+from qgis.PyQt.QtWidgets import QWizard as _QW
 _dsm_layer = QgsRasterLayer(_dsm_path, "DSM_teste")
-QgsProject.instance().addMapLayer(_dsm_layer)
+_rgb_path = os.path.join(_mdt_dir, "RGB.tif")
+_rgb_arr = _np.where(_rows, 1, 0)
+_rds = _gdal.GetDriverByName("GTiff").Create(_rgb_path, _n, _n, 3, _gdal.GDT_Byte)
+_rds.SetGeoTransform((X0, _px, 0, Y0 + _n * _px, 0, -_px))
+_rds.SetProjection(_srs.ExportToWkt())
+for _b, (_on, _off) in enumerate(((40, 150), (140, 110), (40, 80))):
+    _rds.GetRasterBand(_b + 1).WriteArray(_np.where(_rgb_arr, _on, _off)[::-1].astype("uint8"))
+_rds = None
+_rgb_layer = QgsRasterLayer(_rgb_path, "RGB_teste")
+QgsProject.instance().addMapLayers([_dsm_layer, _rgb_layer])
 _shot_dir = os.environ.get("AGRIPRECISA_MDT_SHOT")
 _wz = _mw.MdtWizard(main)
 _wz.resize(1140, 820)
 _wz.show()
+app.processEvents()
+
+# Regression 2.2.0: on a small (or second) monitor the wizard could not shrink and the
+# Back/Next/Cancel buttons were pushed off the window.
+if _wz.minimumHeight() > 480 or _wz.minimumWidth() > 600:
+    errors.append("wizard: minimum size too large for small screens")
+def _check_buttons(step):
+    """Buttons stay inside the window when it is made small (regression 2.2.0)."""
+    _wz.resize(620, 450)
+    app.processEvents()
+    for _btn in (_QW.WizardButton.NextButton, _QW.WizardButton.FinishButton, _QW.WizardButton.CancelButton):
+        _b = _wz.button(_btn)
+        if _b.isVisible() and _b.mapTo(_wz, _b.rect().bottomRight()).y() > _wz.height():
+            errors.append(f"wizard step {step}: buttons outside the window at 620x450")
+    if _wz.height() > 470:
+        errors.append(f"wizard step {step}: window could not shrink to 450 px ({_wz.height()})")
+    _wz.resize(1140, 820)
+    app.processEvents()
+
+
 _p1 = _wz.currentPage()
 _p1.combo_dsm.setLayer(_dsm_layer)
-_p1.combo_crop.setCurrentIndex(1)                     # citrus
-if (_p1.spin_spacing.value(), _p1.spin_res.value()) != (6.5, 0.25):
-    errors.append("wizard step 1: crop did not fill the fields")
-_p1.combo_crop.setCurrentIndex(0)                     # coffee
 app.processEvents()
-print("wizard step 1 info:", _p1.label_info.text()[:90])
-if "31982" not in _p1.label_info.text():
-    errors.append("wizard step 1: CRS not shown")
+_check_buttons(1)
+
+# Step 1: resolution from the DSM, RGB optional, measuring and automatic detection
+if abs(_p1.spin_res.value() - 0.25) > 1e-9:
+    errors.append("wizard step 1: working resolution should start at the DSM pixel")
+if _p1.spin_spacing.value() != 0:
+    errors.append("wizard step 1: spacing should start empty (to be measured)")
+if _p1.view.image is None or _p1.overview.image is None:
+    errors.append("wizard step 1: window or miniature not shown")
+_cx, _cy = _wz.centre
+_p1.spin_n.setValue(4)
+_p1.view.add_point(_cx - 7.2, _cy)                 # 4 inter-rows of 3.6 m apart
+_p1.view.add_point(_cx + 7.2, _cy)
+print("wizard step 1 measured:", _p1.spin_spacing.value(), "|", _p1.label_measure.text()[:60])
+if abs(_p1.spin_spacing.value() - 3.6) > 1e-6:
+    errors.append("wizard step 1: measurement does not fill the spacing")
+_p1.spin_spacing.setValue(0)
+_p1.detect()
+print("wizard step 1 detected:", _p1.spin_spacing.value(), "rows drawn:", len(_p1.view.rows))
+if abs(_p1.spin_spacing.value() - 3.6) > 0.05 or not _p1.view.rows:
+    errors.append("wizard step 1: automatic detection failed")
+if "a 0° do norte" not in _p1.label_measure.text():               # north-south rows: 0, not 180
+    errors.append(f"wizard step 1: row azimuth text {_p1.label_measure.text()}")
+if "cerca de 57.600" not in _p1.label_info.text():                # 60 x 60 m at 0.25 m
+    errors.append("wizard step 1: pixel count of the DSM")
+_p1.combo_rgb.setLayer(_rgb_layer)
+app.processEvents()
+if _wz.source.rgb is None or abs(_p1.spin_spacing.value() - 3.6) > 0.05:
+    errors.append("wizard step 1: RGB layer not used or spacing lost")
 if _shot_dir:
+    _p1.detect()
+    app.processEvents()
     _wz.grab().save(os.path.join(_shot_dir, "mdt_etapa1.png"))
 _wz.next()
+
+# Step 2: DTM preview, profile and sliders
 _p2 = _wz.currentPage()
 app.processEvents()
-_soil0 = _p2.soil_pct
-print(f"wizard step 2: soil {_soil0:.1f}% window {_p2.window_px} px, plant height {_p2.plant_height}")
-if not (40 < _soil0 < 70) or _p2.view_mask.image is None or _p2.overview.image is None:
-    errors.append("wizard step 2: preview not computed")
-_p2.slider_tol.setValue(100)                          # 1.00 m: the text warns about high tolerance
-if _p2.tolerance() != 1.0 or _p2.soil_pct < _soil0 or "alta" not in _p2.label_tol_text.text():
-    errors.append("wizard step 2: tolerance slider does not update the mask and the text")
+_check_buttons(2)
+_pv = _wz.preview
+_err_dtm = float(_np.nanmedian(_np.abs(_pv.c_dtm - _np.nanmedian(_pv.c_dtm))))
+print(f"wizard step 2: soil {_pv.soil_pct:.1f}%, slope used {_pv.slope_used:.1f}%, profile points {len(_p2.profile.dsm)}")
+if _p2.view_dtm.image is None or _p2.profile.dsm is None or not (40 < _pv.soil_pct < 75):
+    errors.append("wizard step 2: DTM preview not computed")
+# the DTM preview has no plants: height of the rows about 2 m
+_hrow = _np.nanmedian(_pv.c_height[_pv.c_valid & ~_pv.c_soil])
+if abs(_hrow - 2.0) > 0.2:
+    errors.append(f"wizard step 2: preview plant height {_hrow:.2f} m")
+_p2.slider_slope.setValue(20)
+if "20" not in _p2.labels["slope"].text() or "informada" not in _p2.texts["slope"].text():
+    errors.append("wizard step 2: slope slider not applied")
+_p2.slider_slope.setValue(0)
+if "automática" not in _p2.texts["slope"].text():
+    errors.append("wizard step 2: automatic slope text")
+_p2.slider_tol.setValue(80)
+if "alta" not in _p2.texts["tol"].text():
+    errors.append("wizard step 2: tolerance text")
 _p2.slider_tol.setValue(25)
-_p2.slider_factor.setValue(10)                        # factor 1.0
-if "estreita" not in _p2.label_factor_text.text():
-    errors.append("wizard step 2: factor text not updated")
+_p2.slider_factor.setValue(10)
+if "estreita" not in _p2.texts["factor"].text():
+    errors.append("wizard step 2: factor text")
 _p2.slider_factor.setValue(15)
-_ext = _p2.overview.extent
-_p2.move_window(_ext[0] + 20, _ext[1] + 20)          # click near a corner
-if abs(_p2.overview.window[0] - (_ext[0] + 20 - _p2.window_side() / 2)) > 1e-6:
-    errors.append("wizard step 2: click did not move the window")
 app.processEvents()
 if _shot_dir:
-    _p2.move_window((_ext[0] + _ext[2]) / 2, (_ext[1] + _ext[3]) / 2)
-    app.processEvents()
     _wz.grab().save(os.path.join(_shot_dir, "mdt_etapa2.png"))
 _wz.next()
+
+# Step 3: plant mask over the RGB, minimum height and transparency
 _p3 = _wz.currentPage()
-_p3.edit_folder.setText(os.path.join(_mdt_dir, "wizard"))
-_p3.box_plants.setChecked(True)
 app.processEvents()
-if "DSM_teste_Trechos_linhas.shp" not in _p3.label_files.text():
-    errors.append("wizard step 3: file list not shown")
-if "DSM_teste_Mascara_planta.tif" not in _p3.label_files.text():
-    errors.append("wizard step 3: plant mask file name")
+_check_buttons(3)
+_ov = _p3.view.overlay
+if _p3.view.image is None or _ov is None:
+    errors.append("wizard step 3: mask preview not shown")
+_txt0 = _p3.label_numbers.text()
+_p3.slider_h.setValue(50)                        # 2.50 m: above the hedges, no plants
+_txt1 = _p3.label_numbers.text()
+print("wizard step 3:", _txt0[:70], "||", _txt1[:70])
+if "<b>0" not in _txt1 or _txt0 == _txt1:
+    errors.append("wizard step 3: minimum height does not change the mask")
+_p3.slider_h.setValue(6)
+_p3.slider_alpha.setValue(18)                    # 90 percent transparent
+if _p3.label_alpha.text() != "90%":
+    errors.append("wizard step 3: transparency not applied")
+app.processEvents()
 if _shot_dir:
+    _p3.slider_alpha.setValue(10)
+    app.processEvents()
     _wz.grab().save(os.path.join(_shot_dir, "mdt_etapa3.png"))
 _wz.next()
+
+# Step 4: outputs with path and name, all on by default
+_p4 = _wz.currentPage()
 app.processEvents()
+_check_buttons(4)
+_paths = {k: _p4.files[k].filePath() for k in _p4.files}
+print("wizard step 4 defaults:", {k: os.path.basename(v) for k, v in _paths.items()})
+if not all(c.isChecked() for c in _p4.checks.values()):
+    errors.append("wizard step 4: outputs should all be on by default")
+_folder4 = os.path.join(_mdt_dir, "wizard")
+for _k, _name in (("OUT_DTM", "DSM_teste_MDT.tif"), ("OUT_HEIGHT", "DSM_teste_Altura.tif"),
+                  ("OUT_MASK", "DSM_teste_Mascara_planta.tif"), ("OUT_POLYGONS", "DSM_teste_Poligonos_planta.shp")):
+    if os.path.basename(_paths[_k]) != _name:
+        errors.append(f"wizard step 4: default name of {_k}")
+    _p4.files[_k].setFilePath(os.path.join(_folder4, _name))
+_p4.files["OUT_HEIGHT"].setFilePath(os.path.join(_folder4, "minha_altura"))   # no extension
+_p4.checks["OUT_DTM"].setChecked(False)
+if _p4.files["OUT_DTM"].isEnabled():
+    errors.append("wizard step 4: unchecked output should disable its path")
 if _shot_dir:
+    _p4.checks["OUT_DTM"].setChecked(True)
     _wz.grab().save(os.path.join(_shot_dir, "mdt_etapa4.png"))
+    _p4.checks["OUT_DTM"].setChecked(False)
+if not _p4.validatePage():
+    errors.append("wizard step 4: valid outputs rejected")
+if set(_wz.outputs) != {"OUT_HEIGHT", "OUT_MASK", "OUT_POLYGONS"} or not _wz.outputs["OUT_HEIGHT"].endswith("minha_altura.tif"):
+    errors.append(f"wizard step 4: outputs {_wz.outputs}")
 _fb = _mw._LogFeedback()
 _res = _mw.run_mdt_job(_wz, _fb)
 _grp = QgsProject.instance().layerTreeRoot().findGroup(i18n.tr("mdt_group_name"))
 _kids = [n.layer() for n in _grp.findLayers()] if _grp else []
 print("wizard loaded:", [(l.name().split(" | ")[1], l.renderer().type()) for l in _kids])
-if len(_kids) != 6:
-    errors.append("wizard: results not loaded")
-print("wizard log:", [ln for ln in _fb.lines if ln.startswith(("Linhas", "Plantas", "   Linhas"))])
-# run again with the layers still open: they are released and replaced, no _2 names
+if len(_kids) != 3 or os.path.exists(os.path.join(_folder4, "DSM_teste_MDT.tif")):
+    errors.append("wizard: results not loaded or unchecked output created")
+print("wizard log:", [ln for ln in _fb.lines if "Declividade" in ln or "Polígonos" in ln])
+# second run with the layers open: released and replaced, no _2 names
 _res2 = _mw.run_mdt_job(_wz, _mw._LogFeedback())
-if os.path.basename(_res2["OUT_DTM"]) != "DSM_teste_MDT.tif" or len(_grp.findLayers()) != 6:
+if os.path.basename(_res2["OUT_MASK"]) != "DSM_teste_Mascara_planta.tif" or len(_grp.findLayers()) != 3:
     errors.append("wizard: second run should replace the previous layers")
 _wz.hide()
 
@@ -923,9 +1022,7 @@ if _vals()[:3] != (3.6, 0.25, 0.25):
     errors.append(f"crop list: dialog should open with the coffee values, got {_vals()}")
 _combo = _wr["CROP"].combobox
 _combo.setCurrentIndex(3)                       # soybean
-print("soybean:", _vals(), "plant distance", _wr["PLANT_DISTANCE"].parameterValue())
-if abs(float(_wr["PLANT_DISTANCE"].parameterValue()) - 0.1) > 1e-9:
-    errors.append("crop list: plant distance not filled")
+print("soybean:", _vals())
 if _vals() != (0.5, 0.1, 0.1):
     errors.append(f"crop list: soybean values not filled, got {_vals()}")
 _wr["SPACING"].setParameterValue(0.45, QgsProcessingContext())
