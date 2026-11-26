@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.2.1 (2026)
+- *DTM and plant height* wizard, steps 1, 2 and 3: **zoom** with + and − buttons or the mouse wheel over the image. The window shrinks to 30, 15, 7.5 and 3.75 m and is read again at the original resolution (no pixelation); the DTM preview and the plant mask are recomputed for the smaller window. **Drag the image** to move the window; the red square on the miniature follows. The automatic spacing detection always uses a 30 m window.
+- Step 3: the plant mask can be shown as **fill** (translucent green) or **outline** (yellow edge of the plant patches), which keeps the image visible when green plants are under a green mask.
+- Fix: the margin around the preview window was not a whole number of pixels, so the preview could come out one pixel short (59 instead of 60) and the mask was slightly shifted against the image. Margin and window now follow the pixel grid. Regression test in the integration test (30 m and 15 m windows).
+- Help texts reviewed in the three languages (zoom and outline explained in the Help of steps 1, 2 and 3).
+
 ## 2.2.0 (2026)
 - *DTM and plant height* wizard redesigned (Raster > AgriPrecisa):
   1. **DSM, RGB and spacing**: optional RGB image (shown in the windows; without it the DSM is shown in grey); the working resolution starts at the DSM pixel, with the number of pixels to process and a warning for very large rasters; the crop list was removed. The **row spacing is measured on a 30 x 30 m window** (miniature of the field to move it): click the centre of a row and of another row a few rows away, enter how many inter-rows lie between them, and the spacing (distance divided by that number) fills the field; or **Detect automatically**, which finds the repeating pattern of the rows in the DSM and draws the detected rows (dashed yellow lines) for checking, with their azimuth.

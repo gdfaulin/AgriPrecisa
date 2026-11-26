@@ -902,6 +902,45 @@ _p1.combo_rgb.setLayer(_rgb_layer)
 app.processEvents()
 if _wz.source.rgb is None or abs(_p1.spin_spacing.value() - 3.6) > 0.05:
     errors.append("wizard step 1: RGB layer not used or spacing lost")
+# 2.2.1: zoom (smaller window read again at full resolution), wheel and drag to pan
+from qgis.PyQt.QtTest import QTest
+from qgis.PyQt.QtCore import QPoint
+_p1.zoom_bar.button_in.click()
+app.processEvents()
+_ext1 = _p1.view.extent
+print("zoom 1:", _wz.window_side, "m, image", _p1.view.image.width(), "px, label", _p1.zoom_bar.label.text())
+if _wz.window_side != 15.0 or abs((_ext1[2] - _ext1[0]) - 15.0) > 1e-9 or _p1.view.image.width() != 60:
+    errors.append("wizard zoom: step 1 window not 15 m at full resolution")
+if abs((_p1.overview.window[2] - _p1.overview.window[0]) - 15.0) > 1e-9 or "15 x 15" not in _p1.zoom_bar.label.text():
+    errors.append("wizard zoom: red square or label not updated")
+_p1.view.wheeled.emit(1)
+if _wz.window_side != 7.5:
+    errors.append("wizard zoom: mouse wheel")
+for _i in range(5):
+    _p1.zoom_bar.button_in.click()
+if _wz.window_side != 3.75 or _p1.zoom_bar.button_in.isEnabled():
+    errors.append("wizard zoom: should stop at 3.75 m")
+_c0 = _wz.centre
+_r = _p1.view.image_rect()
+_mid = QPoint(int(_r.center().x()), int(_r.center().y()))
+QTest.mousePress(_p1.view, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, _mid)
+QTest.mouseMove(_p1.view, _mid + QPoint(40, 0))
+QTest.mouseRelease(_p1.view, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, _mid + QPoint(40, 0))
+app.processEvents()
+_shift = _c0[0] - _wz.centre[0]
+_expected = 40 / _r.width() * 3.75
+print(f"drag: centre moved {_shift:.3f} m west (expected {_expected:.3f}), points {_p1.view.points}")
+if abs(_shift - _expected) > 0.05 or abs(_wz.centre[1] - _c0[1]) > 0.05 or _p1.view.points:
+    errors.append("wizard drag: should pan the window and not measure")
+QTest.mouseClick(_p1.view, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, _mid)
+if len(_p1.view.points) != 1:
+    errors.append("wizard click: a click (no drag) should still add a measuring point")
+_p1.clear_measure()
+for _i in range(5):
+    _p1.zoom_bar.button_out.click()
+_p1.move_window(*_c0)
+if _wz.window_side != 30.0 or _p1.zoom_bar.button_out.isEnabled():
+    errors.append("wizard zoom: should go back to 30 m")
 if _shot_dir:
     _p1.detect()
     app.processEvents()
@@ -915,6 +954,10 @@ _check_buttons(2)
 _pv = _wz.preview
 _err_dtm = float(_np.nanmedian(_np.abs(_pv.c_dtm - _np.nanmedian(_pv.c_dtm))))
 print(f"wizard step 2: soil {_pv.soil_pct:.1f}%, slope used {_pv.slope_used:.1f}%, profile points {len(_p2.profile.dsm)}")
+# Regression 2.2.1: the margin was not a whole number of pixels and the preview came out one
+# pixel short (59 instead of 60 at 15 m), so the mask could be shifted against the image
+if _pv.c_dsm.shape != (120, 120):
+    errors.append(f"wizard step 2: preview of 30 m at 0.25 m should be 120 px, got {_pv.c_dsm.shape}")
 if _p2.view_dtm.image is None or _p2.profile.dsm is None or not (40 < _pv.soil_pct < 75):
     errors.append("wizard step 2: DTM preview not computed")
 # the DTM preview has no plants: height of the rows about 2 m
@@ -935,6 +978,12 @@ _p2.slider_factor.setValue(10)
 if "estreita" not in _p2.texts["factor"].text():
     errors.append("wizard step 2: factor text")
 _p2.slider_factor.setValue(15)
+_p2.zoom_bar.button_in.click()
+app.processEvents()
+print("zoom step 2:", _wz.preview.c_dsm.shape, "extent", round(_p2.view_dsm.extent[2] - _p2.view_dsm.extent[0], 2))
+if _wz.preview.c_dsm.shape != (60, 60) or abs(_p2.view_dtm.extent[2] - _p2.view_dtm.extent[0] - 15) > 1e-9:
+    errors.append("wizard zoom: step 2 preview not recomputed for 15 m")
+_p2.zoom_bar.button_out.click()
 app.processEvents()
 if _shot_dir:
     _wz.grab().save(os.path.join(_shot_dir, "mdt_etapa2.png"))
@@ -954,6 +1003,35 @@ print("wizard step 3:", _txt0[:70], "||", _txt1[:70])
 if "<b>0" not in _txt1 or _txt0 == _txt1:
     errors.append("wizard step 3: minimum height does not change the mask")
 _p3.slider_h.setValue(6)
+# 2.2.1: zoom and outline
+_p3.zoom_bar.button_in.click()
+_p3.zoom_bar.button_in.click()                   # 7.5 m
+app.processEvents()
+if _p3.view.overlay.width() != 30 or _p3.background.width() != 30 or abs(_p3.view.extent[2] - _p3.view.extent[0] - 7.5) > 1e-9:
+    errors.append("wizard zoom: step 3 mask and image not at 7.5 m")
+
+
+def _opaque(img):
+    return sum(1 for _y in range(img.height()) for _x in range(img.width()) if img.pixelColor(_x, _y).alpha() > 0)
+
+
+_fill_px = _opaque(_p3.view.overlay)
+_p3.combo_mode.setCurrentIndex(1)
+app.processEvents()
+_line_px = _opaque(_p3.view.overlay)
+_col = next((_p3.view.overlay.pixelColor(_x, _y) for _y in range(30) for _x in range(30)
+             if _p3.view.overlay.pixelColor(_x, _y).alpha() > 0), None)
+print(f"mask fill {_fill_px} px, outline {_line_px} px, outline colour {_col.name() if _col else None}")
+if not (0 < _line_px < _fill_px) or _col is None or _col.name() != "#ffdc00":
+    errors.append("wizard step 3: outline mode")
+if not _wz.mask_outline:
+    errors.append("wizard step 3: outline choice not kept")
+if _shot_dir:
+    _wz.grab().save(os.path.join(_shot_dir, "mdt_etapa3_zoom_contorno.png"))
+_p3.combo_mode.setCurrentIndex(0)
+_p3.zoom_bar.button_out.click()
+_p3.zoom_bar.button_out.click()
+app.processEvents()
 _p3.slider_alpha.setValue(18)                    # 90 percent transparent
 if _p3.label_alpha.text() != "90%":
     errors.append("wizard step 3: transparency not applied")

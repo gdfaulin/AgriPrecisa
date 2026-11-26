@@ -24,7 +24,8 @@ from qgis.PyQt.QtGui import QColor, QImage, QPainter, QPen, QPainterPath
 from qgis.PyQt.QtWidgets import (
     QDialog, QWizard, QWizardPage, QVBoxLayout, QHBoxLayout, QFormLayout, QGridLayout, QLabel,
     QPushButton, QDoubleSpinBox, QSpinBox, QCheckBox, QMessageBox, QProgressDialog,
-    QTextBrowser, QGroupBox, QSlider, QWidget, QSizePolicy, QScrollArea, QFrame,
+    QTextBrowser, QGroupBox, QSlider, QWidget, QSizePolicy, QScrollArea, QFrame, QToolButton,
+    QComboBox,
 )
 from qgis.core import (
     QgsSettings, QgsProject, QgsRasterLayer, QgsVectorLayer, QgsProcessingContext,
@@ -40,8 +41,10 @@ from ..processing_provider.alg_dtm_rows import (
 )
 
 LAST_FOLDER_KEY = "AgriPrecisa/mdt_last_output_folder"
-WINDOW_SIDE = 30.0            # metres, side of the preview window
-MIN_DISPLAY_RES = 30.0 / 700  # finest pixel used to show the window (700 px across)
+WINDOW_SIDE = 30.0            # metres, side of the preview window without zoom
+ZOOM_SIDES = (30.0, 15.0, 7.5, 3.75)   # sides of the window for each zoom level (2.2.1)
+DISPLAY_PIXELS = 700          # at most this many pixels across the shown window
+OUTLINE_RGB = (255, 220, 0)   # plant mask shown as outline (2.2.1)
 OVERVIEW_PIXELS = 320         # longest side of the field miniature
 FACTOR_RANGE = (1.0, 3.0)
 TOL_RANGE = (0.02, 1.00)
@@ -116,11 +119,26 @@ def stretch_rgb(bands, valid):
     return out
 
 
-def mask_overlay(plants, valid, alpha_percent):
-    """Translucent plant mask (soil and no data fully transparent)."""
+def display_res(native, side):
+    """Pixel used to show a window of ``side`` metres: the native one, unless it is too fine."""
+    return max(native, side / DISPLAY_PIXELS)
+
+
+def mask_overlay(plants, valid, alpha_percent, outline=False):
+    """
+    Plant mask over the image: translucent fill, or only the outline of the plant patches
+    (keeps the image visible and shows the edges). Soil and no data are fully transparent.
+    """
     rgba = np.zeros(plants.shape + (4,), np.uint8)
-    rgba[..., 0], rgba[..., 1], rgba[..., 2] = PLANT_RGBA
-    rgba[..., 3] = np.where(plants & valid, int(round(255 * (100 - alpha_percent) / 100.0)), 0)
+    shown = plants & valid
+    if outline:
+        from scipy import ndimage
+        # border_value=1: patches cut by the edge of the window are not outlined along it
+        shown = shown & ~ndimage.binary_erosion(shown, border_value=1)
+        rgba[..., 0], rgba[..., 1], rgba[..., 2] = OUTLINE_RGB
+    else:
+        rgba[..., 0], rgba[..., 1], rgba[..., 2] = PLANT_RGBA
+    rgba[..., 3] = np.where(shown, int(round(255 * (100 - alpha_percent) / 100.0)), 0)
     return rgba
 
 
@@ -217,12 +235,17 @@ class Preview:
 
     def compute(self, wizard):
         w = wizard
-        margin = w.spacing * FACTOR_RANGE[1] / 2 + w.resolution
-        dsm_key = (w.centre, w.resolution, w.spacing, id(w.source))
+        dsm_key = (w.centre, w.resolution, w.spacing, id(w.source), w.window_side)
         if dsm_key != self.dsm_key:
             self.dsm_key = dsm_key
-            self.dsm = w.source.dsm_window(window_bounds(w.centre, margin=margin), w.resolution)
-            self.margin_px = int(round(margin / w.resolution))
+            # regression 2.2.1: the margin and the window are whole pixels, so the cropped
+            # preview has exactly side / resolution pixels and lines up with the image
+            res = w.resolution
+            self.margin_px = int(math.ceil((w.spacing * FACTOR_RANGE[1] / 2) / res)) + 1
+            n = max(int(round(w.window_side / res)), 1)
+            half = n * res / 2 + self.margin_px * res
+            cx, cy = w.centre
+            self.dsm = w.source.dsm_window((cx - half, cy - half, cx + half, cy + half), res)
             self.opening_key = None
             self.key = None
         key = (dsm_key, w.factor, w.tolerance, w.slope)
@@ -292,13 +315,20 @@ class ImageView(QWidget):
 
 
 class MapView(ImageView):
-    """ImageView in map coordinates: ``extent`` maps the image; clicks emit map coordinates."""
+    """
+    ImageView in map coordinates: ``extent`` maps the image. A click emits its map
+    coordinates; a drag emits the map offset (pan); the mouse wheel emits +1 or -1 (zoom).
+    """
 
     clicked = pyqtSignal(float, float)
+    panned = pyqtSignal(float, float)
+    wheeled = pyqtSignal(int)
+    DRAG_PIXELS = 5
 
     def __init__(self, title, parent=None):
         super().__init__(title, parent)
         self.extent = None
+        self._press = None
         self.setCursor(Qt.CursorShape.CrossCursor)
 
     def to_widget(self, x, y):
@@ -307,16 +337,42 @@ class MapView(ImageView):
         return QPointF(r.left() + (x - xmin) / (xmax - xmin) * r.width(),
                        r.top() + (ymax - y) / (ymax - ymin) * r.height())
 
+    @staticmethod
+    def _pos(event):
+        return event.position() if hasattr(event, "position") else event.localPos()
+
+    def to_map(self, pos):
+        r = self.image_rect()
+        xmin, ymin, xmax, ymax = self.extent
+        return (xmin + (pos.x() - r.left()) / r.width() * (xmax - xmin),
+                ymax - (pos.y() - r.top()) / r.height() * (ymax - ymin))
+
     def mousePressEvent(self, event):
         if self.image is None or self.extent is None:
             return
-        r = self.image_rect()
-        pos = event.position() if hasattr(event, "position") else event.localPos()
-        if not r.contains(pos):
+        pos = self._pos(event)
+        self._press = QPointF(pos) if self.image_rect().contains(pos) else None
+
+    def mouseMoveEvent(self, event):
+        if self._press is not None:
+            self.setCursor(Qt.CursorShape.ClosedHandCursor)
+
+    def mouseReleaseEvent(self, event):
+        start, self._press = self._press, None
+        self.setCursor(Qt.CursorShape.CrossCursor)
+        if start is None or self.extent is None:
             return
-        xmin, ymin, xmax, ymax = self.extent
-        self.clicked.emit(xmin + (pos.x() - r.left()) / r.width() * (xmax - xmin),
-                          ymax - (pos.y() - r.top()) / r.height() * (ymax - ymin))
+        end = self._pos(event)
+        if (end - start).manhattanLength() <= self.DRAG_PIXELS:
+            self.clicked.emit(*self.to_map(start))
+        else:
+            (x0, y0), (x1, y1) = self.to_map(start), self.to_map(end)
+            self.panned.emit(x1 - x0, y1 - y0)
+
+    def wheelEvent(self, event):
+        delta = event.angleDelta().y()
+        if delta:
+            self.wheeled.emit(1 if delta > 0 else -1)
 
 
 class OverviewMap(MapView):
@@ -437,6 +493,59 @@ class ProfileView(QWidget):
         p.end()
 
 
+class ZoomBar(QWidget):
+    """Zoom buttons (+ and -) with the current window side (2.2.1)."""
+
+    zoom = pyqtSignal(int)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.button_out = QToolButton()
+        self.button_out.setText("\u2212")
+        self.button_out.setToolTip(tr("mdt_w_zoom_out"))
+        self.button_in = QToolButton()
+        self.button_in.setText("+")
+        self.button_in.setToolTip(tr("mdt_w_zoom_in"))
+        self.label = QLabel()
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(QLabel(tr("mdt_w_zoom")))
+        lay.addWidget(self.button_out)
+        lay.addWidget(self.button_in)
+        lay.addWidget(self.label)
+        lay.addStretch()
+        self.button_in.clicked.connect(lambda: self.zoom.emit(1))
+        self.button_out.clicked.connect(lambda: self.zoom.emit(-1))
+
+    def set_level(self, level):
+        self.button_out.setEnabled(level > 0)
+        self.button_in.setEnabled(level < len(ZOOM_SIDES) - 1)
+        self.label.setText(tr("mdt_w_zoom_side", side=fmt(ZOOM_SIDES[level], 2 if level == 3 else 1 if level == 2 else 0)))
+
+
+class ZoomMixin:
+    """Zoom (buttons and wheel) and pan (drag) shared by steps 1 to 3 (2.2.1)."""
+
+    def connect_zoom(self, views):
+        self.zoom_bar.zoom.connect(self.on_zoom)
+        for v in views:
+            v.wheeled.connect(self.on_zoom)
+            v.panned.connect(self.on_pan)
+
+    def on_zoom(self, delta):
+        w = self.wizard()
+        level = min(max(w.zoom + delta, 0), len(ZOOM_SIDES) - 1)
+        self.zoom_bar.set_level(level)
+        if level != w.zoom and w.source is not None:
+            w.zoom = level
+            self.move_window(*w.centre)
+
+    def on_pan(self, dx, dy):
+        w = self.wizard()
+        if w.source is not None:
+            self.move_window(w.centre[0] - dx, w.centre[1] - dy)
+
+
 def make_slider(lo, hi, step):
     s = QSlider(Qt.Orientation.Horizontal)
     s.setRange(int(round(lo / step)), int(round(hi / step)))
@@ -473,6 +582,10 @@ def scrollable(page, layout):
     return area
 
 
+def click_hint():
+    return wrap_label(tr("mdt_w_click_overview"))
+
+
 def show_overview(view, wizard):
     img, ext, _c = wizard.source.overview()
     view.extent = ext
@@ -482,7 +595,7 @@ def show_overview(view, wizard):
 # ---------------------------------------------------------------------------
 # Step 1: DSM, RGB, resolution and row spacing
 # ---------------------------------------------------------------------------
-class DsmPage(QWizardPage):
+class DsmPage(ZoomMixin, QWizardPage):
     help_key = "mdt_help_page1"
 
     def __init__(self):
@@ -518,6 +631,7 @@ class DsmPage(QWizardPage):
         self.overview = OverviewMap(tr("mdt_w1_overview"))
         self.view = MeasureView(tr("mdt_w1_view"))
         self.view.setMinimumSize(240, 240)
+        self.zoom_bar = ZoomBar()
 
         form = QFormLayout()
         form.addRow(tr("mdt_w1_dsm"), self.combo_dsm)
@@ -537,11 +651,15 @@ class DsmPage(QWizardPage):
         left.addWidget(box)
         left.addWidget(self.label_info)
         left.addWidget(self.overview, 1)
-        left.addWidget(wrap_label(tr("mdt_w_click_overview")))
+        left.addWidget(click_hint())
+        right = QVBoxLayout()
+        right.addWidget(self.zoom_bar)
+        right.addWidget(self.view, 1)
         row = QHBoxLayout()
         row.addLayout(left, 2)
-        row.addWidget(self.view, 3)
+        row.addLayout(right, 3)
         scrollable(self, row)
+        self.connect_zoom([self.view])
 
         self.combo_dsm.layerChanged.connect(self.on_dsm)
         self.combo_rgb.layerChanged.connect(self.on_rgb)
@@ -556,6 +674,7 @@ class DsmPage(QWizardPage):
         self.distance = None
 
     def initializePage(self):
+        self.zoom_bar.set_level(self.wizard().zoom)
         if self.wizard().source is None:
             self.on_dsm()
 
@@ -601,11 +720,10 @@ class DsmPage(QWizardPage):
         if w.source is None:
             return
         w.centre = (x, y)
-        bounds = window_bounds(w.centre)
+        bounds = window_bounds(w.centre, w.window_side)
         self.overview.window = bounds
         self.overview.update()
-        res = max(w.source.native, MIN_DISPLAY_RES)
-        n = int(round(WINDOW_SIDE / res))
+        n = int(round(w.window_side / display_res(w.source.native, w.window_side)))
         self.view.extent = bounds
         self.view.clear()
         self.distance = None
@@ -635,7 +753,7 @@ class DsmPage(QWizardPage):
         if w.source is None:
             return
         res = max(w.source.native, 0.05)
-        bounds = window_bounds(w.centre)
+        bounds = window_bounds(w.centre, WINDOW_SIDE)     # 30 m: several rows, whatever the zoom
         dsm = w.source.dsm_window(bounds, res, resample="average")
         gt = (bounds[0], res, 0.0, bounds[3], 0.0, -res)
         spacing, theta, score, phi = mm.detect_spacing(dsm, np.isfinite(dsm), gt)
@@ -721,7 +839,7 @@ class DsmPage(QWizardPage):
 # ---------------------------------------------------------------------------
 # Step 2: DTM adjustment
 # ---------------------------------------------------------------------------
-class DtmPage(QWizardPage):
+class DtmPage(ZoomMixin, QWizardPage):
     help_key = "mdt_help_page2"
 
     def __init__(self):
@@ -729,8 +847,9 @@ class DtmPage(QWizardPage):
         self.setTitle(tr("mdt_w2_title"))
         self.setSubTitle(tr("mdt_w2_subtitle"))
         self.overview = OverviewMap(tr("mdt_w_overview"))
-        self.view_dsm = ImageView(tr("mdt_w2_view_dsm"))
-        self.view_dtm = ImageView(tr("mdt_w2_view_dtm"))
+        self.view_dsm = MapView(tr("mdt_w2_view_dsm"))
+        self.view_dtm = MapView(tr("mdt_w2_view_dtm"))
+        self.zoom_bar = ZoomBar()
         self.profile = ProfileView()
         self.slider_factor = make_slider(*FACTOR_RANGE, 0.1)
         self.slider_factor.setTickInterval(5)
@@ -747,10 +866,15 @@ class DtmPage(QWizardPage):
         images = QHBoxLayout()
         left = QVBoxLayout()
         left.addWidget(self.overview, 1)
-        left.addWidget(wrap_label(tr("mdt_w_click_overview")))
+        left.addWidget(click_hint())
         images.addLayout(left, 2)
-        images.addWidget(self.view_dsm, 3)
-        images.addWidget(self.view_dtm, 3)
+        pair = QHBoxLayout()
+        pair.addWidget(self.view_dsm)
+        pair.addWidget(self.view_dtm)
+        right = QVBoxLayout()
+        right.addWidget(self.zoom_bar)
+        right.addLayout(pair, 1)
+        images.addLayout(right, 6)
         box = QGroupBox(tr("mdt_w2_controls"))
         g = QGridLayout(box)
         for i, (key, slider) in enumerate((("factor", self.slider_factor), ("tol", self.slider_tol),
@@ -766,6 +890,7 @@ class DtmPage(QWizardPage):
         layout.addWidget(self.label_numbers)
         layout.addWidget(box)
         scrollable(self, layout)
+        self.connect_zoom([self.view_dsm, self.view_dtm])
         self.overview.clicked.connect(self.move_window)
         self.slider_factor.valueChanged.connect(self.compute)
         self.slider_tol.valueChanged.connect(self.compute)
@@ -779,6 +904,7 @@ class DtmPage(QWizardPage):
             slider.blockSignals(True)
             slider.setValue(int(value))
             slider.blockSignals(False)
+        self.zoom_bar.set_level(w.zoom)
         show_overview(self.overview, w)
         self.move_window(*w.centre)
 
@@ -791,7 +917,8 @@ class DtmPage(QWizardPage):
     def move_window(self, x, y):
         w = self.wizard()
         w.centre = (x, y)
-        self.overview.window = window_bounds(w.centre)
+        bounds = window_bounds(w.centre, w.window_side)
+        self.overview.window = self.view_dsm.extent = self.view_dtm.extent = bounds
         self.overview.update()
         self.compute()
 
@@ -857,7 +984,7 @@ class DtmPage(QWizardPage):
 # ---------------------------------------------------------------------------
 # Step 3: plant mask over the image
 # ---------------------------------------------------------------------------
-class MaskPage(QWizardPage):
+class MaskPage(ZoomMixin, QWizardPage):
     help_key = "mdt_help_page3"
 
     def __init__(self):
@@ -865,8 +992,12 @@ class MaskPage(QWizardPage):
         self.setTitle(tr("mdt_w3_title"))
         self.setSubTitle(tr("mdt_w3_subtitle"))
         self.overview = OverviewMap(tr("mdt_w_overview"))
-        self.view = ImageView(tr("mdt_w3_view"))
+        self.view = MapView(tr("mdt_w3_view"))
         self.view.setMinimumSize(240, 240)
+        self.zoom_bar = ZoomBar()
+        self.combo_mode = QComboBox()
+        self.combo_mode.addItem(tr("mdt_w3_mode_fill"), False)
+        self.combo_mode.addItem(tr("mdt_w3_mode_outline"), True)
         self.slider_h = make_slider(*PLANT_RANGE, 0.05)
         self.slider_h.setTickInterval(10)
         self.slider_alpha = make_slider(0, 90, 5)
@@ -880,10 +1011,17 @@ class MaskPage(QWizardPage):
         images = QHBoxLayout()
         left = QVBoxLayout()
         left.addWidget(self.overview, 1)
-        left.addWidget(wrap_label(tr("mdt_w_click_overview")))
+        left.addWidget(click_hint())
         left.addWidget(wrap_label(tr("mdt_w3_legend")))
         images.addLayout(left, 2)
-        images.addWidget(self.view, 5)
+        top = QHBoxLayout()
+        top.addWidget(self.zoom_bar, 1)
+        top.addWidget(QLabel(tr("mdt_w3_mode")))
+        top.addWidget(self.combo_mode)
+        right = QVBoxLayout()
+        right.addLayout(top)
+        right.addWidget(self.view, 1)
+        images.addLayout(right, 5)
         box = QGroupBox(tr("mdt_w2_controls"))
         g = QGridLayout(box)
         g.addWidget(QLabel(tr("mdt_w3_height")), 0, 0)
@@ -899,6 +1037,8 @@ class MaskPage(QWizardPage):
         layout.addWidget(self.label_numbers)
         layout.addWidget(box)
         scrollable(self, layout)
+        self.connect_zoom([self.view])
+        self.combo_mode.currentIndexChanged.connect(self.update_mask)
         self.overview.clicked.connect(self.move_window)
         self.slider_h.valueChanged.connect(self.update_mask)
         self.slider_alpha.valueChanged.connect(self.update_mask)
@@ -911,13 +1051,17 @@ class MaskPage(QWizardPage):
             slider.blockSignals(True)
             slider.setValue(int(value))
             slider.blockSignals(False)
+        self.combo_mode.blockSignals(True)
+        self.combo_mode.setCurrentIndex(1 if w.mask_outline else 0)
+        self.combo_mode.blockSignals(False)
+        self.zoom_bar.set_level(w.zoom)
         show_overview(self.overview, w)
         self.move_window(*w.centre)
 
     def move_window(self, x, y):
         w = self.wizard()
         w.centre = (x, y)
-        self.overview.window = window_bounds(w.centre)
+        self.overview.window = self.view.extent = window_bounds(w.centre, w.window_side)
         self.overview.update()
         self.update_mask()
 
@@ -926,14 +1070,15 @@ class MaskPage(QWizardPage):
         w.plant_height = round(self.slider_h.value() * 0.05, 2)
         w.alpha = self.slider_alpha.value() * 5
         pv = w.preview.compute(w)
-        key = (w.centre, id(w.source))
+        w.mask_outline = bool(self.combo_mode.currentData())
+        key = (w.centre, id(w.source), w.window_side)
         if key != self._bg_key:
             self._bg_key = key
-            res = max(w.source.native, MIN_DISPLAY_RES)
-            n = int(round(WINDOW_SIDE / res))
-            self.background = rgb_image(w.source.background(window_bounds(w.centre), n, n))
+            n = int(round(w.window_side / display_res(w.source.native, w.window_side)))
+            self.background = rgb_image(w.source.background(window_bounds(w.centre, w.window_side), n, n))
         plants = mm.plant_mask(pv.c_height, pv.c_valid, w.plant_height)
-        self.view.set_image(self.background, rgba_image(mask_overlay(plants, pv.c_valid, w.alpha)))
+        self.view.set_image(self.background, rgba_image(
+            mask_overlay(plants, pv.c_valid, w.alpha, outline=w.mask_outline)))
         self.label_h.setText(f"{fmt(w.plant_height, 2)} m")
         self.label_alpha.setText(f"{w.alpha}%")
         heights = pv.c_height[pv.c_valid & np.isfinite(pv.c_height)]
@@ -1072,11 +1217,17 @@ class MdtWizard(QWizard):
         self.slope = 0.0
         self.plant_height = mm.DEFAULT_PLANT_HEIGHT
         self.alpha = DEFAULT_ALPHA
+        self.mask_outline = False
+        self.zoom = 0                   # index in ZOOM_SIDES (2.2.1)
         self.outputs = {}
         for page in (DsmPage(), DtmPage(), MaskPage(), OutputPage()):
             self.addPage(page)
         self.helpRequested.connect(self.show_help)
         self._fitted = False
+
+    @property
+    def window_side(self):
+        return ZOOM_SIDES[self.zoom]
 
     def fit_to_screen(self):
         """Size the window to the screen it is on (regression 2.2.0, see ``scrollable``)."""
