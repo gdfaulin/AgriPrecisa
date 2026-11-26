@@ -227,6 +227,8 @@ class DtmRowCropsAlgorithm(QgsProcessingAlgorithm):
     OUT_HEIGHT = "OUT_HEIGHT"
     OUT_MASK = "OUT_MASK"
     SLOPE = "SLOPE"
+    METHOD = "METHOD"
+    FURROWS = "FURROWS"
     PLANT_HEIGHT = "PLANT_HEIGHT"
     OUT_POLYGONS = "OUT_POLYGONS"
 
@@ -277,6 +279,11 @@ class DtmRowCropsAlgorithm(QgsProcessingAlgorithm):
             self.TOLERANCE, tr("mdt_p_tolerance"), NUMBER_DOUBLE, 0.0, minValue=0.0, maxValue=2.0))
         self.addParameter(QgsProcessingParameterNumber(
             self.SLOPE, tr("mdt_p_slope"), NUMBER_DOUBLE, 0.0, minValue=0.0, maxValue=100.0))
+        self.addParameter(QgsProcessingParameterEnum(
+            self.METHOD, tr("mdt_p_method"), options=[tr("mdt_method_opening"), tr("mdt_method_slope")],
+            defaultValue=mm.METHOD_OPENING))
+        self.addParameter(QgsProcessingParameterNumber(
+            self.FURROWS, tr("mdt_p_furrows"), NUMBER_DOUBLE, 0.0, minValue=0.0, maxValue=2.0))
         self.addParameter(QgsProcessingParameterNumber(
             self.PLANT_HEIGHT, tr("mdt_p_plant_height"), NUMBER_DOUBLE, mm.DEFAULT_PLANT_HEIGHT,
             minValue=0.01, maxValue=50.0))
@@ -436,21 +443,22 @@ class DtmRowCropsAlgorithm(QgsProcessingAlgorithm):
         if feedback.isCanceled():
             return {}
 
-        # 2. morphological opening
-        feedback.pushInfo(tr("mdt_step2"))
-        opening = mm.ground_surface(dsm, valid, window)
+        # 2 and 3. soil (ground) pixels: morphological opening or slope-based filter
+        method = self.parameterAsEnum(parameters, self.METHOD, context)
+        slope_in = self.parameterAsDouble(parameters, self.SLOPE, context)
+        feedback.pushInfo(tr("mdt_step2" if method == mm.METHOD_OPENING else "mdt_step2_slope"))
+        soil, slope_used, _opening = mm.classify_ground(dsm, valid, pixel, window, tol, slope_in, method)
+        del _opening
         feedback.setProgress(35)
         if feedback.isCanceled():
             return {}
-
-        # 3. soil classification
         feedback.pushInfo(tr("mdt_step3"))
-        slope_in = self.parameterAsDouble(parameters, self.SLOPE, context)
-        threshold, slope_used = mm.soil_threshold(opening, valid, pixel, window, tol, slope_in)
-        feedback.pushInfo(tr("mdt_log_slope_auto" if slope_in <= 0 else "mdt_log_slope_manual",
-                             slope=fmt(slope_used, 1)))
-        soil = mm.classify_soil(dsm, opening, valid, threshold)
-        del threshold
+        if method == mm.METHOD_SLOPE:
+            feedback.pushInfo(tr("mdt_log_slope_filter", slope=fmt(slope_used, 0),
+                                 radius=fmt(window // 2 * pixel, 2)))
+        else:
+            feedback.pushInfo(tr("mdt_log_slope_auto" if slope_in <= 0 else "mdt_log_slope_manual",
+                                 slope=fmt(slope_used, 1)))
         perc = mm.soil_percent(soil, valid)
         feedback.pushInfo(tr("mdt_log_soil", pct=fmt(perc, 1)))
         if perc < mm.LOW_SOIL_PERCENT:
@@ -478,7 +486,10 @@ class DtmRowCropsAlgorithm(QgsProcessingAlgorithm):
         # 5. smoothing
         feedback.pushInfo(tr("mdt_step5"))
         dtm = mm.smooth_dtm(filled, dsm, valid, window)
-        height = dsm - dtm
+        furrows = self.parameterAsDouble(parameters, self.FURROWS, context)
+        if furrows > 0:
+            feedback.pushInfo(tr("mdt_log_furrows", sigma=fmt(furrows * spacing, 2), f=fmt(furrows, 2)))
+        dtm, height = mm.apply_furrows(dtm, dsm, valid, pixel, spacing, furrows)
         feedback.setProgress(85)
 
         # 6. plant mask (height above the DTM at least the minimum plant height) and saving

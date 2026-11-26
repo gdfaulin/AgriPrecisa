@@ -832,6 +832,16 @@ if not (15 <= _pg.featureCount() <= 17):
 if "OUT_DTM" in _r3:
     errors.append("DTM tool: unchecked DTM output should not be created")
 
+# 2.3.0: slope-based filter and furrow removal in the algorithm
+_r4 = processing.run("agriprecisa:dtm_row_crops", dict(
+    _params, METHOD=1, SLOPE=0, FURROWS=0.5, OUT_DTM=os.path.join(_mdt_dir, "MDT_vos.tif"),
+    OUT_HEIGHT=os.path.join(_mdt_dir, "H_vos.tif"), OUT_MASK=None))
+_dv, _hv = _read(_r4["OUT_DTM"]), _read(_r4["OUT_HEIGHT"])
+_err_v = float(_np.max(_np.abs(_dv[_c] - _terrain[_c])))
+print(f"slope-based + furrows: DTM max error {_err_v:.3f} m, plant height {_np.median(_hv[_c][_rows[_c]]):.2f} m, min height {_hv[_hv > -9999].min():.3f}")
+if _err_v > 0.15 or abs(_np.median(_hv[_c][_rows[_c]]) - 2.0) > 0.15 or _hv[_hv > -9999].min() < 0:
+    errors.append("DTM tool: slope-based filter with furrow removal")
+
 # Wizard (2.2.0)
 from agriprecisa.gui import mdt_wizard as _mw
 from qgis.PyQt.QtWidgets import QWizard as _QW
@@ -978,6 +988,25 @@ _p2.slider_factor.setValue(10)
 if "estreita" not in _p2.texts["factor"].text():
     errors.append("wizard step 2: factor text")
 _p2.slider_factor.setValue(15)
+# 2.3.0: method and furrow removal
+if "desligada" not in _p2.labels["furrows"].text() or "desligada" not in _p2.texts["furrows"].text():
+    errors.append("wizard step 2: furrow removal should start off")
+_p2.slider_furrows.setValue(10)                     # 0.50 x spacing
+if _wz.furrows != 0.5 or "recomendada" not in _p2.texts["furrows"].text():
+    errors.append("wizard step 2: furrow slider")
+if float(_np.nanmin(_wz.preview.c_height)) < 0:
+    errors.append("wizard step 2: height below 0 with furrow removal")
+_p2.combo_method.setCurrentIndex(1)
+app.processEvents()
+print("step 2 slope-based:", round(_wz.preview.soil_pct, 1), "% soil,", _p2.labels["slope"].text(), "|", _p2.text_method.text()[:40])
+if _wz.method != 1 or "30%" not in _p2.labels["slope"].text() or "Vosselman" not in _p2.text_method.text():
+    errors.append("wizard step 2: slope-based method")
+if not (40 < _wz.preview.soil_pct < 75):
+    errors.append("wizard step 2: slope-based preview")
+if _shot_dir:
+    _wz.grab().save(os.path.join(_shot_dir, "mdt_etapa2_vosselman.png"))
+_p2.combo_method.setCurrentIndex(0)
+_p2.slider_furrows.setValue(0)
 _p2.zoom_bar.button_in.click()
 app.processEvents()
 print("zoom step 2:", _wz.preview.c_dsm.shape, "extent", round(_p2.view_dsm.extent[2] - _p2.view_dsm.extent[0], 2))

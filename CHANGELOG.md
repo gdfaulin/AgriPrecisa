@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.3.0 (2026)
+- **Slope-based filter** (Vosselman, 2000), a second DTM method, with the same principle as the QGIS and SAGA *DTM filter (slope-based)*: a pixel is soil when no neighbour within the radius (half the window) is lower than distance x maximum slope + tolerance. The slope slider is the maximum slope (0 = 30 percent, as in QGIS and SAGA). Large radii test 16 directions at about 14 distances, so the preview stays interactive.
+- **Furrow removal**: Gaussian smoothing of the DTM with sigma = fraction x row spacing (0 = off, 0.5 recommended). Without it the DTM goes down to the visible soil at every point and copies the micro-relief of soil preparation (furrows, ridges, sugarcane *quebra-lombo*), which shows as lines in the DTM. With it the DTM follows the mean soil level, plant height is measured from that level and the bottom of the furrows gets height 0.
+- Wizard step 2: method list and furrow removal slider, with explanations that change with the value; the summary of step 4 shows both. Processing algorithm: new parameters *DTM method* and *Furrow removal*.
+- Calibrated on a real young sugarcane field (DSM at 2.2 cm, rows at 1.51 m): without removal the DTM showed the rows; with 0.5 the row pattern disappears and the median plant height changes by about 1 cm.
+- Tests: slope-based filter on rolling soil and on steep planes, kernel offsets, furrow removal with both methods on a synthetic young sugarcane field (V furrows, low leaves), unchanged behaviour with removal off; integration test drives the new controls.
+- Help texts reviewed in the three languages (method and furrow removal in the Help of step 2 and in the Processing help).
+
 ## 2.2.1 (2026)
 - *DTM and plant height* wizard, steps 1, 2 and 3: **zoom** with + and − buttons or the mouse wheel over the image. The window shrinks to 30, 15, 7.5 and 3.75 m and is read again at the original resolution (no pixelation); the DTM preview and the plant mask are recomputed for the smaller window. **Drag the image** to move the window; the red square on the miniature follows. The automatic spacing detection always uses a 30 m window.
 - Step 3: the plant mask can be shown as **fill** (translucent green) or **outline** (yellow edge of the plant patches), which keeps the image visible when green plants are under a green mask.
