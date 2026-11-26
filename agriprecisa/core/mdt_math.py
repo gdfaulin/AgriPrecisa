@@ -38,6 +38,10 @@ DEFAULT_PLANT_HEIGHT = 0.30   # m, plant mask: pixels at least this high above t
 MAX_AUTO_SLOPE = 1.0          # 100 percent, cap of the automatic slope
 DEFAULT_RESOLUTION = 0.25
 DEFAULT_TOLERANCE = 0.25
+METHOD_OPENING = 0            # morphological opening (default)
+METHOD_SLOPE = 1              # slope-based filter (Vosselman, 2000)
+DEFAULT_VOSSELMAN_SLOPE = 30.0   # percent, as in SAGA and QGIS DTM filter (slope-based)
+MAX_FULL_KERNEL = 6           # radius (pixels) up to which every neighbour is tested
 PIXELS_PER_ROW = 4     # recommended: at least 4 pixels across the inter-row
 MIN_WINDOW = 5         # below this the window cannot "see" the inter-row
 LOW_SOIL_PERCENT = 10
@@ -180,15 +184,107 @@ def height_stats(height, soil, valid):
             "max": float(np.max(h)), "plant_percent": 100.0 * h.size / max(int(valid.sum()), 1)}
 
 
-def dtm_from_dsm(dsm, window, tolerance, fill=fill_nearest, pixel=1.0, slope_percent=None):
+def _kernel_offsets(radius):
+    """
+    Neighbour offsets (dy, dx) tested by the slope-based filter. Small radii use the whole
+    disc; larger radii use 16 directions at about 14 distances (a few hundred shifts instead
+    of thousands), enough to find the soil around a plant and much faster.
+    """
+    r = int(radius)
+    if r <= MAX_FULL_KERNEL:
+        yy, xx = np.mgrid[-r:r + 1, -r:r + 1]
+        keep = (np.hypot(yy, xx) <= r + 1e-9) & ((yy != 0) | (xx != 0))
+        return list(zip(yy[keep].tolist(), xx[keep].tolist()))
+    dists = np.unique(np.concatenate([np.arange(1, 5), np.round(np.geomspace(4, r, 10))])).astype(int)
+    offs = set()
+    for ang in np.radians(np.arange(0.0, 360.0, 22.5)):
+        for d in dists:
+            offs.add((int(round(d * math.sin(ang))), int(round(d * math.cos(ang)))))
+    offs.discard((0, 0))
+    return sorted(offs)
+
+
+def slope_based_ground(dsm, valid, pixel, radius_px, slope_percent, tolerance=0.0):
+    """
+    Slope-based filter (Vosselman, 2000; as SAGA and QGIS DTM filter (slope-based)): a pixel is
+    ground when no neighbour within the radius is lower by more than
+    dz_max(d) = d x slope + tolerance, d being the distance between them. The tolerance plays
+    the role of the confidence interval that relaxes the filter.
+    """
+    r = max(1, int(radius_px))
+    s = slope_percent / 100.0
+    h, w = dsm.shape
+    pad = np.pad(np.where(valid, dsm, np.inf), r, mode="constant", constant_values=np.inf)
+    low = np.full(dsm.shape, np.inf)
+    for dy, dx in _kernel_offsets(r):
+        dz = math.hypot(dy, dx) * pixel * s + tolerance
+        np.minimum(low, pad[r + dy:r + dy + h, r + dx:r + dx + w] + dz, out=low)
+    with np.errstate(invalid="ignore"):
+        return valid & (dsm <= low)
+
+
+def remove_furrows(dtm, valid, pixel, spacing, fraction):
+    """
+    Furrow removal: Gaussian smoothing of the DTM with sigma = fraction x row spacing. The
+    micro-relief of furrows and ridges (period = row spacing) is removed and the DTM follows
+    the mean soil level (sigma of half a spacing keeps less than 1 percent of that relief).
+    ``fraction`` 0 leaves the DTM unchanged.
+    """
+    if not fraction or fraction <= 0:
+        return dtm
+    from scipy import ndimage
+    sigma = fraction * spacing / pixel
+    ok = np.isfinite(dtm)
+    num = ndimage.gaussian_filter(np.where(ok, dtm, 0.0), sigma, mode="nearest")
+    den = ndimage.gaussian_filter(ok.astype("float64"), sigma, mode="nearest")
+    with np.errstate(invalid="ignore", divide="ignore"):
+        out = np.where(den > 1e-6, num / np.where(den > 1e-6, den, 1.0), np.nan)
+    out[~valid] = np.nan
+    return out
+
+
+def classify_ground(dsm, valid, pixel, window, tolerance, slope_percent, method, opening=None):
+    """
+    Soil (ground) pixels with either method. Returns (soil, slope used in percent, opening).
+    Opening: slope 0 = automatic (see soil_threshold). Slope-based: slope 0 = 30 percent;
+    radius = half the window.
+    """
+    if method == METHOD_SLOPE:
+        s = slope_percent if slope_percent and slope_percent > 0 else DEFAULT_VOSSELMAN_SLOPE
+        return slope_based_ground(dsm, valid, pixel, window // 2, s, tolerance), float(s), None
+    if opening is None:
+        opening = ground_surface(dsm, valid, window)
+    thr, used = soil_threshold(opening, valid, pixel, window, tolerance, slope_percent)
+    return classify_soil(dsm, opening, valid, thr), used, opening
+
+
+def dtm_from_dsm(dsm, window, tolerance, fill=fill_nearest, pixel=1.0, slope_percent=None,
+                 method=METHOD_OPENING, spacing=None, furrows=0.0):
     """Whole method on an array (NaN = no data). Returns (dtm, height, soil)."""
     valid = np.isfinite(dsm)
-    opening = ground_surface(dsm, valid, window)
-    threshold, _ = soil_threshold(opening, valid, pixel, window, tolerance, slope_percent)
-    soil = classify_soil(dsm, opening, valid, threshold)
+    if method == METHOD_OPENING and slope_percent is None:
+        opening = ground_surface(dsm, valid, window)
+        soil = classify_soil(dsm, opening, valid, tolerance)
+    else:
+        soil, _used, _op = classify_ground(dsm, valid, pixel, window, tolerance, slope_percent or 0, method)
     filled = fill(np.where(soil, dsm, np.nan))
     dtm = smooth_dtm(filled, dsm, valid, window)
-    return dtm, dsm - dtm, soil
+    dtm, height = apply_furrows(dtm, dsm, valid, pixel, spacing, furrows)
+    return dtm, height, soil
+
+
+def apply_furrows(dtm, dsm, valid, pixel, spacing, furrows):
+    """
+    Furrow removal and plant height. With furrow removal the DTM stays at the mean soil level
+    (it is not cut back to the DSM, which would bring it down into every furrow again); the
+    soil at the bottom of the furrows lies below that level and gets height 0.
+    Returns (dtm, height).
+    """
+    if furrows and spacing:
+        dtm = remove_furrows(dtm, valid, pixel, spacing, furrows)
+        with np.errstate(invalid="ignore"):
+            return dtm, np.maximum(dsm - dtm, 0.0)
+    return dtm, dsm - dtm
 
 
 # ---------------------------------------------------------------------------

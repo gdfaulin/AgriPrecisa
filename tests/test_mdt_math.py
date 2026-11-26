@@ -185,3 +185,75 @@ def test_plant_mask_and_patches():
     assert sorted(round(p["area"], 2) for p in patches) == [2.5, 4.0]
     assert {round(p["max"], 1) for p in patches} == {1.0, 2.0}
     assert labels.max() == 2
+
+
+# ---------------------------------------------------------------- 2.3.0
+def cane_field(spacing=1.5, furrow=0.30, n=400, px=0.05, angle=30.0, slope=0.04, seed=0):
+    """
+    Young sugarcane after "quebra-lombo": V-shaped furrows under the rows and ridges between
+    them (``furrow`` from bottom to top) on a gentle slope; cane rows 0.7 m wide where a third
+    of the pixels are low leaves (0.03 to 0.4 m) and the rest 0.8 to 1.8 m.
+    Returns (dsm, soil, mean soil level, cane mask, tall leaves mask).
+    """
+    import math
+    rng = np.random.default_rng(seed)
+    rows_i, cols_i = np.indices((n, n))
+    x, y = (cols_i + 0.5) * px, -(rows_i + 0.5) * px
+    t = math.radians(angle)
+    u = x * math.cos(t) + y * math.sin(t)
+    du = np.abs(((u + spacing / 2) % spacing) - spacing / 2)
+    mean_soil = 600 + slope * x
+    soil = mean_soil + furrow * (du / (spacing / 2)) - furrow / 2
+    cane = du < 0.35
+    low = rng.random(x.shape) < 0.35
+    leaves = np.where(low, rng.uniform(0.03, 0.4, x.shape), rng.uniform(0.8, 1.8, x.shape))
+    return soil + np.where(cane, leaves, 0.0), soil, mean_soil, cane, cane & ~low
+
+
+def test_slope_based_filter_separates_plants_from_rolling_soil():
+    px = 0.05
+    dsm, soil, mean_soil, cane, tall = cane_field(px=px)
+    valid = np.ones(dsm.shape, bool)
+    radius = mm.window_pixels(1.5, 1.5, px) // 2
+    ground = mm.slope_based_ground(dsm, valid, px, radius, 30.0, 0.05)
+    core = (slice(40, -40), slice(40, -40))
+    assert not ground[core][tall[core]].any()                 # tall cane is never ground
+    assert ground[core][~cane[core]].mean() > 0.9             # ridges and furrow flanks are ground
+    # steep slope (20 percent) and no objects: everything is ground with 30 percent
+    y, x = np.mgrid[0:100, 0:100] * px
+    plane = 600 + 0.2 * x
+    assert mm.slope_based_ground(plane, np.ones(plane.shape, bool), px, 8, 30.0, 0.0).all()
+    # and nothing below 20 percent would accept it
+    assert not mm.slope_based_ground(plane, np.ones(plane.shape, bool), px, 8, 10.0, 0.0)[5:-5, 5:-5].all()
+
+
+def test_kernel_offsets_small_full_and_large_sampled():
+    assert len(mm._kernel_offsets(2)) == 12
+    big = mm._kernel_offsets(50)
+    assert 100 < len(big) < 400 and (0, 50) in big and (0, 0) not in big
+
+
+@pytest.mark.parametrize("method", [mm.METHOD_OPENING, mm.METHOD_SLOPE])
+def test_furrow_removal_brings_the_dtm_to_the_mean_soil_level(method):
+    px = 0.05
+    dsm, soil, mean_soil, cane, tall = cane_field(px=px)
+    window = mm.window_pixels(1.5, 1.5, px)
+    core = (slice(60, -60), slice(60, -60))
+    common = dict(pixel=px, method=method, spacing=1.5, slope_percent=30 if method else 0)
+    dtm0, h0, _ = mm.dtm_from_dsm(dsm, window, 0.25, **common)
+    dtm1, h1, _ = mm.dtm_from_dsm(dsm, window, 0.25, furrows=0.5, **common)
+    ripple0 = np.nanstd((dtm0 - mean_soil)[core])
+    ripple1 = np.nanstd((dtm1 - mean_soil)[core])
+    assert ripple0 > 0.02 and ripple1 < 0.005               # rows no longer visible in the DTM
+    # the level is kept (only the ripple goes away)
+    assert abs(np.nanmean(dtm1[core]) - np.nanmean(dtm0[core])) < 0.01
+    assert np.nanmin(h1) >= 0.0
+    assert np.nanmedian(h1[core][tall[core]]) > 1.0
+
+
+def test_furrow_removal_off_keeps_previous_behaviour():
+    dsm = cane_field(px=0.05, n=200)[0]
+    window = mm.window_pixels(1.5, 1.5, 0.05)
+    a = mm.dtm_from_dsm(dsm, window, 0.25, pixel=0.05, spacing=1.5, furrows=0)
+    b = mm.dtm_from_dsm(dsm, window, 0.25, pixel=0.05)
+    assert np.allclose(a[0], b[0], equal_nan=True)

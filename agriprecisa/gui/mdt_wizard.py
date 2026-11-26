@@ -48,7 +48,8 @@ OUTLINE_RGB = (255, 220, 0)   # plant mask shown as outline (2.2.1)
 OVERVIEW_PIXELS = 320         # longest side of the field miniature
 FACTOR_RANGE = (1.0, 3.0)
 TOL_RANGE = (0.02, 1.00)
-SLOPE_RANGE = (0, 60)         # percent; 0 = automatic
+SLOPE_RANGE = (0, 100)        # percent; 0 = automatic (opening) or 30 percent (slope-based filter)
+FURROW_RANGE = (0.0, 1.0)     # furrow removal: sigma as a fraction of the row spacing; 0 = off
 PLANT_RANGE = (0.05, 3.00)
 DEFAULT_TOLERANCE = 0.25
 DEFAULT_ALPHA = 50            # percent of transparency of the mask
@@ -248,26 +249,29 @@ class Preview:
             self.dsm = w.source.dsm_window((cx - half, cy - half, cx + half, cy + half), res)
             self.opening_key = None
             self.key = None
-        key = (dsm_key, w.factor, w.tolerance, w.slope)
+        key = (dsm_key, w.method, w.factor, w.tolerance, w.slope, w.furrows)
         if key == self.key:
             return self
         self.key = key
         valid = np.isfinite(self.dsm)
         window = max(mm.window_pixels(w.spacing, w.factor, w.resolution), 3)
-        if self.opening_key != (dsm_key, w.factor):
-            self.opening_key = (dsm_key, w.factor)
-            self.opening = mm.ground_surface(self.dsm, valid, window)
-        thr, self.slope_used = mm.soil_threshold(self.opening, valid, w.resolution, window,
-                                                 w.tolerance, w.slope)
-        soil = mm.classify_soil(self.dsm, self.opening, valid, thr)
+        opening = None
+        if w.method == mm.METHOD_OPENING:
+            if self.opening_key != (dsm_key, w.factor):
+                self.opening_key = (dsm_key, w.factor)
+                self.opening = mm.ground_surface(self.dsm, valid, window)
+            opening = self.opening
+        soil, self.slope_used, _op = mm.classify_ground(self.dsm, valid, w.resolution, window, w.tolerance,
+                                                        w.slope, w.method, opening=opening)
         filled = mm.fill_nearest(np.where(soil, self.dsm, np.nan))
         dtm = mm.smooth_dtm(filled, self.dsm, valid, window)
+        dtm, height = mm.apply_furrows(dtm, self.dsm, valid, w.resolution, w.spacing, w.furrows)
         m = self.margin_px
         crop = (slice(m, -m or None), slice(m, -m or None))
         self.window_px = window
         self.c_dsm, self.c_dtm = self.dsm[crop], dtm[crop]
         self.c_valid, self.c_soil = valid[crop], soil[crop]
-        self.c_height = self.c_dsm - self.c_dtm
+        self.c_height = height[crop]
         self.soil_pct = mm.soil_percent(self.c_soil, self.c_valid)
         return self
 
@@ -857,10 +861,16 @@ class DtmPage(ZoomMixin, QWizardPage):
         self.slider_tol.setTickInterval(10)
         self.slider_slope = make_slider(*SLOPE_RANGE, 1)
         self.slider_slope.setTickInterval(10)
-        self.labels = {k: QLabel() for k in ("factor", "tol", "slope")}
+        self.slider_furrows = make_slider(*FURROW_RANGE, 0.05)
+        self.slider_furrows.setTickInterval(2)
+        self.combo_method = QComboBox()
+        self.combo_method.addItem(tr("mdt_method_opening"), mm.METHOD_OPENING)
+        self.combo_method.addItem(tr("mdt_method_slope"), mm.METHOD_SLOPE)
+        self.text_method = wrap_label()
+        self.labels = {k: QLabel() for k in ("factor", "tol", "slope", "furrows")}
         for lab in self.labels.values():
             lab.setMinimumWidth(80)
-        self.texts = {k: wrap_label() for k in ("factor", "tol", "slope")}
+        self.texts = {k: wrap_label() for k in ("factor", "tol", "slope", "furrows")}
         self.label_numbers = wrap_label()
 
         images = QHBoxLayout()
@@ -877,8 +887,12 @@ class DtmPage(ZoomMixin, QWizardPage):
         images.addLayout(right, 6)
         box = QGroupBox(tr("mdt_w2_controls"))
         g = QGridLayout(box)
+        g.addWidget(QLabel(tr("mdt_w2_method")), 0, 0)
+        g.addWidget(self.combo_method, 0, 1, 1, 2)
+        g.addWidget(self.text_method, 1, 0, 1, 3)
         for i, (key, slider) in enumerate((("factor", self.slider_factor), ("tol", self.slider_tol),
-                                           ("slope", self.slider_slope))):
+                                           ("slope", self.slider_slope),
+                                           ("furrows", self.slider_furrows)), start=1):
             g.addWidget(QLabel(tr(f"mdt_w2_{key}")), 2 * i, 0)
             g.addWidget(slider, 2 * i, 1)
             g.addWidget(self.labels[key], 2 * i, 2)
@@ -895,15 +909,21 @@ class DtmPage(ZoomMixin, QWizardPage):
         self.slider_factor.valueChanged.connect(self.compute)
         self.slider_tol.valueChanged.connect(self.compute)
         self.slider_slope.valueChanged.connect(self.compute)
+        self.slider_furrows.valueChanged.connect(self.compute)
+        self.combo_method.currentIndexChanged.connect(self.compute)
 
     def initializePage(self):
         w = self.wizard()
         for slider, value in ((self.slider_factor, round(w.factor / 0.1)),
                               (self.slider_tol, round(w.tolerance / 0.01)),
-                              (self.slider_slope, round(w.slope))):
+                              (self.slider_slope, round(w.slope)),
+                              (self.slider_furrows, round(w.furrows / 0.05))):
             slider.blockSignals(True)
             slider.setValue(int(value))
             slider.blockSignals(False)
+        self.combo_method.blockSignals(True)
+        self.combo_method.setCurrentIndex(self.combo_method.findData(w.method))
+        self.combo_method.blockSignals(False)
         self.zoom_bar.set_level(w.zoom)
         show_overview(self.overview, w)
         self.move_window(*w.centre)
@@ -913,6 +933,8 @@ class DtmPage(ZoomMixin, QWizardPage):
         w.factor = round(self.slider_factor.value() * 0.1, 2)
         w.tolerance = round(self.slider_tol.value() * 0.01, 2)
         w.slope = float(self.slider_slope.value())
+        w.furrows = round(self.slider_furrows.value() * 0.05, 2)
+        w.method = self.combo_method.currentData()
 
     def move_window(self, x, y):
         w = self.wizard()
@@ -953,13 +975,32 @@ class DtmPage(ZoomMixin, QWizardPage):
         w = self.wizard()
         self.labels["factor"].setText(f"{fmt(w.factor, 1)} x")
         self.labels["tol"].setText(f"{fmt(w.tolerance, 2)} m")
-        self.labels["slope"].setText(tr("mdt_w2_slope_auto_short") if w.slope <= 0 else f"{fmt(w.slope, 0)}%")
+        slope_method = w.method == mm.METHOD_SLOPE
+        if w.slope > 0:
+            self.labels["slope"].setText(f"{fmt(w.slope, 0)}%")
+        else:
+            self.labels["slope"].setText(tr("mdt_w2_slope_default_short") if slope_method
+                                         else tr("mdt_w2_slope_auto_short"))
+        self.labels["furrows"].setText(tr("mdt_w2_furrows_off") if w.furrows <= 0
+                                       else f"{fmt(w.furrows, 2)} x")
+        self.text_method.setText(tr("mdt_w2_method_slope_text" if slope_method else "mdt_w2_method_opening_text"))
+        if w.furrows <= 0:
+            self.texts["furrows"].setText(tr("mdt_w2_furrows_text_off"))
+        else:
+            self.texts["furrows"].setText(tr("mdt_w2_furrows_text_low" if w.furrows < 0.35 else
+                                             "mdt_w2_furrows_text_mid" if w.furrows <= 0.7 else
+                                             "mdt_w2_furrows_text_high",
+                                             sigma=fmt(w.furrows * w.spacing, 2)))
         self.texts["factor"].setText(tr("mdt_w2_factor_low" if w.factor < 1.3 else
                                         "mdt_w2_factor_high" if w.factor > 2.0 else "mdt_w2_factor_mid"))
         self.texts["tol"].setText(tr("mdt_w2_tol_low" if w.tolerance < 0.12 else
                                      "mdt_w2_tol_high" if w.tolerance > 0.45 else "mdt_w2_tol_mid"))
-        self.texts["slope"].setText(tr("mdt_w2_slope_auto", s=fmt(pv.slope_used, 0)) if w.slope <= 0
-                                    else tr("mdt_w2_slope_manual", s=fmt(w.slope, 0)))
+        if slope_method:
+            self.texts["slope"].setText(tr("mdt_w2_slope_filter", s=fmt(pv.slope_used, 0),
+                                           r=fmt(pv.window_px // 2 * w.resolution, 2)))
+        else:
+            self.texts["slope"].setText(tr("mdt_w2_slope_auto", s=fmt(pv.slope_used, 0)) if w.slope <= 0
+                                        else tr("mdt_w2_slope_manual", s=fmt(w.slope, 0)))
         h = pv.c_height[pv.c_valid & ~pv.c_soil & np.isfinite(pv.c_height)]
         text = tr("mdt_w2_numbers", soil=fmt(pv.soil_pct, 1), n=pv.window_px,
                   size=fmt(pv.window_px * w.resolution, 2),
@@ -1153,7 +1194,11 @@ class OutputPage(QWizardPage):
             res=fmt(w.resolution, 3), spacing=fmt(w.spacing, 2), factor=fmt(w.factor, 1),
             window=fmt(mm.window_pixels(w.spacing, w.factor, w.resolution) * w.resolution, 2),
             tol=fmt(w.tolerance, 2),
-            slope=tr("mdt_w2_slope_auto_short") if w.slope <= 0 else f"{fmt(w.slope, 0)}%",
+            slope=(f"{fmt(w.slope, 0)}%" if w.slope > 0 else
+                   tr("mdt_w2_slope_default_short") if w.method == mm.METHOD_SLOPE else tr("mdt_w2_slope_auto_short")),
+            method=tr("mdt_method_slope" if w.method == mm.METHOD_SLOPE else "mdt_method_opening"),
+            furrows=tr("mdt_w2_furrows_off") if w.furrows <= 0 else
+            tr("mdt_w4_furrows_on", f=fmt(w.furrows, 2), sigma=fmt(w.furrows * w.spacing, 2)),
             h=fmt(w.plant_height, 2)))
 
     def chosen(self):
@@ -1215,6 +1260,8 @@ class MdtWizard(QWizard):
         self.factor = mm.DEFAULT_FACTOR
         self.tolerance = DEFAULT_TOLERANCE
         self.slope = 0.0
+        self.method = mm.METHOD_OPENING
+        self.furrows = 0.0
         self.plant_height = mm.DEFAULT_PLANT_HEIGHT
         self.alpha = DEFAULT_ALPHA
         self.mask_outline = False
@@ -1259,6 +1306,7 @@ class MdtWizard(QWizard):
         params = {
             "INPUT": self.dsm, "CROP": mm.CUSTOM, "SPACING": self.spacing, "FACTOR": self.factor,
             "RESOLUTION": self.resolution, "TOLERANCE": self.tolerance, "SLOPE": self.slope,
+            "METHOD": self.method, "FURROWS": self.furrows,
             "PLANT_HEIGHT": self.plant_height, "ZERO_NODATA": self.zero_nodata,
         }
         for key, *_ in OUTPUTS:

@@ -27,14 +27,14 @@ agriprecisa/                pasta do complemento (é o que vai no ZIP)
   metadata.txt              versão, changelog, metadados do repositório do QGIS
   core/idw_math.py          matemática pura, sem QGIS (IDW com mínimo e máximo de vizinhas, cobertura, validação cruzada; testada com pytest)
   core/pipeline.py          fluxo IDW (retângulo + 100 m) > células inteiras (só ID 1..n) > estatística zonal > recorte > Grade Padrão única
-  core/mdt_math.py          MDT e altura de plantas em culturas em linhas: matemática pura (abertura morfológica, correção de declividade, solo, suavização, máscara e manchas de planta, detecção do espaçamento, valores por cultura; testada com pytest)
+  core/mdt_math.py          MDT e altura de plantas em culturas em linhas: matemática pura (abertura morfológica, filtro por declividade de Vosselman, correção de declividade, remoção de sulcos, solo, suavização, máscara e manchas de planta, detecção do espaçamento, valores por cultura; testada com pytest)
   core/compat.py            constantes compatíveis com QGIS 3.x e 4.x
   core/paths.py             pasta de saída padrão, nomes de arquivos (Grade Padrão) e de campos Shapefile
   gui/idw_wizard.py         assistente em 4 etapas (Etapas 1 e 2 com painel fixo de explicação à direita)
   gui/params_page.py        Etapa 3: P, raio em Avançado, vizinhas na tabela, ajuste automático
   gui/widgets.py            prévia do mapa
   gui/cv_dialog.py          tabela de erro da validação cruzada
-  gui/mdt_wizard.py         assistente do MDT em 4 etapas: MDS/RGB e medição do espaçamento; prévia do MDT com perfil (fator, tolerância, declividade); máscara de planta sobre o RGB (altura mínima, transparência); camadas de saída com caminho e nome. Zoom (recortes de 30 a 3,75 m) e arraste nas Etapas 1 a 3. Páginas com rolagem e janela ajustada à tela
+  gui/mdt_wizard.py         assistente do MDT em 4 etapas: MDS/RGB e medição do espaçamento; prévia do MDT com perfil (método, fator, tolerância, declividade, remoção de sulcos); máscara de planta sobre o RGB (altura mínima, transparência); camadas de saída com caminho e nome. Zoom (recortes de 30 a 3,75 m) e arraste nas Etapas 1 a 3. Páginas com rolagem e janela ajustada à tela
   processing_provider/      provedor e algoritmos da Caixa de Ferramentas (alg_idw_grid.py; alg_dtm_rows.py = MDT e altura de plantas, menu Raster > AgriPrecisa)
   i18n.py                   textos em pt, en e es (toda chave nos três idiomas)
 tests/                      testes pytest (sem QGIS)
